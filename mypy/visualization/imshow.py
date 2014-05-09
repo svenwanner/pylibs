@@ -4,7 +4,7 @@ import numpy as np
 import pylab as plt
 
 
-def imshow(im, cmap="gray"):
+def imshow(im, cmap="gray", show=True):
     if cmap == "gray": 
         cmap = plt.cm.gray
     elif cmap == "jet": 
@@ -20,7 +20,8 @@ def imshow(im, cmap="gray"):
 
     plt.imshow(im, cmap=cmap)
     plt.title("range: ("+str(amin)+","+str(amax)+")")
-    plt.show()
+    if show:
+        plt.show()
 
 
 def imoverlay(im, overlay, alpha=0.5, show=True):

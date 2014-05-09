@@ -1,6 +1,7 @@
 import vigra
 import numpy as np
 from numpy import linalg as LA
+from scipy import linalg
 
 
 def structure_tensor3d(lf, inner_scale, outer_scale):
@@ -36,7 +37,11 @@ def structure_tensor3d(lf, inner_scale, outer_scale):
             mat[2, 1] = st[lf.shape[0] / 2, y, x, 4]
             mat[2, 2] = st[lf.shape[0] / 2, y, x, 5]
 
-            evals[y, x, :], evecs[y, x, :, :] = LA.eigh(mat)
+            tmp_evals, tmp_evecs = linalg.eig(mat)
+
+            evals[y, x, :] = np.real(tmp_evals[:])
+            evecs[y, x, :, :] = np.real(tmp_evecs[:])
+
 
     return evals, evecs
 
@@ -55,54 +60,68 @@ def structure_tensor3d_conditioner(evals, evecs):
     assert isinstance(evecs, np.ndarray)
 
     disparity = np.zeros((evals.shape[0], evals.shape[1]))
+    coherence = np.zeros((evals.shape[0], evals.shape[1]))
+
     for y in xrange(evals.shape[0]):
         for x in xrange(evals.shape[1]):
             axis = np.array([evals[y, x, 0], evals[y, x, 1], evals[y, x, 2]])
-            stype, order = shapeEstimator(axis)
+            stype, coh, order = shape_estimator(axis)
 
-            #Todo handle eigenvectors depending stype and order
+            coherence[y, x] = coh
+
             if (stype == 0):
                 disparity[y, x] = 0
             elif (stype == 1):
-                disparity[y, x] = 1
+                vec = evecs[x, y, :, order[0]]
+                #Todo: must be adapted if vertical lf is input vec[2] should then be vec[1]
+                disparity[y, x] = np.arctan2(vec[2], vec[0])
+                if disparity[y, x] >= np.pi/2.0:
+                    disparity[y, x] -= np.pi/2.0
             elif (stype == 2):
-                disparity[y, x] = 2
+                vec = evecs[x, y, :, order[2]]
+                #Todo: must be adapted if vertical lf is input vec[2] should then be vec[1]
+                disparity[y, x] = np.arctan2(vec[2], vec[0])
+                disparity[y, x] -= np.pi/2.0
+                if disparity[y, x] >= np.pi/2.0:
+                    disparity[y, x] -= np.pi/2.0
             elif (stype == 3):
-                disparity[y, x] = 3
+                disparity[y, x] = 0
 
-    return disparity
+    return disparity, coherence
 
 
-def shapeEstimator(axis, dev=0.2):
+def shape_estimator(axis):
     """
     checks the 3D structure tensor conditions, by deciding if the
-    eigenvalues describe a sphere (0), a disc (1) or a cigar shape (2).
+    eigenvalues describe a sphere (0), a cigar (1) or a disc shape (2).
     returns the type found and the order of the eigenvalues from small to big.
 
     :param axis: ndarray of three eigenvalues
-    :param dev: float describing the difference between the eigenvalue lengths
-    as deviation from a sphere shape in percent
     :return type, order: int defining the type sphere (0), a disc (1) or a cigar shape (2),
                          ndarray containing the order of the eigenvalue sizes from small to big
     """
 
     assert isinstance(axis, np.ndarray)
-    assert isinstance(dev, float)
+
+    formfac1 = 0.85
+    formfac2 = 0.3
 
     order = axis.argsort()
-    axis[order[0]] = axis[order[0]] / axis[order[2]]
-    axis[order[1]] = axis[order[1]] / axis[order[2]]
-    axis[order[2]] = 1
 
-    high = axis[order[2]]
-    mid = axis[order[1]]
-    low = axis[order[0]]
+    if axis[order[0]] < 1e-6:
+        axis[order[0]] = 1e-6
+    if axis[order[1]] < 1e-6:
+        axis[order[1]] = 1e-6
 
-    if high - mid < dev and high - low < dev:
-        return 0, order
-    elif (high - mid < dev and high - low >= dev) or (high - mid >= dev and high - low < dev):
-        return 1, order
-    elif (high - mid >= dev and high - low >= dev):
-        return 2, order
+    mid = axis[order[1]] / axis[order[2]]
+    low = axis[order[0]] / axis[order[2]]
+
+    if mid >= formfac1 <= low:   #case sphere
+        return 0, 0.0, order
+    elif mid >= formfac1 > low:  #case disc
+        return 1, 1.0-low, order
+    elif mid < formfac1 > low:   #case cigar
+        return 2, 1.0-(low+mid), order
     else:
-        return 3, order
+        print "unintended case happend, check the shape check properties!"
+        return 3, 0.0, order
