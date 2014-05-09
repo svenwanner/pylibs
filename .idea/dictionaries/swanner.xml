@@ -2,11 +2,14 @@
   <dictionary name="swanner">
     <words>
       <w>amax</w>
+      <w>amin</w>
       <w>eposx</w>
       <w>eposy</w>
       <w>evals</w>
       <w>evecs</w>
       <w>fnames</w>
+      <w>imoverlay</w>
+      <w>olay</w>
       <w>sposx</w>
       <w>sposy</w>
     </words>
