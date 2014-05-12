@@ -3,8 +3,9 @@
   <component name="ChangeListManager">
     <list default="true" id="d6b80225-76b4-4f69-b16b-0cb9ba43a749" name="Default" comment="overlay show implemented">
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/mypy/workflows/StructureTensor3D.py" afterPath="$PROJECT_DIR$/mypy/workflows/StructureTensor3D.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/mypy/visualization/imshow.py" afterPath="$PROJECT_DIR$/mypy/visualization/imshow.py" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/mypy/lightfield/depth/structureTensor3D.py" afterPath="$PROJECT_DIR$/mypy/lightfield/depth/structureTensor3D.py" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/dictionaries/swanner.xml" afterPath="$PROJECT_DIR$/.idea/dictionaries/swanner.xml" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
     </list>
     <ignored path="pylibs.iws" />
     <ignored path=".idea/workspace.xml" />
@@ -32,10 +33,8 @@
           <file leaf-file-name="structureTensor3D.py" pinned="false" current="true" current-in-tab="true">
             <entry file="file://$PROJECT_DIR$/mypy/lightfield/depth/structureTensor3D.py">
               <provider selected="true" editor-type-id="text-editor">
-                <state line="82" column="60" selection-start="3209" selection-end="3209" vertical-scroll-proportion="-0.44230768" vertical-offset="1752" max-vertical-offset="2376">
-                  <folding>
-                    <element signature="e#0#12#0" expanded="true" />
-                  </folding>
+                <state line="95" column="36" selection-start="3961" selection-end="3961" vertical-scroll-proportion="0.7169811" vertical-offset="1200" max-vertical-offset="2952">
+                  <folding />
                 </state>
               </provider>
             </entry>
@@ -45,7 +44,6 @@
               <provider selected="true" editor-type-id="text-editor">
                 <state line="23" column="8" selection-start="502" selection-end="502" vertical-scroll-proportion="0.0" vertical-offset="216" max-vertical-offset="1476">
                   <folding>
-                    <element signature="e#0#12#0" expanded="true" />
                     <marker date="1399643823243" expanded="true" signature="564:2558" placeholder="..." />
                   </folding>
                 </state>
@@ -55,10 +53,8 @@
           <file leaf-file-name="io.py" pinned="false" current="false" current-in-tab="false">
             <entry file="file://$PROJECT_DIR$/mypy/lightfield/io.py">
               <provider selected="true" editor-type-id="text-editor">
-                <state line="14" column="32" selection-start="493" selection-end="521" vertical-scroll-proportion="0.0" vertical-offset="0" max-vertical-offset="1476">
-                  <folding>
-                    <element signature="e#0#18#0" expanded="true" />
-                  </folding>
+                <state line="14" column="32" selection-start="493" selection-end="521" vertical-scroll-proportion="0.0" vertical-offset="252" max-vertical-offset="1476">
+                  <folding />
                 </state>
               </provider>
             </entry>
@@ -66,7 +62,7 @@
           <file leaf-file-name="helpers.py" pinned="false" current="false" current-in-tab="false">
             <entry file="file://$PROJECT_DIR$/mypy/lightfield/helpers.py">
               <provider selected="true" editor-type-id="text-editor">
-                <state line="12" column="36" selection-start="451" selection-end="465" vertical-scroll-proportion="0.0" vertical-offset="0" max-vertical-offset="612">
+                <state line="12" column="36" selection-start="451" selection-end="465" vertical-scroll-proportion="0.0" vertical-offset="216" max-vertical-offset="612">
                   <folding />
                 </state>
               </provider>
@@ -79,7 +75,7 @@
           <file leaf-file-name="StructureTensor3D.py" pinned="false" current="false" current-in-tab="true">
             <entry file="file://$PROJECT_DIR$/mypy/workflows/StructureTensor3D.py">
               <provider selected="true" editor-type-id="text-editor">
-                <state line="23" column="32" selection-start="991" selection-end="991" vertical-scroll-proportion="0.66346157" vertical-offset="0" max-vertical-offset="864">
+                <state line="42" column="0" selection-start="1610" selection-end="1610" vertical-scroll-proportion="0.63622975" vertical-offset="324" max-vertical-offset="1062">
                   <folding>
                     <element signature="e#0#38#0" expanded="true" />
                   </folding>
@@ -135,7 +131,7 @@
     <option name="STATE" value="0" />
   </component>
   <component name="ProjectView">
-    <navigator currentView="ProjectPane" proportions="" version="1" splitterProportion="0.5">
+    <navigator proportions="" version="1" splitterProportion="0.5">
       <flattenPackages />
       <showMembers />
       <showModules />
@@ -146,119 +142,7 @@
       <autoscrollFromSource />
       <sortByType />
     </navigator>
-    <panes>
-      <pane id="ProjectPane">
-        <subPane>
-          <PATH>
-            <PATH_ELEMENT>
-              <option name="myItemId" value="pylibs" />
-              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.ProjectViewProjectNode" />
-            </PATH_ELEMENT>
-          </PATH>
-          <PATH>
-            <PATH_ELEMENT>
-              <option name="myItemId" value="pylibs" />
-              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.ProjectViewProjectNode" />
-            </PATH_ELEMENT>
-            <PATH_ELEMENT>
-              <option name="myItemId" value="pylibs" />
-              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
-            </PATH_ELEMENT>
-          </PATH>
-          <PATH>
-            <PATH_ELEMENT>
-              <option name="myItemId" value="pylibs" />
-              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.ProjectViewProjectNode" />
-            </PATH_ELEMENT>
-            <PATH_ELEMENT>
-              <option name="myItemId" value="pylibs" />
-              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
-            </PATH_ELEMENT>
-            <PATH_ELEMENT>
-              <option name="myItemId" value="mypy" />
-              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
-            </PATH_ELEMENT>
-          </PATH>
-          <PATH>
-            <PATH_ELEMENT>
-              <option name="myItemId" value="pylibs" />
-              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.ProjectViewProjectNode" />
-            </PATH_ELEMENT>
-            <PATH_ELEMENT>
-              <option name="myItemId" value="pylibs" />
-              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
-            </PATH_ELEMENT>
-            <PATH_ELEMENT>
-              <option name="myItemId" value="mypy" />
-              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
-            </PATH_ELEMENT>
-            <PATH_ELEMENT>
-              <option name="myItemId" value="workflows" />
-              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
-            </PATH_ELEMENT>
-          </PATH>
-          <PATH>
-            <PATH_ELEMENT>
-              <option name="myItemId" value="pylibs" />
-              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.ProjectViewProjectNode" />
-            </PATH_ELEMENT>
-            <PATH_ELEMENT>
-              <option name="myItemId" value="pylibs" />
-              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
-            </PATH_ELEMENT>
-            <PATH_ELEMENT>
-              <option name="myItemId" value="mypy" />
-              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
-            </PATH_ELEMENT>
-            <PATH_ELEMENT>
-              <option name="myItemId" value="visualization" />
-              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
-            </PATH_ELEMENT>
-          </PATH>
-          <PATH>
-            <PATH_ELEMENT>
-              <option name="myItemId" value="pylibs" />
-              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.ProjectViewProjectNode" />
-            </PATH_ELEMENT>
-            <PATH_ELEMENT>
-              <option name="myItemId" value="pylibs" />
-              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
-            </PATH_ELEMENT>
-            <PATH_ELEMENT>
-              <option name="myItemId" value="mypy" />
-              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
-            </PATH_ELEMENT>
-            <PATH_ELEMENT>
-              <option name="myItemId" value="lightfield" />
-              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
-            </PATH_ELEMENT>
-          </PATH>
-          <PATH>
-            <PATH_ELEMENT>
-              <option name="myItemId" value="pylibs" />
-              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.ProjectViewProjectNode" />
-            </PATH_ELEMENT>
-            <PATH_ELEMENT>
-              <option name="myItemId" value="pylibs" />
-              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
-            </PATH_ELEMENT>
-            <PATH_ELEMENT>
-              <option name="myItemId" value="mypy" />
-              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
-            </PATH_ELEMENT>
-            <PATH_ELEMENT>
-              <option name="myItemId" value="lightfield" />
-              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
-            </PATH_ELEMENT>
-            <PATH_ELEMENT>
-              <option name="myItemId" value="depth" />
-              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
-            </PATH_ELEMENT>
-          </PATH>
-        </subPane>
-      </pane>
-      <pane id="Scope" />
-    </panes>
+    <panes />
   </component>
   <component name="PropertiesComponent">
     <property name="last_opened_file_path" value="$PROJECT_DIR$" />
@@ -482,24 +366,24 @@
     <frame x="48" y="-4" width="1873" height="1085" extended-state="6" />
     <editor active="true" />
     <layout>
-      <window_info id="Messages" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.32903227" sideWeight="0.5" order="-1" side_tool="false" content_ui="tabs" />
       <window_info id="Changes" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
       <window_info id="Terminal" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.328125" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.32903227" sideWeight="0.5" order="10" side_tool="false" content_ui="tabs" />
-      <window_info id="Find" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.328125" sideWeight="0.5" order="5" side_tool="false" content_ui="tabs" />
-      <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.24984913" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
+      <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.24945888" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
       <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.109307356" sideWeight="0.5" order="1" side_tool="false" content_ui="combo" />
       <window_info id="Debug" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.4" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Favorites" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.21062161" sideWeight="0.5" order="0" side_tool="true" content_ui="tabs" />
-      <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="2" side_tool="true" content_ui="tabs" />
-      <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" weight="0.31875" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
+      <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.26145834" sideWeight="0.5" order="2" side_tool="true" content_ui="tabs" />
+      <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" weight="0.26145834" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
       <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.328125" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
       <window_info id="Cvs" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.25" sideWeight="0.5" order="8" side_tool="false" content_ui="tabs" />
       <window_info id="Message" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="4" side_tool="false" content_ui="tabs" />
+      <window_info id="Find" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.328125" sideWeight="0.5" order="5" side_tool="false" content_ui="tabs" />
       <window_info id="Ant Build" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.25" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
+      <window_info id="Messages" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.32903227" sideWeight="0.5" order="11" side_tool="false" content_ui="tabs" />
       <window_info id="Commander" active="false" anchor="right" auto_hide="false" internal_type="SLIDING" type="SLIDING" visible="false" weight="0.4" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
-      <window_info id="Inspection" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.4" sideWeight="0.5" order="9" side_tool="false" content_ui="tabs" />
       <window_info id="Hierarchy" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.25" sideWeight="0.5" order="2" side_tool="false" content_ui="combo" />
+      <window_info id="Inspection" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.4" sideWeight="0.5" order="9" side_tool="false" content_ui="tabs" />
     </layout>
   </component>
   <component name="Vcs.Log.UiProperties">
@@ -525,12 +409,49 @@
     <breakpoint-manager />
   </component>
   <component name="editorHistoryManager">
+    <entry file="file://$PROJECT_DIR$/mypy/lightfield/depth/structureTensor3D.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state line="82" column="60" selection-start="3209" selection-end="3209" vertical-scroll-proportion="0.0" vertical-offset="0" max-vertical-offset="2376">
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/mypy/visualization/imshow.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state line="23" column="8" selection-start="502" selection-end="502" vertical-scroll-proportion="0.0" vertical-offset="216" max-vertical-offset="1476">
+          <folding>
+            <marker date="1399643823243" expanded="true" signature="564:2558" placeholder="..." />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/mypy/lightfield/io.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state line="14" column="32" selection-start="493" selection-end="521" vertical-scroll-proportion="0.0" vertical-offset="252" max-vertical-offset="1476">
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/mypy/lightfield/helpers.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state line="12" column="36" selection-start="451" selection-end="465" vertical-scroll-proportion="0.0" vertical-offset="216" max-vertical-offset="612">
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/mypy/workflows/StructureTensor3D.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state line="2" column="48" selection-start="143" selection-end="143" vertical-scroll-proportion="0.0" vertical-offset="36" max-vertical-offset="864">
+          <folding>
+            <element signature="e#0#38#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/mypy/lightfield/io.py">
       <provider selected="true" editor-type-id="text-editor">
         <state line="14" column="32" selection-start="493" selection-end="521" vertical-scroll-proportion="0.0" vertical-offset="0" max-vertical-offset="1476">
-          <folding>
-            <element signature="e#0#18#0" expanded="true" />
-          </folding>
+          <folding />
         </state>
       </provider>
     </entry>
@@ -545,7 +466,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state line="23" column="8" selection-start="502" selection-end="502" vertical-scroll-proportion="0.0" vertical-offset="216" max-vertical-offset="1476">
           <folding>
-            <element signature="e#0#12#0" expanded="true" />
             <marker date="1399643823243" expanded="true" signature="564:2558" placeholder="..." />
           </folding>
         </state>
@@ -553,7 +473,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/mypy/workflows/StructureTensor3D.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state line="23" column="32" selection-start="991" selection-end="991" vertical-scroll-proportion="0.66346157" vertical-offset="0" max-vertical-offset="864">
+        <state line="42" column="0" selection-start="1610" selection-end="1610" vertical-scroll-proportion="0.63622975" vertical-offset="324" max-vertical-offset="1062">
           <folding>
             <element signature="e#0#38#0" expanded="true" />
           </folding>
@@ -562,10 +482,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/mypy/lightfield/depth/structureTensor3D.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state line="82" column="60" selection-start="3209" selection-end="3209" vertical-scroll-proportion="-0.44230768" vertical-offset="1752" max-vertical-offset="2376">
-          <folding>
-            <element signature="e#0#12#0" expanded="true" />
-          </folding>
+        <state line="95" column="36" selection-start="3961" selection-end="3961" vertical-scroll-proportion="0.7169811" vertical-offset="1200" max-vertical-offset="2952">
+          <folding />
         </state>
       </provider>
     </entry>

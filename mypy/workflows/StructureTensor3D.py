@@ -3,6 +3,7 @@ from mypy.visualization.imshow import imoverlay, imshow
 from mypy.lightfield import helpers as lfhelpers
 from mypy.lightfield.depth import structureTensor3D as st3d
 
+import scipy.misc as misc
 
 def compute(path, results, name, roi, inner_scale=0.6, outer_scale=1.0, focus=0):
     """
@@ -27,7 +28,11 @@ def compute(path, results, name, roi, inner_scale=0.6, outer_scale=1.0, focus=0)
     assert isinstance(focus, int)
 
     lf = lfio.load_3d(path, roi=roi)
-    lf = lfhelpers.refocus_3d(lf, focus)
+    if focus > 0:
+        lf = lfhelpers.refocus_3d(lf, focus)
+
+    imshow(lf[:,20,:,0])
+    misc.imsave("/home/swanner/Desktop/tmp.png",lf[:,20,:,0])
 
     evals, evecs = st3d.structure_tensor3d(lf[:, :, :, 0], inner_scale, outer_scale)
     disparity, coherence = st3d.structure_tensor3d_conditioner(evals, evecs)
@@ -36,8 +41,14 @@ def compute(path, results, name, roi, inner_scale=0.6, outer_scale=1.0, focus=0)
     #imoverlay(lf[4, :, :, :], disparity, alpha=0.3)
 
 
-compute("/home/swanner/Desktop/TestLF/render/9x1/imgs_bw/",
+# compute("/home/swanner/Desktop/TestLF/render/9x1/imgs_bw/",
+#         "/home/swanner/Desktop/TestLF/3DTensor/results",
+#         "pearplanepyr",
+#         {"size": [128, 128], "pos": [280, 440]},
+#         0.6, 1.3, 4)
+
+compute("/home/swanner/Desktop/TestLF2/rendered/",
         "/home/swanner/Desktop/TestLF/3DTensor/results",
         "pearplanepyr",
-        {"size": [128, 128], "pos": [280, 440]},
-        0.6, 1.3, 4)
+        {"size": [128, 128], "pos": [0, 0]},
+        0.7, 1.3, 0)
