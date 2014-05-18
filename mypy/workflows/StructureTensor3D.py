@@ -31,9 +31,6 @@ def compute(path, results, name, roi, inner_scale=0.6, outer_scale=1.0, focus=0)
     if focus > 0:
         lf = lfhelpers.refocus_3d(lf, focus)
 
-    imshow(lf[:,20,:,0])
-    misc.imsave("/home/swanner/Desktop/tmp.png",lf[:,20,:,0])
-
     evals, evecs = st3d.structure_tensor3d(lf[:, :, :, 0], inner_scale, outer_scale)
     disparity, coherence = st3d.structure_tensor3d_conditioner(evals, evecs)
     imshow(disparity, cmap="jet")

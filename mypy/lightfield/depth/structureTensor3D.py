@@ -2,6 +2,7 @@ import vigra
 import numpy as np
 from numpy import linalg as LA
 from scipy import linalg
+from mypy.visualization.imshow import imoverlay, imshow
 
 
 def structure_tensor3d(lf, inner_scale, outer_scale):
@@ -71,31 +72,55 @@ def structure_tensor3d_conditioner(evals, evecs):
     disparity = np.zeros((evals.shape[0], evals.shape[1]))
     coherence = np.zeros((evals.shape[0], evals.shape[1]))
 
-    mean_vec = np.zeros((3,3))
-    n=0
+    mean_vec1 = np.zeros((3,3))
+    mean_eval1 = np.zeros((3))
+    mean_vec2 = np.zeros((3,3))
+    mean_eval2 = np.zeros((3))
+
+    region = np.zeros((evals.shape[0], evals.shape[1]))
+
     for y in xrange(evals.shape[0]):
         for x in xrange(evals.shape[1]):
 
+            if evecs[y, x, 0, 0] < 0:
+                evecs[y, x, 0, 0] *= -1
+
             if x > 10 and x < 21 and y > 10 and y < 21:
+                region[y,x] = 1
                 for i in range(3):
                     for j in range(3):
-                        mean_vec[i,j] += evecs[y, x, i, j]
-                n+=1
+                        mean_vec1[i,j] += evecs[y, x, i, j]
+                    mean_eval1[i] += evals[y,x,i]
+
+            if x > 74 and x < 85 and y > 10 and y < 21:
+                region[y,x] = 1
+                for i in range(3):
+                    for j in range(3):
+                        mean_vec2[i,j] += evecs[y, x, i, j]
+                    mean_eval2[i] += evals[y,x,i]
 
             if x == 20 and y == 20:
-                mean_vec[:]/=float(n)
-                print "mean_vec",mean_vec
+                mean_vec1[:]/=10.0
+                mean_eval1[:]/=10.0
+                print "mean_vec1",mean_vec1
+                print "mean_val1",mean_eval1
                 #print "eval 1",evals[y,x,0] ," evec 1: ", evecs[y, x, 0, 0],",",evecs[y, x, 1, 0],",",evecs[y, x, 2, 0]
                 # print "eval 2",evals[y,x,1] ," evec 2: ", evecs[y, x, 0, 1],",",evecs[y, x, 1, 1],",",evecs[y, x, 2, 1]
                 # print "eval 3",evals[y,x,2] ," evec 3: ", evecs[y, x, 0, 2],",",evecs[y, x, 1, 2],",",evecs[y, x, 2, 2]
 
-            if evecs[y, x, 0, 0] < 0:
-                evecs[y, x, 0, 0] *= -1
-            disparity[y, x] = evecs[y, x, 0, 2]/evecs[y, x, 0, 1]
-            if disparity[y, x] > 1 or disparity[y, x] < -1:
-                disparity[y, x] = -1
+            if x == 84 and y == 20:
+                mean_vec2[:]/=10.0
+                mean_eval2[:]/=10.0
+                print "\nmean_vec2",mean_vec2
+                print "mean_val2",mean_eval2
 
-            disparity[y, x] -= 0.33
+
+            disparity[y, x] = evecs[y, x, 0, 2]/evecs[y, x, 0, 1]
+            if disparity[y, x] > 0.4 or disparity[y, x] < 0.26:
+                disparity[y, x] = -1
+            else:
+                disparity[y, x] = 0
+
 
 
 
@@ -122,6 +147,7 @@ def structure_tensor3d_conditioner(evals, evecs):
             # elif (stype == 3):
             #     disparity[y, x] = 0
 
+    imshow(region)
     return disparity, coherence
 
 

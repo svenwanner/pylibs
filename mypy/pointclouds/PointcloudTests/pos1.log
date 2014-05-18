@@ -1,0 +1,12 @@
+focal_length_fov_x : 0.683230996131897
+focal_length_fov_y : 0.3947911262512207
+focal_length_mm : 45.0
+focal_length_px : 1350.0
+sensor_height_mm : 18.0
+sensor_width_mm : 32.0
+matrix_world : <Matrix 4x4 ( 0.8492, -0.2047,  0.4868,  2.2861)
+            ( 0.5280,  0.3479, -0.7747, -4.7266)
+            (-0.0108,  0.9149,  0.4036,  3.6840)
+            ( 0.0000,  0.0000,  0.0000,  1.0000)>
+location : <Vector (2.2861, -4.7266, 3.6840)>
+rotation : <Euler (x=1.1554, y=0.0108, z=0.5563), order='XYZ'>
