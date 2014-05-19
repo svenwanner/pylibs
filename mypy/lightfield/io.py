@@ -5,7 +5,7 @@ import scipy.misc as misc
 
 def load_3d(path, rgb=False, roi=None):
     """
-    load a 3d light field from filesequence. The images need to be in .png
+    load a 3d light field from filesequence. The images need to be in .png, .tif or .jpg
 
     :param path: string path to load filesequence from
     :param rgb: bool to define number of channels in light field returned
@@ -14,12 +14,20 @@ def load_3d(path, rgb=False, roi=None):
     """
     assert isinstance(path, str)
     assert isinstance(rgb, bool)
-    assert isinstance(roi, dict)
+    if roi is not None:
+        assert isinstance(roi, dict)
 
     fnames = []
     for f in glob(path + "*.png"):
         fnames.append(f)
+    if len(fnames) == 0:
+        for f in glob(path + "*.jpg"):
+            fnames.append(f)
+    if len(fnames) == 0:
+        for f in glob(path + "*.tif"):
+            fnames.append(f)
     fnames.sort()
+
 
     sposx = 0
     eposx = 0
@@ -61,12 +69,12 @@ def load_3d(path, rgb=False, roi=None):
         im = misc.imread(fnames[n])
         if rgb:
             if roi is None:
-                lf[0, :, :, :] = im[:, :, 0:3]
+                lf[n, :, :, :] = im[:, :, 0:3]
             else:
-                lf[0, :, :, :] = im[sposx:eposx, sposy:eposy, 0:3]
+                lf[n, :, :, :] = im[sposx:eposx, sposy:eposy, 0:3]
         else:
             if roi is None:
-                lf[n, :, :, 0] = im[:, :]
+                lf[n, :, :, 0] = 0.3 * im[:, :, 0] + 0.59 * im[:, :, 1] + 0.11 * im[:, :, 2]
             else:
                 lf[n, :, :, 0] = im[sposx:eposx, sposy:eposy]
 
