@@ -59,19 +59,41 @@ def evaluateStructureTensor(tensor):
     return orientation, coherence
 
 
-def preDerivation(lf3d, scale=0.1):
+def preImgDerivation(lf3d, scale=0.1, direction='h'):
     assert isinstance(lf3d, np.ndarray)
     assert isinstance(scale, float)
 
     for i in xrange(lf3d.shape[0]):
         for c in xrange(lf3d.shape[3]):
             grad = vigra.filters.gaussianGradient(lf3d[i, :, :, c], scale)
-            tmp = vigra.colors.linearRangeMapping(grad[:, :, 0], newRange=(0.0, 1.0))
+            if direction == 'h':
+                tmp = vigra.colors.linearRangeMapping(grad[:, :, 0], newRange=(0.0, 1.0))
+            if direction == 'v':
+                tmp = vigra.colors.linearRangeMapping(grad[:, :, 1], newRange=(0.0, 1.0))
             lf3d[i, :, :, c] = tmp
 
     return lf3d
 
-def epiPreDerivation(lf3d, scale=0.1, direction='h'):
+
+def preImgLaplace(lf3d, scale=0.1, direction='h'):
+    assert isinstance(lf3d, np.ndarray)
+    assert isinstance(scale, float)
+
+    for i in xrange(lf3d.shape[0]):
+        for c in xrange(lf3d.shape[3]):
+            laplace = vigra.filters.laplacianOfGaussian(lf3d[i, :, :, c], scale)
+            lf3d[i, :, :, c] = laplace[:]
+            # grad = vigra.filters.gaussianGradient(lf3d[i, :, :, c], scale)
+            # if direction == 'h':
+            #     tmp = vigra.colors.linearRangeMapping(grad[:, :, 0], newRange=(0.0, 1.0))
+            # if direction == 'v':
+            #     tmp = vigra.colors.linearRangeMapping(grad[:, :, 1], newRange=(0.0, 1.0))
+            # lf3d[i, :, :, c] = tmp
+
+    return lf3d
+
+
+def preEpiDerivation(lf3d, scale=0.1, direction='h'):
     assert isinstance(lf3d, np.ndarray)
     assert isinstance(scale, float)
 
@@ -94,6 +116,27 @@ def epiPreDerivation(lf3d, scale=0.1, direction='h'):
                 except:
                     tmp = grad[:, :, 0]
                 lf3d[:, :, x, c] = tmp[:]
+    else:
+        assert False, "unknown lightfield direction!"
+
+    return lf3d
+
+
+def preEpiLaplace(lf3d, scale=0.1, direction='h'):
+    assert isinstance(lf3d, np.ndarray)
+    assert isinstance(scale, float)
+
+    if direction == 'h':
+        for y in xrange(lf3d.shape[1]):
+            for c in xrange(lf3d.shape[3]):
+                laplace = vigra.filters.laplacianOfGaussian(lf3d[:, y, :, c], scale)
+                lf3d[:, y, :, c] = laplace[:]
+
+    elif direction == 'v':
+        for x in xrange(lf3d.shape[2]):
+            for c in xrange(lf3d.shape[3]):
+                laplace = vigra.filters.laplacianOfGaussian(lf3d[:, :, x, c], scale)
+                lf3d[:, :, x, c] = laplace[:]
     else:
         assert False, "unknown lightfield direction!"
 
