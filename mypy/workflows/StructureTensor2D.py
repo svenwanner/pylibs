@@ -13,12 +13,21 @@ path_horizontal = "/home/swanner/rexHome/Zeiss/Zeiss_MetalDummy1_20_03_2014/nois
 path_vertical = "/home/swanner/rexHome/Zeiss/Zeiss_MetalDummy1_20_03_2014/noise_15x15_cross_190514/v/"
 result_path = "/home/swanner/rexHome/Zeiss/Zeiss_MetalDummy1_20_03_2014/noise_15x15_cross_190514/results/"
 result_label = "noPrefilter"
+global_shifts = [8, 9]
+
+path_horizontal = "/fdata/lightFields/rampScene/horizontal/"
+path_vertical = "/fdata/lightFields/rampScene/vertical/"
+result_path = "/fdata/lightFields/rampScene/results/"
+result_label = "noPrefilter"
+global_shifts = [3,4,5,6,7]
+
 rgb = True
 
 prefilter = False
 inner_scale = 0.6
-outer_scale = 2.0
-global_shifts = [8, 9]
+outer_scale = 1.5
+
+
 
 
 #============================================================================================================
@@ -64,6 +73,7 @@ for shift in global_shifts:
             lf3d = st2d.epiPreDerivation(lf3d, scale=0.1, direction='h')
         st3d = st2d.structureTensor2D(lf3d, inner_scale=inner_scale, outer_scale=outer_scale, direction='h')
         orientation_h, coherence_h = st2d.evaluateStructureTensor(st3d)
+        imshow(orientation_h[lf_shape[0]/2, :, :])
         orientation_h[:] += shift
         imshow(orientation_h[lf_shape[0]/2, :, :])
         misc.imsave(result_path+result_label+"orientation_h_shift_{0}.png".format(shift), orientation_h[lf_shape[0]/2, :, :])
@@ -78,17 +88,18 @@ for shift in global_shifts:
         st3d = st2d.structureTensor2D(lf3d, inner_scale=inner_scale, outer_scale=outer_scale, direction='v')
         orientation_v, coherence_v = st2d.evaluateStructureTensor(st3d)
         orientation_v[:] += shift
-        imshow(orientation_h[lf_shape[0]/2, :, :])
         misc.imsave(result_path+result_label+"orientation_v_shift_{0}.png".format(shift), orientation_v[lf_shape[0]/2, :, :])
         misc.imsave(result_path+result_label+"coherence_v_{0}.png".format(shift), coherence_v[lf_shape[0]/2, :, :])
 
     if compute_h and compute_v:
         orientation_tmp, coherence_tmp, cam_labels_tmp = st2d.mergeOrientations_wta(orientation_h, coherence_h, orientation_v, coherence_v)
+        imshow(orientation_tmp[lf3dh.shape[0]/2, :, :])
         misc.imsave(result_path+result_label+"camLabels_shift_{0}.png".format(shift), cam_labels_tmp[lf3dh.shape[0]/2, :, :])
-        misc.imsave(result_path+result_label+"orientation_merged_shift_{0}.png".format(shift), orientation_tmp[lf_shape[0]/2, :, :])
+        misc.imsave(result_path+result_label+"orientation_merged_vh_shift_{0}.png".format(shift), orientation_tmp[lf_shape[0]/2, :, :])
         misc.imsave(result_path+result_label+"coherence_merged_{0}.png".format(shift), coherence_tmp[lf_shape[0]/2, :, :])
 
         orientation, coherence, cam_labels = st2d.mergeOrientations_wta(orientation, coherence, orientation_tmp, coherence_tmp)
+        misc.imsave(result_path+result_label+"orientation_merged_shift_{0}.png".format(shift), orientation[lf_shape[0]/2, :, :])
 
     else:
        if compute_h:
@@ -100,7 +111,7 @@ for shift in global_shifts:
 invalids = np.where(coherence < 0.01)
 orientation[invalids] = 0
 misc.imsave(result_path+result_label+"camLabels_final.png", cam_labels[lf_shape[0]/2, :, :])
-tmp = vigra.colors.linearRangeMapping(orientation[lf_shape[0]/2, :, :], newRange=(0.0, 255.0))
-misc.imsave(result_path+result_label+"orientation_final.png", tmp)
-tmp = vigra.colors.linearRangeMapping(coherence[lf_shape[0]/2, :, :], newRange=(0.0, 255.0))
-misc.imsave(result_path+result_label+"coherence_final.png", tmp)
+#tmp = vigra.colors.linearRangeMapping(orientation[lf_shape[0]/2, :, :], newRange=(0.0, 255.0))
+misc.imsave(result_path+result_label+"orientation_final.png", orientation[lf_shape[0]/2, :, :])
+#tmp = vigra.colors.linearRangeMapping(coherence[lf_shape[0]/2, :, :], newRange=(0.0, 255.0))
+misc.imsave(result_path+result_label+"coherence_final.png", coherence[lf_shape[0]/2, :, :])

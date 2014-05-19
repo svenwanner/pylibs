@@ -14,16 +14,17 @@ def refocus_3d(lf, focus, lf_type='h'):
     assert isinstance(focus, int)
     assert isinstance(lf_type, type(''))
 
-    tmp = np.copy(lf)
-    if lf_type == 'h':
-        for h in range(lf.shape[0]):
-            for c in range(lf.shape[3]):
-                lf[h, :, :, c] = np.roll(tmp[h, :, :, c], shift=(h - lf.shape[0] / 2) * focus, axis=1)
-    elif lf_type == 'v':
-        for v in range(lf.shape[0]):
-            for c in range(lf.shape[3]):
-                lf[v, :, :, c] = np.roll(tmp[v, :, :, c], shift=(v - lf.shape[0] / 2) * focus, axis=0)
-    else:
-        print "refocus undefined"
+    if focus > 0:
+        tmp = np.copy(lf)
+        if lf_type == 'h':
+            for h in range(lf.shape[0]):
+                for c in range(lf.shape[3]):
+                    lf[h, :, :, c] = np.roll(tmp[h, :, :, c], shift=(h - lf.shape[0] / 2) * focus, axis=1)
+        elif lf_type == 'v':
+            for v in range(lf.shape[0]):
+                for c in range(lf.shape[3]):
+                    lf[v, :, :, c] = np.roll(tmp[v, :, :, c], shift=(v - lf.shape[0] / 2) * focus, axis=0)
+        else:
+            print "refocus undefined"
 
     return lf
