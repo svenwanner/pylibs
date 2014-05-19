@@ -2,33 +2,44 @@ import os
 import vigra
 import numpy as np
 
+
+from mypy.lightfield.helpers import enum
 from mypy.lightfield import io as lfio
 from mypy.visualization.imshow import imoverlay, imshow
 from mypy.lightfield import helpers as lfhelpers
 from mypy.lightfield.depth import structureTensor2D as st2d
 
 import scipy.misc as misc
+COLORSPACE = enum(RGB=0, LAB=1, LUV=2)
+PREFILTER = enum(NO=0, imgD=1, epiD=2, imgD2=3, epiD2=4)
 
+
+
+#path to data and result directory
 path_horizontal = "/home/swanner/rexHome/Zeiss/Zeiss_MetalDummy1_20_03_2014/noise_15x15_cross_190514/h/"
 path_vertical = "/home/swanner/rexHome/Zeiss/Zeiss_MetalDummy1_20_03_2014/noise_15x15_cross_190514/v/"
 result_path = "/home/swanner/rexHome/Zeiss/Zeiss_MetalDummy1_20_03_2014/noise_15x15_cross_190514/results/"
 result_label = "noPrefilter"
-global_shifts = [8, 9]
 
 path_horizontal = "/fdata/lightFields/rampScene/horizontal/"
 path_vertical = "/fdata/lightFields/rampScene/vertical/"
 result_path = "/fdata/lightFields/rampScene/results/"
-result_label = "prefilter_ImgD"
+result_label = "noPrefilter"
+
+#list of global shifts
+global_shifts = [8, 9]
 global_shifts = [3,4,5,6,7]
 
+#lf is rgb
 rgb = True
 
-prefilter=None
-prefilter = "Dimg"
-#prefilter = "Depi"
-#prefilter = "D2img"
-#prefilter = "D2epi"
+#color space RGB,LAB,LUV
+color_space = COLORSPACE.RGB
 
+#pefltering NO,IMGD,EPID,IMGD2,EPID2
+prefilter=PREFILTER.NO
+
+#structure tensor scales
 inner_scale = 0.6
 outer_scale = 1.5
 
@@ -73,14 +84,19 @@ for shift in global_shifts:
     if compute_h:
         lf3d = np.copy(lf3dh)
         lf3d = lfhelpers.refocus_3d(lf3d, shift, 'h')
-        if prefilter == "Dimg":
-                lf3d = st2d.preImgDerivation(lf3d, scale=0.4, direction='h')
-        if prefilter == "Depi":
-            lf3d = st2d.preEpiDerivation(lf3d, scale=0.4, direction='h')
-        if prefilter == "D2img":
-            lf3d = st2d.preImgLaplace(lf3d, scale=0.4)
-        if prefilter == "D2epi":
-            lf3d = st2d.preEpiLaplace(lf3d, scale=0.4, direction='h')
+
+        if color_space:
+            lf3d = st2d.changeColorSpace(lf3d, color_space)
+
+        if prefilter > 0:
+            if prefilter == PREFILTER.IMGD:
+                    lf3d = st2d.preImgDerivation(lf3d, scale=0.4, direction='h')
+            if prefilter == PREFILTER.EPID:
+                lf3d = st2d.preEpiDerivation(lf3d, scale=0.4, direction='h')
+            if prefilter == PREFILTER.IMGD2:
+                lf3d = st2d.preImgLaplace(lf3d, scale=0.4)
+            if prefilter == PREFILTER.EPID2:
+                lf3d = st2d.preEpiLaplace(lf3d, scale=0.4, direction='h')
 
         st3d = st2d.structureTensor2D(lf3d, inner_scale=inner_scale, outer_scale=outer_scale, direction='h')
         orientation_h, coherence_h = st2d.evaluateStructureTensor(st3d)
@@ -91,14 +107,18 @@ for shift in global_shifts:
     if compute_v:
         lf3d = np.copy(lf3dv)
         lf3d = lfhelpers.refocus_3d(lf3d, shift, 'v')
-        if prefilter is not None:
-            if prefilter == "Dimg":
+
+        if color_space:
+            lf3d = st2d.changeColorSpace(lf3d, color_space)
+
+        if prefilter > 0:
+            if prefilter == PREFILTER.IMGD:
                 lf3d = st2d.preImgDerivation(lf3d, scale=0.4, direction='v')
-            if prefilter == "Depi":
+            if prefilter == PREFILTER.EPID:
                 lf3d = st2d.preEpiDerivation(lf3d, scale=0.4, direction='v')
-            if prefilter == "D2img":
+            if prefilter == PREFILTER.IMGD2:
                 lf3d = st2d.preImgLaplace(lf3d, scale=0.4)
-            if prefilter == "D2epi":
+            if prefilter == PREFILTER.EPID2:
                 lf3d = st2d.preEpiLaplace(lf3d, scale=0.4, direction='v')
 
         st3d = st2d.structureTensor2D(lf3d, inner_scale=inner_scale, outer_scale=outer_scale, direction='v')

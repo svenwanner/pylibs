@@ -1,5 +1,7 @@
 import numpy as np
 
+def enum(**enums):
+    return type('Enum', (), enums)
 
 def refocus_3d(lf, focus, lf_type='h'):
     """

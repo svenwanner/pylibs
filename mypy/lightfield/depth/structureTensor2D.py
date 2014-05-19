@@ -59,6 +59,16 @@ def evaluateStructureTensor(tensor):
     return orientation, coherence
 
 
+def changeColorSpace(lf3d, cspace=0):
+    if lf3d.shape[3] == 3 and cspace > 0:
+        for n in range(lf3d.shape[0]):
+            if cspace == 1:
+                lf3d[n, :, :, :] = vigra.colors.transform_RGB2Lab(lf3d[n, :, :, :])
+            if cspace == 2:
+                lf3d[n, :, :, :] = vigra.colors.transform_RGB2Luv(lf3d[n, :, :, :])
+    return lf3d
+
+
 def preImgDerivation(lf3d, scale=0.1, direction='h'):
     assert isinstance(lf3d, np.ndarray)
     assert isinstance(scale, float)
@@ -83,12 +93,6 @@ def preImgLaplace(lf3d, scale=0.1, direction='h'):
         for c in xrange(lf3d.shape[3]):
             laplace = vigra.filters.laplacianOfGaussian(lf3d[i, :, :, c], scale)
             lf3d[i, :, :, c] = laplace[:]
-            # grad = vigra.filters.gaussianGradient(lf3d[i, :, :, c], scale)
-            # if direction == 'h':
-            #     tmp = vigra.colors.linearRangeMapping(grad[:, :, 0], newRange=(0.0, 1.0))
-            # if direction == 'v':
-            #     tmp = vigra.colors.linearRangeMapping(grad[:, :, 1], newRange=(0.0, 1.0))
-            # lf3d[i, :, :, c] = tmp
 
     return lf3d
 
