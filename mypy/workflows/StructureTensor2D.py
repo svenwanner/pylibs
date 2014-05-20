@@ -11,37 +11,31 @@ from mypy.lightfield.depth import structureTensor2D as st2d
 
 import scipy.misc as misc
 COLORSPACE = enum(RGB=0, LAB=1, LUV=2)
-PREFILTER = enum(NO=0, imgD=1, epiD=2, imgD2=3, epiD2=4)
+PREFILTER = enum(NO=0, IMGD=1, EPID=2, IMGD2=3, EPID2=4)
 
 
 
 #path to data and result directory
-path_horizontal = "/home/swanner/rexHome/Zeiss/Zeiss_MetalDummy1_20_03_2014/noise_15x15_cross_190514/h/"
-path_vertical = "/home/swanner/rexHome/Zeiss/Zeiss_MetalDummy1_20_03_2014/noise_15x15_cross_190514/v/"
-result_path = "/home/swanner/rexHome/Zeiss/Zeiss_MetalDummy1_20_03_2014/noise_15x15_cross_190514/results/"
-result_label = "noPrefilter"
-
-path_horizontal = "/fdata/lightFields/rampScene/horizontal/"
-path_vertical = "/fdata/lightFields/rampScene/vertical/"
-result_path = "/fdata/lightFields/rampScene/results/"
-result_label = "noPrefilter"
+path_horizontal = "/home/swanner/rexHome/Zeiss/Zeiss_MetalDummy1_20_03_2014/15x15_cross_190514/h/"
+path_vertical = "/home/swanner/rexHome/Zeiss/Zeiss_MetalDummy1_20_03_2014/15x15_cross_190514/v/"
+result_path = "/home/swanner/rexHome/Zeiss/Zeiss_MetalDummy1_20_03_2014/15x15_cross_190514/results/"
+result_label = "testLaplaceAndGradPrefilter"
 
 #list of global shifts
 global_shifts = [8, 9]
-global_shifts = [3,4,5,6,7]
 
 #lf is rgb
 rgb = True
 
 #color space RGB,LAB,LUV
-color_space = COLORSPACE.RGB
+color_space = COLORSPACE.LUV
 
 #pefltering NO,IMGD,EPID,IMGD2,EPID2
-prefilter=PREFILTER.NO
+prefilter=PREFILTER.IMGD2
 
 #structure tensor scales
 inner_scale = 0.6
-outer_scale = 1.5
+outer_scale = 1.9
 
 
 
@@ -97,6 +91,7 @@ for shift in global_shifts:
                 lf3d = st2d.preImgLaplace(lf3d, scale=0.4)
             if prefilter == PREFILTER.EPID2:
                 lf3d = st2d.preEpiLaplace(lf3d, scale=0.4, direction='h')
+
 
         st3d = st2d.structureTensor2D(lf3d, inner_scale=inner_scale, outer_scale=outer_scale, direction='h')
         orientation_h, coherence_h = st2d.evaluateStructureTensor(st3d)
