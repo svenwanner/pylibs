@@ -7,6 +7,47 @@ def loadEXR(filename):
     return vigra.readImage(filename)[:, :, 0].transpose()
 
 
+def save_pointcloud(filename, depth_map=None, disparity_map=None, color=None, focal_length=None, base_line=None, min_depth=0.01, max_depth=10.0):
+
+    assert isinstance(filename, str)
+    if depth_map is not None:
+        assert isinstance(depth_map, np.ndarray)
+    if depth_map is not None:
+        assert isinstance(disparity_map, np.ndarray)
+    if color is not None:
+        assert isinstance(color, np.ndarray)
+    if focal_length is not None:
+        assert isinstance(focal_length, float)
+    if base_line is not None:
+        assert isinstance(base_line, float)
+
+    if depth_map is None and disparity_map is None:
+        assert False, "need either a depth_map or a disparity_map!"
+    if disparity_map is not None and (focal_length is None or base_line is None):
+        assert False, "disparity_maps need focal_length and base_line as additional input!"
+    if depth_map is not None and focal_length is None:
+        assert False, "depth_map need focal_length as additional input!"
+
+    if depth_map is None:
+        depth_map = disparity_to_depth(disparity_map, base_line, focal_length, min_depth, max_depth)
+    else:
+        np.place(depth_map, depth_map < min_depth, 0)
+        np.place(depth_map, depth_map > max_depth, 0)
+    cloud = cloud_from_depth(depth_map, focal_length)
+    plyWriter = PlyWriter(filename, cloud, color)
+
+
+
+def disparity_to_depth(disparity, base_line, focal_length, min_depth=0.1, max_depth=1):
+    depth = np.zeros_like(disparity)
+    for y in range(disparity.shape[0]):
+        for x in range(disparity.shape[1]):
+            depth[y, x] = focal_length*base_line/(disparity[y, x]+1e-16)
+            if depth[y, x] > max_depth or depth[y, x] < min_depth or np.isinf(depth[y, x]):
+                depth[y, x] = 0
+    return depth
+
+
 def cloud_from_depth(depth_map, focal_length):
     """
     computes a point cloud from a depth image by reprojecting from
@@ -98,21 +139,22 @@ class PlyWriter(object):
             self.add_confidence_header(f)
         f.write('end_header\n')
 
-
+    @staticmethod
     def add_color_header(self, f):
         f.write('property uchar red\n')
         f.write('property uchar green\n')
         f.write('property uchar blue\n')
 
-
+    @staticmethod
     def add_confidence_header(self, f):
         f.write('property float confidence\n')
 
 
+    @staticmethod
     def add_intensity_header(self, f):
         f.write('property float intensity\n')
 
-
+    @staticmethod
     def write_points(self, f, points, colors=None, confidence=None, intensity=None):
         for n, point in enumerate(points):
             f.write("{0} {1} {2}".format(point[0], point[1], point[2]))

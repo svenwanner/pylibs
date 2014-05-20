@@ -13,29 +13,40 @@ import scipy.misc as misc
 COLORSPACE = enum(RGB=0, LAB=1, LUV=2)
 PREFILTER = enum(NO=0, IMGD=1, EPID=2, IMGD2=3, EPID2=4)
 
-
+import mypy.pointclouds.depthToCloud as dtc
 
 #path to data and result directory
 path_horizontal = "/home/swanner/rexHome/Zeiss/Zeiss_MetalDummy1_20_03_2014/15x15_cross_190514/h/"
 path_vertical = "/home/swanner/rexHome/Zeiss/Zeiss_MetalDummy1_20_03_2014/15x15_cross_190514/v/"
+centerview_path = "/home/swanner/rexHome/Zeiss/Zeiss_MetalDummy1_20_03_2014/15x15_cross_190514/left.png"
 result_path = "/home/swanner/rexHome/Zeiss/Zeiss_MetalDummy1_20_03_2014/15x15_cross_190514/results/"
-result_label = "testLaplaceAndGradPrefilter"
+result_label = "LaplaceImgPrefilter"
 
-#list of global shifts
+#list of global shifts in px
 global_shifts = [8, 9]
+
+# distance between two cameras in m
+base_line = 0.001
+
+# depth range possible
+min_depth = 0.1
+max_depth = 1.0
+
+# focal length in pixel
+focal_length = 5740.38
 
 #lf is rgb
 rgb = True
 
 #color space RGB,LAB,LUV
-color_space = COLORSPACE.LUV
+color_space = COLORSPACE.RGB
 
 #pefltering NO,IMGD,EPID,IMGD2,EPID2
 prefilter=PREFILTER.IMGD2
 
 #structure tensor scales
 inner_scale = 0.6
-outer_scale = 1.9
+outer_scale = 2.2
 
 
 
@@ -139,3 +150,16 @@ orientation[invalids] = 0
 misc.imsave(result_path+result_label+"camLabels_final.png", cam_labels[lf_shape[0]/2, :, :])
 misc.imsave(result_path+result_label+"orientation_final.png", orientation[lf_shape[0]/2, :, :])
 misc.imsave(result_path+result_label+"coherence_final.png", coherence[lf_shape[0]/2, :, :])
+
+depth = dtc.disparity_to_depth(orientation[lf_shape[0]/2, :, :], base_line, focal_length, min_depth, max_depth)
+color = misc.imread(centerview_path)
+
+tmp = np.zeros((lf_shape[1], lf_shape[2], 4), dtype=np.float32)
+tmp[:, :, 0] = orientation[lf_shape[0]/2, :, :]
+tmp[:, :, 1] = coherence[lf_shape[0]/2, :, :]
+tmp[:, :, 2] = depth[:]
+tmp[:, :, 3] = cam_labels[lf_shape[0]/2, :, :]
+vim = vigra.RGBImage(tmp)
+vim.writeImage(result_path+result_label+"final.exr")
+
+dtc.save_pointcloud(result_path+result_label+"pointcloud.ply", depth_map=depth, color=color, focal_length=focal_length)
