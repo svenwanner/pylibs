@@ -148,23 +148,7 @@ def preEpiLaplace(lf3d, scale=0.1, direction='h'):
 
 
 def mergeOrientations_wta(orientation1, coherence1, orientation2, coherence2):
-
-    labels = np.zeros_like(orientation1)
-    orientation = np.zeros_like(orientation1)
-    coherence = np.zeros_like(orientation1)
-    for n in xrange(orientation.shape[0]):
-        for y in xrange(orientation.shape[1]):
-            for x in xrange(orientation.shape[2]):
-                if coherence1[n, y, x] >= coherence2[n, y, x]:
-                    orientation[n, y, x] = orientation1[n, y, x]
-                    coherence[n, y, x] = coherence1[n, y, x]
-                else:
-                    orientation[n, y, x] = orientation2[n, y, x]
-                    coherence[n, y, x] = coherence2[n, y, x]
-                    labels[n, y, x] = 255
-    # labels = np.zeros_like(orientation1, dtype=np.uint8)
-    # winner = np.where(coherence2 > coherence1)
-    # orientation1[winner] = orientation2[winner]
-    # coherence1[winner] = coherence2[winner]
-    # labels[winner] = 1
-    return orientation, coherence, labels
+    winner = np.where(coherence2 > coherence1)
+    orientation1[winner] = orientation2[winner]
+    coherence1[winner] = coherence2[winner]
+    return orientation1, coherence1

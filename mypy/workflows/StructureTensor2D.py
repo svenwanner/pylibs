@@ -1,165 +1,191 @@
 import os
 import vigra
 import numpy as np
+import scipy.misc as misc
 
 
-from mypy.lightfield.helpers import enum
 from mypy.lightfield import io as lfio
-from mypy.visualization.imshow import imoverlay, imshow
+from mypy.lightfield.helpers import enum
+import mypy.pointclouds.depthToCloud as dtc
 from mypy.lightfield import helpers as lfhelpers
 from mypy.lightfield.depth import structureTensor2D as st2d
 
-import scipy.misc as misc
+
 COLORSPACE = enum(RGB=0, LAB=1, LUV=2)
 PREFILTER = enum(NO=0, IMGD=1, EPID=2, IMGD2=3, EPID2=4)
 
-import mypy.pointclouds.depthToCloud as dtc
-
-#path to data and result directory
-path_horizontal = "/home/swanner/rexHome/Zeiss/Zeiss_MetalDummy1_20_03_2014/15x15_cross_190514/h/"
-path_vertical = "/home/swanner/rexHome/Zeiss/Zeiss_MetalDummy1_20_03_2014/15x15_cross_190514/v/"
-centerview_path = "/home/swanner/rexHome/Zeiss/Zeiss_MetalDummy1_20_03_2014/15x15_cross_190514/left.png"
-result_path = "/home/swanner/rexHome/Zeiss/Zeiss_MetalDummy1_20_03_2014/15x15_cross_190514/results/"
-result_label = "LaplaceImgPrefilter"
-
-#list of global shifts in px
-global_shifts = [8, 9]
-
-# distance between two cameras in m
-base_line = 0.001
-
-# depth range possible
-min_depth = 0.1
-max_depth = 1.0
-
-# focal length in pixel
-focal_length = 5740.38
-
-#lf is rgb
-rgb = True
-
-#color space RGB,LAB,LUV
-color_space = COLORSPACE.RGB
-
-#pefltering NO,IMGD,EPID,IMGD2,EPID2
-prefilter=PREFILTER.IMGD2
-
-#structure tensor scales
-inner_scale = 0.6
-outer_scale = 2.2
 
 
+class Config:
+    def __init__(self):
+
+        self.result_path = None             # path to store the results
+        self.result_label = None            # name of the results folder
+
+        self.path_horizontal = None         # path to the horizontal images [optional]
+        self.path_vertical = None           # path to the vertical images [optional]
+
+        self.centerview_path = None         # path to the center view image to get color for pointcloud [optional]
+
+        self.inner_scale = 0.6              # structure tensor inner scale
+        self.outer_scale = 1.3              # structure tensor outer scale
+        self.focal_length = 5740.38         # focal length in pixel [default Nikon D800 f=28mm]
+        self.global_shifts = [0]            # list of horopter shifts in pixel
+        self.base_line = None               # camera baseline
+        self.color_space = COLORSPACE.RGB   # colorscape to convert the images into [RGB,LAB,LUV]
+        self.prefilter_scale = 0.4          # scale of the prefilter
+        self.prefilter = PREFILTER.IMGD2    # type of the prefilter [NO,IMGD, EPID, IMGD2, EPID2]
+
+        self.min_depth = 0.01               # minimum depth possible
+        self.max_depth = 1.0                # maximum depth possible
+
+        self.rgb = True                     # forces grayscale if False
+
+        self.output_level = 2               # level of detail for file output possible 1,2,3
 
 
 #============================================================================================================
 #============================================================================================================
 #============================================================================================================
 
-if not result_path.endswith("/"):
-    result_path += "/"
-if not result_label.endswith("/"):
-    result_label += "/"
-if not os.path.isdir(result_path+result_label):
-    os.makedirs(result_path+result_label)
+def structureTensor2D(config):
+    if not config.result_path.endswith("/"):
+        config.result_path += "/"
+    if not config.result_label.endswith("/"):
+        config.result_label += "/"
+    if not os.path.isdir(config.result_path+config.result_label):
+        os.makedirs(config.result_path+config.result_label)
+
+    compute_h = False
+    compute_v = False
+    lf_shape = None
+    lf3dh = None
+    lf3dv = None
+
+    print "load data...",
+    try:
+        if not config.path_horizontal.endswith("/"):
+            config.path_horizontal += "/"
+        lf3dh = lfio.load_3d(config.path_horizontal, rgb=config.rgb)
+        compute_h = True
+        lf_shape = lf3dh.shape
+    except:
+        pass
+
+    try:
+        if not config.path_vertical.endswith("/"):
+            config.path_vertical += "/"
+        compute_v = True
+        lf3dv = lfio.load_3d(config.path_vertical, rgb=config.rgb)
+        if lf_shape is None:
+            lf_shape = lf3dv.shape
+    except:
+        pass
+
+    orientation = np.zeros((lf_shape[0], lf_shape[1], lf_shape[2]), dtype=np.float32)
+    coherence = np.zeros((lf_shape[0], lf_shape[1], lf_shape[2]), dtype=np.float32)
+    print "ok"
+
+    for shift in config.global_shifts:
+
+        if compute_h:
+            print "compute horizontal shift {0}".format(shift), "...",
+            lf3d = np.copy(lf3dh)
+            lf3d = lfhelpers.refocus_3d(lf3d, shift, 'h')
+
+            if config.color_space:
+                lf3d = st2d.changeColorSpace(lf3d, config.color_space)
+
+            if config.prefilter > 0:
+                if config.prefilter == PREFILTER.IMGD:
+                    lf3d = st2d.preImgDerivation(lf3d, scale=config.prefilter_scale, direction='h')
+                if config.prefilter == PREFILTER.EPID:
+                    lf3d = st2d.preEpiDerivation(lf3d, scale=config.prefilter_scale, direction='h')
+                if config.prefilter == PREFILTER.IMGD2:
+                    lf3d = st2d.preImgLaplace(lf3d, scale=config.prefilter_scale)
+                if config.prefilter == PREFILTER.EPID2:
+                    lf3d = st2d.preEpiLaplace(lf3d, scale=config.prefilter_scale, direction='h')
 
 
-compute_h = False
-compute_v = False
-lf_shape = None
-if path_horizontal is not None:
-    if not path_horizontal.endswith("/"):
-        path_horizontal += "/"
-    lf3dh = lfio.load_3d(path_horizontal, rgb=rgb)
-    compute_h = True
-    lf_shape = lf3dh.shape
-if path_vertical is not None:
-    if not path_vertical.endswith("/"):
-        path_vertical += "/"
-    compute_v = True
-    lf3dv = lfio.load_3d(path_vertical, rgb=rgb)
-    if lf_shape is None:
-        lf_shape = lf3dv.shape
+            st3d = st2d.structureTensor2D(lf3d, inner_scale=config.inner_scale, outer_scale=config.outer_scale, direction='h')
+            orientation_h, coherence_h = st2d.evaluateStructureTensor(st3d)
+            orientation_h[:] += shift
+            if config.output_level == 3:
+                misc.imsave(config.result_path+config.result_label+"orientation_h_shift_{0}.png".format(shift), orientation_h[lf_shape[0]/2, :, :])
+            if config.output_level == 3:
+                misc.imsave(config.result_path+config.result_label+"coherence_h_{0}.png".format(shift), coherence_h[lf_shape[0]/2, :, :])
+            print "ok"
 
-orientation = np.zeros((lf_shape[0], lf_shape[1], lf_shape[2]), dtype=np.float32)
-coherence = np.zeros((lf_shape[0], lf_shape[1], lf_shape[2]), dtype=np.float32)
-cam_labels = np.zeros((lf_shape[0], lf_shape[1], lf_shape[2]), dtype=np.uint8)
+        if compute_v:
+            print "compute vertical shift {0}".format(shift), "...",
+            lf3d = np.copy(lf3dv)
+            lf3d = lfhelpers.refocus_3d(lf3d, shift, 'v')
 
-for shift in global_shifts:
+            if config.color_space:
+                lf3d = st2d.changeColorSpace(lf3d, config.color_space)
 
-    if compute_h:
-        lf3d = np.copy(lf3dh)
-        lf3d = lfhelpers.refocus_3d(lf3d, shift, 'h')
+            if config.prefilter > 0:
+                if config.prefilter == PREFILTER.IMGD:
+                    lf3d = st2d.preImgDerivation(lf3d, scale=config.prefilter_scale, direction='v')
+                if config.prefilter == PREFILTER.EPID:
+                    lf3d = st2d.preEpiDerivation(lf3d, scale=config.prefilter_scale, direction='v')
+                if config.prefilter == PREFILTER.IMGD2:
+                    lf3d = st2d.preImgLaplace(lf3d, scale=config.prefilter_scale)
+                if config.prefilter == PREFILTER.EPID2:
+                    lf3d = st2d.preEpiLaplace(lf3d, scale=config.prefilter_scale, direction='v')
 
-        if color_space:
-            lf3d = st2d.changeColorSpace(lf3d, color_space)
+            st3d = st2d.structureTensor2D(lf3d, inner_scale=config.inner_scale, outer_scale=config.outer_scale, direction='v')
+            orientation_v, coherence_v = st2d.evaluateStructureTensor(st3d)
+            orientation_v[:] += shift
+            if config.output_level == 3:
+                misc.imsave(config.result_path+config.result_label+"orientation_v_shift_{0}.png".format(shift), orientation_v[lf_shape[0]/2, :, :])
+            if config.output_level == 3:
+                misc.imsave(config.result_path+config.result_label+"coherence_v_{0}.png".format(shift), coherence_v[lf_shape[0]/2, :, :])
+            print "ok"
 
-        if prefilter > 0:
-            if prefilter == PREFILTER.IMGD:
-                    lf3d = st2d.preImgDerivation(lf3d, scale=0.4, direction='h')
-            if prefilter == PREFILTER.EPID:
-                lf3d = st2d.preEpiDerivation(lf3d, scale=0.4, direction='h')
-            if prefilter == PREFILTER.IMGD2:
-                lf3d = st2d.preImgLaplace(lf3d, scale=0.4)
-            if prefilter == PREFILTER.EPID2:
-                lf3d = st2d.preEpiLaplace(lf3d, scale=0.4, direction='h')
+        if compute_h and compute_v:
+            print "merge vertical/horizontal ...",
+            orientation_tmp, coherence_tmp = st2d.mergeOrientations_wta(orientation_h, coherence_h, orientation_v, coherence_v)
+            orientation, coherence = st2d.mergeOrientations_wta(orientation, coherence, orientation_tmp, coherence_tmp)
 
+            if config.output_level >= 2:
+                misc.imsave(config.result_path+config.result_label+"orientation_merged_shift_{0}.png".format(shift), orientation[lf_shape[0]/2, :, :])
+            print "ok"
 
-        st3d = st2d.structureTensor2D(lf3d, inner_scale=inner_scale, outer_scale=outer_scale, direction='h')
-        orientation_h, coherence_h = st2d.evaluateStructureTensor(st3d)
-        orientation_h[:] += shift
-        misc.imsave(result_path+result_label+"orientation_h_shift_{0}.png".format(shift), orientation_h[lf_shape[0]/2, :, :])
-        misc.imsave(result_path+result_label+"coherence_h_{0}.png".format(shift), coherence_h[lf_shape[0]/2, :, :])
-
-    if compute_v:
-        lf3d = np.copy(lf3dv)
-        lf3d = lfhelpers.refocus_3d(lf3d, shift, 'v')
-
-        if color_space:
-            lf3d = st2d.changeColorSpace(lf3d, color_space)
-
-        if prefilter > 0:
-            if prefilter == PREFILTER.IMGD:
-                lf3d = st2d.preImgDerivation(lf3d, scale=0.4, direction='v')
-            if prefilter == PREFILTER.EPID:
-                lf3d = st2d.preEpiDerivation(lf3d, scale=0.4, direction='v')
-            if prefilter == PREFILTER.IMGD2:
-                lf3d = st2d.preImgLaplace(lf3d, scale=0.4)
-            if prefilter == PREFILTER.EPID2:
-                lf3d = st2d.preEpiLaplace(lf3d, scale=0.4, direction='v')
-
-        st3d = st2d.structureTensor2D(lf3d, inner_scale=inner_scale, outer_scale=outer_scale, direction='v')
-        orientation_v, coherence_v = st2d.evaluateStructureTensor(st3d)
-        orientation_v[:] += shift
-        misc.imsave(result_path+result_label+"orientation_v_shift_{0}.png".format(shift), orientation_v[lf_shape[0]/2, :, :])
-        misc.imsave(result_path+result_label+"coherence_v_{0}.png".format(shift), coherence_v[lf_shape[0]/2, :, :])
-
-    if compute_h and compute_v:
-        orientation_tmp, coherence_tmp, cam_labels_tmp = st2d.mergeOrientations_wta(orientation_h, coherence_h, orientation_v, coherence_v)
-        orientation, coherence, cam_labels = st2d.mergeOrientations_wta(orientation, coherence, orientation_tmp, coherence_tmp)
-        misc.imsave(result_path+result_label+"orientation_merged_shift_{0}.png".format(shift), orientation[lf_shape[0]/2, :, :])
-
-    else:
-       if compute_h:
-           orientation, coherence, cam_labels = st2d.mergeOrientations_wta(orientation, coherence, orientation_h, coherence_h)
-       if compute_v:
-           orientation, coherence, cam_labels = st2d.mergeOrientations_wta(orientation, coherence, orientation_v, coherence_v)
+        else:
+            print "merge shifts"
+            if compute_h:
+                orientation, coherence = st2d.mergeOrientations_wta(orientation, coherence, orientation_h, coherence_h)
+            if compute_v:
+               orientation, coherence = st2d.mergeOrientations_wta(orientation, coherence, orientation_v, coherence_v)
+            print "ok"
 
 
-invalids = np.where(coherence < 0.01)
-orientation[invalids] = 0
-misc.imsave(result_path+result_label+"camLabels_final.png", cam_labels[lf_shape[0]/2, :, :])
-misc.imsave(result_path+result_label+"orientation_final.png", orientation[lf_shape[0]/2, :, :])
-misc.imsave(result_path+result_label+"coherence_final.png", coherence[lf_shape[0]/2, :, :])
+    invalids = np.where(coherence < 0.01)
+    orientation[invalids] = 0
 
-depth = dtc.disparity_to_depth(orientation[lf_shape[0]/2, :, :], base_line, focal_length, min_depth, max_depth)
-color = misc.imread(centerview_path)
+    if config.output_level >= 2:
+        misc.imsave(config.result_path+config.result_label+"orientation_final.png", orientation[lf_shape[0]/2, :, :])
+        misc.imsave(config.result_path+config.result_label+"coherence_final.png", coherence[lf_shape[0]/2, :, :])
 
-tmp = np.zeros((lf_shape[1], lf_shape[2], 4), dtype=np.float32)
-tmp[:, :, 0] = orientation[lf_shape[0]/2, :, :]
-tmp[:, :, 1] = coherence[lf_shape[0]/2, :, :]
-tmp[:, :, 2] = depth[:]
-tmp[:, :, 3] = cam_labels[lf_shape[0]/2, :, :]
-vim = vigra.RGBImage(tmp)
-vim.writeImage(result_path+result_label+"final.exr")
+    depth = dtc.disparity_to_depth(orientation[lf_shape[0]/2, :, :], config.base_line, config.focal_length, config.min_depth, config.max_depth)
 
-dtc.save_pointcloud(result_path+result_label+"pointcloud.ply", depth_map=depth, color=color, focal_length=focal_length)
+    if config.output_level >= 1:
+        try:
+            color = misc.imread(config.centerview_path)
+        except:
+            pass
+
+        tmp = np.zeros((lf_shape[1], lf_shape[2], 4), dtype=np.float32)
+        tmp[:, :, 0] = orientation[lf_shape[0]/2, :, :]
+        tmp[:, :, 1] = coherence[lf_shape[0]/2, :, :]
+        tmp[:, :, 2] = depth[:]
+        vim = vigra.RGBImage(tmp)
+        vim.writeImage(config.result_path+config.result_label+"final.exr")
+
+        print "make pointcloud...",
+        try:
+            dtc.save_pointcloud(config.result_path+config.result_label+"pointcloud.ply", depth_map=depth, color=color, focal_length=config.focal_length)
+        except:
+            dtc.save_pointcloud(config.result_path+config.result_label+"pointcloud.ply", depth_map=depth, focal_length=config.focal_length)
+        print "ok"

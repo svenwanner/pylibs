@@ -12,7 +12,7 @@ def save_pointcloud(filename, depth_map=None, disparity_map=None, color=None, fo
     assert isinstance(filename, str)
     if depth_map is not None:
         assert isinstance(depth_map, np.ndarray)
-    if depth_map is not None:
+    if disparity_map is not None:
         assert isinstance(disparity_map, np.ndarray)
     if color is not None:
         assert isinstance(color, np.ndarray)
@@ -139,22 +139,21 @@ class PlyWriter(object):
             self.add_confidence_header(f)
         f.write('end_header\n')
 
-    @staticmethod
+
     def add_color_header(self, f):
         f.write('property uchar red\n')
         f.write('property uchar green\n')
         f.write('property uchar blue\n')
 
-    @staticmethod
+
     def add_confidence_header(self, f):
         f.write('property float confidence\n')
 
 
-    @staticmethod
     def add_intensity_header(self, f):
         f.write('property float intensity\n')
 
-    @staticmethod
+
     def write_points(self, f, points, colors=None, confidence=None, intensity=None):
         for n, point in enumerate(points):
             f.write("{0} {1} {2}".format(point[0], point[1], point[2]))
