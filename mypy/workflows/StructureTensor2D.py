@@ -9,6 +9,7 @@ from mypy.lightfield.helpers import enum
 import mypy.pointclouds.depthToCloud as dtc
 from mypy.lightfield import helpers as lfhelpers
 from mypy.lightfield.depth import structureTensor2D as st2d
+from mypy.visualization.imshow import epishow
 
 
 COLORSPACE = enum(RGB=0, LAB=1, LUV=2)
@@ -25,13 +26,18 @@ class Config:
         self.path_horizontal = None         # path to the horizontal images [optional]
         self.path_vertical = None           # path to the vertical images [optional]
 
+        self.roi = None                     # region of interest
+
         self.centerview_path = None         # path to the center view image to get color for pointcloud [optional]
 
         self.inner_scale = 0.6              # structure tensor inner scale
-        self.outer_scale = 1.3              # structure tensor outer scale
+        self.outer_scale = 0.9              # structure tensor outer scale
+        self.double_tensor = 2.0            # if > 0.0 a second structure tensor with the outerscale specified is applied
+        self.coherence_threshold = 0.7      # if coherence less than value the disparity is set to invalid
         self.focal_length = 5740.38         # focal length in pixel [default Nikon D800 f=28mm]
         self.global_shifts = [0]            # list of horopter shifts in pixel
-        self.base_line = None               # camera baseline
+        self.base_line = 0.001              # camera baseline
+
         self.color_space = COLORSPACE.RGB   # colorscape to convert the images into [RGB,LAB,LUV]
         self.prefilter_scale = 0.4          # scale of the prefilter
         self.prefilter = PREFILTER.IMGD2    # type of the prefilter [NO,IMGD, EPID, IMGD2, EPID2]
@@ -66,7 +72,7 @@ def structureTensor2D(config):
     try:
         if not config.path_horizontal.endswith("/"):
             config.path_horizontal += "/"
-        lf3dh = lfio.load_3d(config.path_horizontal, rgb=config.rgb)
+        lf3dh = lfio.load_3d(config.path_horizontal, rgb=config.rgb, roi=config.roi)
         compute_h = True
         lf_shape = lf3dh.shape
     except:
@@ -76,7 +82,7 @@ def structureTensor2D(config):
         if not config.path_vertical.endswith("/"):
             config.path_vertical += "/"
         compute_v = True
-        lf3dv = lfio.load_3d(config.path_vertical, rgb=config.rgb)
+        lf3dv = lfio.load_3d(config.path_vertical, rgb=config.rgb, roi=config.roi)
         if lf_shape is None:
             lf_shape = lf3dv.shape
     except:
@@ -108,8 +114,18 @@ def structureTensor2D(config):
 
 
             st3d = st2d.structureTensor2D(lf3d, inner_scale=config.inner_scale, outer_scale=config.outer_scale, direction='h')
+            if config.double_tensor > 0.0:
+                tmp = st2d.structureTensor2D(lf3d, inner_scale=config.inner_scale, outer_scale=config.double_tensor, direction='h')
+                st3d[:] += tmp[:]
+                st3d /= 2.0
+
             orientation_h, coherence_h = st2d.evaluateStructureTensor(st3d)
             orientation_h[:] += shift
+
+            if config.coherence_threshold > 0.0:
+                invalids = np.where(coherence_h < config.coherence_treshold)
+                coherence_h[invalids] = 0.0
+
             if config.output_level == 3:
                 misc.imsave(config.result_path+config.result_label+"orientation_h_shift_{0}.png".format(shift), orientation_h[lf_shape[0]/2, :, :])
             if config.output_level == 3:
@@ -135,8 +151,18 @@ def structureTensor2D(config):
                     lf3d = st2d.preEpiLaplace(lf3d, scale=config.prefilter_scale, direction='v')
 
             st3d = st2d.structureTensor2D(lf3d, inner_scale=config.inner_scale, outer_scale=config.outer_scale, direction='v')
+            if config.double_tensor > 0.0:
+                tmp = st2d.structureTensor2D(lf3d, inner_scale=config.inner_scale, outer_scale=config.double_tensor, direction='v')
+                st3d[:] += tmp[:]
+                st3d /= 2.0
+
             orientation_v, coherence_v = st2d.evaluateStructureTensor(st3d)
             orientation_v[:] += shift
+
+            if config.coherence_threshold > 0.0:
+                invalids = np.where(coherence_v < config.coherence_treshold)
+                coherence_v[invalids] = 0.0
+
             if config.output_level == 3:
                 misc.imsave(config.result_path+config.result_label+"orientation_v_shift_{0}.png".format(shift), orientation_v[lf_shape[0]/2, :, :])
             if config.output_level == 3:
@@ -158,6 +184,8 @@ def structureTensor2D(config):
                 orientation, coherence = st2d.mergeOrientations_wta(orientation, coherence, orientation_h, coherence_h)
             if compute_v:
                orientation, coherence = st2d.mergeOrientations_wta(orientation, coherence, orientation_v, coherence_v)
+            if config.output_level >= 2:
+                misc.imsave(config.result_path+config.result_label+"orientation_merged_shift_{0}.png".format(shift), orientation[lf_shape[0]/2, :, :])
             print "ok"
 
 

@@ -3,6 +3,45 @@ import numpy as np
 
 import pylab as plt
 
+from mypy.lightfield import helpers as lfhelpers
+
+def epishow(lf3d, position, direction, shift=0, cmap="gray"):
+    """
+    simple epi viewer
+
+    :param lf3d: ndarray 3d light field of shape [cams,y,x,channels=[1]/[3]]
+    :param position:  int fixed spatial position to extract the epi
+    :param direction: int direction or type of 3d lightfield 'h' or 'v'
+    :param shift: int refocus shift in pixel
+    :param cmap: string defining the colormap [default "gray"] "gray","hot","jet"
+    """
+    assert isinstance(lf3d, np.ndarray)
+    assert isinstance(position, int)
+    assert isinstance(direction, type(''))
+    assert isinstance(shift, int)
+    assert isinstance(cmap, str)
+
+    if direction == 'h':
+        lf = lfhelpers.refocus_3d(lf3d, shift, lf_type='h')
+        epi = lf[:, position, :, 0:lf3d.shape[3]]
+    if direction == 'v':
+        lf = lfhelpers.refocus_3d(lf3d, shift, lf_type='v')
+        epi = lf[:, :, position, 0:lf3d.shape[3]]
+
+    if lf3d.shape[3] == 3:
+        plt.imshow(epi)
+    elif lf3d.shape[3] == 1:
+        if cmap == "gray":
+            plt.imshow(epi, cmap=plt.cm.gray)
+        elif cmap == "hot":
+            plt.imshow(epi, cmap=plt.cm.hot)
+        else:
+            plt.imshow(epi, cmap=plt.cm.jet)
+    else:
+        assert False, "unsupported lf shape!"
+
+    plt.show()
+
 
 def imshow(im, cmap="gray", show=True):
     if cmap == "gray": 
