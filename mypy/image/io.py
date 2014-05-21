@@ -1,7 +1,4 @@
-# -*- coding: utf-8 -*-
-
 import numpy as np
-import pylab as plt
 import scipy.misc as misc
 
 def load(filename, roi=None, bw=True, normed=True):
@@ -19,7 +16,7 @@ def load(filename, roi=None, bw=True, normed=True):
         else:
             tmp = np.zeros((img.shape[0],img.shape[1],3))
     else:
-        
+        pass
         
     if roi is not None:
         

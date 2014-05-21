@@ -1,6 +1,43 @@
 import numpy as np
+import pylab as plt
 from glob import glob
 import scipy.misc as misc
+
+
+
+def epiViewer(lf3d, position, direction, cmap="gray"):
+
+    """
+    simple epi viewer
+
+    :param lf3d: ndarray 3d light field of shape [cams,y,x,channels=[1]/[3]]
+    :param position:  int fixed spatial position to extract the epi
+    :param direction: int direction or type of 3d lightfield 'h' or 'v'
+    :param cmap: string defining the colormap [default "gray"] "gray","hot","jet"
+    """
+    assert isinstance(lf3d, np.ndarray)
+    assert isinstance(position, int)
+    assert isinstance(direction, type(''))
+    assert isinstance(cmap, str)
+
+    if direction == 'h':
+        epi = lf3d[:, position, :, 0:lf3d.shape[3]]
+    if direction == 'v':
+        epi = lf3d[:, :, position, 0:lf3d.shape[3]]
+
+    if lf3d.shape[3] == 3:
+        plt.show(epi)
+    elif lf3d.shape[3] == 1:
+        if cmap == "gray":
+            plt.show(epi, cmap=plt.cm.gray)
+        elif cmap == "hot":
+            plt.show(epi, cmap=plt.cm.hot)
+        else:
+            plt.show(epi, cmap=plt.cm.jet)
+    else:
+        assert False, "unsupported lf shape!"
+
+    plt.show()
 
 
 def load_3d(path, rgb=False, roi=None):
