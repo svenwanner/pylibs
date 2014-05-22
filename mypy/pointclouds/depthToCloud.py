@@ -91,6 +91,7 @@ class PlyWriter(object):
         if self.colors is not None:
             colors = []
             assert isinstance(self.colors, np.ndarray)
+            print self.colors.shape,self.cloud.shape
             assert (self.colors.shape[0] == self.cloud.shape[0] and self.colors.shape[1] == self.cloud.shape[1]), "Shape mismatch between color and cloud!"
 
         if self.intensity is not None:
@@ -105,14 +106,16 @@ class PlyWriter(object):
 
         for y in xrange(self.cloud.shape[0]):
             for x in xrange(self.cloud.shape[1]):
-                points.append([self.cloud[y, x, 0], self.cloud[y, x, 1], self.cloud[y, x, 2]])
 
-                if self.colors is not None:
-                    colors.append([self.colors[y, x, 0], self.colors[y, x, 1], self.colors[y, x, 2]])
-                if self.intensity is not None:
-                    intensity.append(self.intensity[y, x])
-                if self.confidence is not None:
-                    confidence.append(self.confidence[y, x])
+                if self.cloud[y, x, 2] > 0:
+                    points.append([self.cloud[y, x, 0], self.cloud[y, x, 1], self.cloud[y, x, 2]])
+
+                    if self.colors is not None:
+                        colors.append([self.colors[y, x, 0], self.colors[y, x, 1], self.colors[y, x, 2]])
+                    if self.intensity is not None:
+                        intensity.append(self.intensity[y, x])
+                    if self.confidence is not None:
+                        confidence.append(self.confidence[y, x])
 
         f = open(self.name, 'w')
 
