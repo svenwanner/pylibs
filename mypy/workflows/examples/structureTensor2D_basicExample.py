@@ -38,6 +38,8 @@ config.base_line = 0.001                    # camera baseline [default 0.001]
 config.color_space = st2d.COLORSPACE.RGB    # colorscape to convert the images into possible RGB,LAB,LUV [default RGB]
 config.prefilter_scale = 0.4                # scale of the prefilter [0.4]
 config.prefilter = st2d.PREFILTER.IMGD2     # type of the prefilter possible NO,IMGD, EPID, IMGD2, EPID2 [default IMGD2}
+config.median = 5                           # apply median filter on disparity map
+
 config.min_depth = 0.01                     # minimum depth possible [default 0.01]
 config.max_depth = 1.0                      # maximum depth possible [default 1.0]
 config.rgb = True                           # forces grayscale if False [default True]

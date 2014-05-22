@@ -2,6 +2,7 @@ import os
 import vigra
 import numpy as np
 import scipy.misc as misc
+from scipy.ndimage.filters import median_filter
 
 
 from mypy.lightfield import io as lfio
@@ -41,6 +42,8 @@ class Config:
         self.color_space = COLORSPACE.RGB   # colorscape to convert the images into [RGB,LAB,LUV]
         self.prefilter_scale = 0.4          # scale of the prefilter
         self.prefilter = PREFILTER.IMGD2    # type of the prefilter [NO,IMGD, EPID, IMGD2, EPID2]
+
+        self.median = 5                     # apply median filter on disparity map
 
         self.min_depth = 0.01               # minimum depth possible
         self.max_depth = 1.0                # maximum depth possible
@@ -123,7 +126,7 @@ def structureTensor2D(config):
             orientation_h[:] += shift
 
             if config.coherence_threshold > 0.0:
-                invalids = np.where(coherence_h < config.coherence_treshold)
+                invalids = np.where(coherence_h < config.coherence_threshold)
                 coherence_h[invalids] = 0.0
 
             if config.output_level == 3:
@@ -160,7 +163,7 @@ def structureTensor2D(config):
             orientation_v[:] += shift
 
             if config.coherence_threshold > 0.0:
-                invalids = np.where(coherence_v < config.coherence_treshold)
+                invalids = np.where(coherence_v < config.coherence_threshold)
                 coherence_v[invalids] = 0.0
 
             if config.output_level == 3:
@@ -197,6 +200,10 @@ def structureTensor2D(config):
         misc.imsave(config.result_path+config.result_label+"coherence_final.png", coherence[lf_shape[0]/2, :, :])
 
     depth = dtc.disparity_to_depth(orientation[lf_shape[0]/2, :, :], config.base_line, config.focal_length, config.min_depth, config.max_depth)
+    if config.median > 0:
+        depth = median_filter(depth, config.median)
+    if config.output_level >= 1:
+        misc.imsave(config.result_path+config.result_label+"depth_final.png", depth)
 
     if config.output_level >= 1:
         try:

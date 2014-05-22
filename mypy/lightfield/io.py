@@ -3,8 +3,21 @@ import pylab as plt
 from glob import glob
 import scipy.misc as misc
 
+from mypy.image.io import loadEXR
+from mypy.visualization.imshow import imshow
 
+def finalResultViewer(final_exr, save_to=None):
 
+    try:
+        final_res = loadEXR(final_exr)
+        for i in range(3):
+            imshow(final_res[:, :, i])
+
+        if isinstance(save_to, str):
+            for i in range(3):
+                misc.imsave(save_to, final_res[:, :, i])
+    except:
+        print "Error reading final.exr!"
 
 
 
