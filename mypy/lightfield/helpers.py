@@ -3,6 +3,7 @@ import numpy as np
 def enum(**enums):
     return type('Enum', (), enums)
 
+
 def refocus_3d(lf, focus, lf_type='h'):
     """
     refocus a 3D light field by an integer pixel shift

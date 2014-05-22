@@ -1,6 +1,7 @@
 import os
 import vigra
 import numpy as np
+import pylab as plt
 import scipy.misc as misc
 from scipy.ndimage.filters import median_filter
 
@@ -178,7 +179,7 @@ def structureTensor2D(config):
             orientation, coherence = st2d.mergeOrientations_wta(orientation, coherence, orientation_tmp, coherence_tmp)
 
             if config.output_level >= 2:
-                misc.imsave(config.result_path+config.result_label+"orientation_merged_shift_{0}.png".format(shift), orientation[lf_shape[0]/2, :, :])
+                plt.imsave(config.result_path+config.result_label+"orientation_merged_shift_{0}.png".format(shift), orientation[lf_shape[0]/2, :, :], cmap=plt.cm.jet)
             print "ok"
 
         else:
@@ -186,30 +187,29 @@ def structureTensor2D(config):
             if compute_h:
                 orientation, coherence = st2d.mergeOrientations_wta(orientation, coherence, orientation_h, coherence_h)
             if compute_v:
-               orientation, coherence = st2d.mergeOrientations_wta(orientation, coherence, orientation_v, coherence_v)
+                orientation, coherence = st2d.mergeOrientations_wta(orientation, coherence, orientation_v, coherence_v)
             if config.output_level >= 2:
-                misc.imsave(config.result_path+config.result_label+"orientation_merged_shift_{0}.png".format(shift), orientation[lf_shape[0]/2, :, :])
+                plt.imsave(config.result_path+config.result_label+"orientation_merged_shift_{0}.png".format(shift), orientation[lf_shape[0]/2, :, :], cmap=plt.cm.jet)
+                plt.imsave(config.result_path+config.result_label+"coherence_merged_shift_{0}.png".format(shift), coherence[lf_shape[0]/2, :, :], cmap=plt.cm.jet)
             print "ok"
-
 
     invalids = np.where(coherence < 0.01)
     orientation[invalids] = 0
 
     if config.output_level >= 2:
-        misc.imsave(config.result_path+config.result_label+"orientation_final.png", orientation[lf_shape[0]/2, :, :])
-        misc.imsave(config.result_path+config.result_label+"coherence_final.png", coherence[lf_shape[0]/2, :, :])
+        plt.imsave(config.result_path+config.result_label+"orientation_final.png", orientation[lf_shape[0]/2, :, :], cmap=plt.cm.jet)
+        plt.imsave(config.result_path+config.result_label+"coherence_final.png", coherence[lf_shape[0]/2, :, :], cmap=plt.cm.jet)
 
     depth = dtc.disparity_to_depth(orientation[lf_shape[0]/2, :, :], config.base_line, config.focal_length, config.min_depth, config.max_depth)
     if config.median > 0:
         depth = median_filter(depth, config.median)
     if config.output_level >= 1:
-        misc.imsave(config.result_path+config.result_label+"depth_final.png", depth)
+        plt.imsave(config.result_path+config.result_label+"depth_final.png", depth, cmap=plt.cm.jet)
 
     if config.output_level >= 1:
-        try:
+        if isinstance(config.centerview_path, str):
+            print "read color data"
             color = misc.imread(config.centerview_path)
-        except:
-            pass
 
         tmp = np.zeros((lf_shape[1], lf_shape[2], 4), dtype=np.float32)
         tmp[:, :, 0] = orientation[lf_shape[0]/2, :, :]
@@ -219,8 +219,10 @@ def structureTensor2D(config):
         vim.writeImage(config.result_path+config.result_label+"final.exr")
 
         print "make pointcloud...",
-        try:
+        if isinstance(color, np.ndarray):
+            print "write color pc"
             dtc.save_pointcloud(config.result_path+config.result_label+"pointcloud.ply", depth_map=depth, color=color, focal_length=config.focal_length)
-        except:
+        else:
             dtc.save_pointcloud(config.result_path+config.result_label+"pointcloud.ply", depth_map=depth, focal_length=config.focal_length)
+
         print "ok"

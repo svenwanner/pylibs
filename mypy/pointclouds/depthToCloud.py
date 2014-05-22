@@ -2,9 +2,7 @@ import numpy as np
 import scipy.ndimage as nd
 import vigra
 
-
-def loadEXR(filename):
-    return vigra.readImage(filename)[:, :, 0].transpose()
+from mypy.image.io import loadEXR
 
 
 def save_pointcloud(filename, depth_map=None, disparity_map=None, color=None, focal_length=None, base_line=None, min_depth=0.01, max_depth=10.0):
