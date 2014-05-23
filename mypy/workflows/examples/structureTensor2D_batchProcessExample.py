@@ -14,7 +14,7 @@ context = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()
 
 
 #create a config object
-config = st2d.Config
+config = st2d.Config()
 
 #                                change only below here
 #-----------------------------------------------------------------------------------
@@ -55,6 +55,7 @@ config.color_space = st2d.COLORSPACE.RGB    # colorscape to convert the images i
 config.prefilter_scale = 0.4                # scale of the prefilter [0.4]
 config.prefilter = st2d.PREFILTER.IMGD2     # type of the prefilter possible NO,IMGD, EPID, IMGD2, EPID2 [default IMGD2}
 config.median = 5                           # apply median filter on disparity map
+config.selective_gaussian = 2.0             # apply a selective gaussian post filter
 
 config.min_depth = 0.01                     # minimum depth possible [default 0.01]
 config.max_depth = 1.0                      # maximum depth possible [default 1.0]
@@ -77,17 +78,22 @@ for scale in outer_scales:
     config.result_label = "noPrefilter"
     config.prefilter = st2d.PREFILTER.NO
     st2d.structureTensor2D(config)
+    config.saveLog()
 
     config.result_label = "gradientImgPrefilter"
     config.prefilter = st2d.PREFILTER.IMGD2
     st2d.structureTensor2D(config)
+    config.saveLog()
 
     config.result_label = "gradientEpiPrefilter"
     config.prefilter = st2d.PREFILTER.EPID2
+    config.saveLog()
 
     config.result_label = "laplaceImgPrefilter"
     config.prefilter = st2d.PREFILTER.IMGD2
     st2d.structureTensor2D(config)
+    config.saveLog()
 
     config.result_label = "laplaceEpiPrefilter"
     config.prefilter = st2d.PREFILTER.EPID2
+    config.saveLog()

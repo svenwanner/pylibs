@@ -1,7 +1,7 @@
 import mypy.workflows.StructureTensor2D as st2d
 
 
-config = st2d.Config
+config = st2d.Config()
 
 #                                change only below here
 #-----------------------------------------------------------------------------------
@@ -24,7 +24,7 @@ config.path_vertical = "/home/swanner/Desktop/ZeissData/v"
 
 # path to the center view image to get color for pointcloud [default None]
 config.centerview_path = "/home/swanner/Desktop/ZeissData/results/"+config.result_label+"/coherence_final.png"
-config.centerview_path = "/home/swanner/Desktop/ZeissData/cv.png"
+#config.centerview_path = "/home/swanner/Desktop/ZeissData/cv.png"
 
 #region of interest to process roi = {"pos":[y,x],"size":[sy,sx]
 config.roi = None
@@ -42,7 +42,8 @@ config.color_space = st2d.COLORSPACE.RGB    # colorscape to convert the images i
 config.prefilter_scale = 0.4                # scale of the prefilter [0.4]
 config.prefilter = st2d.PREFILTER.IMGD2     # type of the prefilter possible NO,IMGD, EPID, IMGD2, EPID2 [default IMGD2}
 config.median = 3                           # apply median filter on disparity map
-config.nonlinear_diffusion = None              # apply nonlinear diffusion [0] edge threshold, [1] scale
+config.nonlinear_diffusion = None           # apply nonlinear diffusion [0] edge threshold, [1] scale
+config.selective_gaussian = 2.0             # apply a selective gaussian post filter
 
 config.min_depth = 0.01                     # minimum depth possible [default 0.01]
 config.max_depth = 1.0                      # maximum depth possible [default 1.0]
@@ -57,4 +58,4 @@ config.output_level = 2                     # level of detail for file output po
 #===     run workflow     ===
 #============================
 st2d.structureTensor2D(config)
-
+config.saveLog()

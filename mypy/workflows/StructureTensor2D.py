@@ -20,6 +20,10 @@ PREFILTER = enum(NO=0, IMGD=1, EPID=2, IMGD2=3, EPID2=4)
 
 
 
+#============================================================================================================
+#============================================================================================================
+#============================================================================================================
+
 class Config:
     def __init__(self):
 
@@ -47,6 +51,7 @@ class Config:
 
         self.median = 5                     # apply median filter on disparity map
         self.nonlinear_diffusion = [0.5, 5] # apply nonlinear diffusion [0] edge threshold, [1] scale
+        self.selective_gaussian = 2.0       # apply a selective gaussian post filter
 
         self.min_depth = 0.01               # minimum depth possible
         self.max_depth = 1.0                # maximum depth possible
@@ -54,6 +59,45 @@ class Config:
         self.rgb = True                     # forces grayscale if False
 
         self.output_level = 2               # level of detail for file output possible 1,2,3
+
+    def saveLog(self, filename=None):
+        if filename is not None:
+            f = open(filename, "w")
+        else:
+            f = open(self.result_path+self.result_label+"/log.txt", "w")
+        f.write("roi : ")
+        f.write(str(self.roi)+"\n")
+        f.write("inner_scale : ")
+        f.write(str(self.inner_scale)+"\n")
+        f.write("outer_scale : ")
+        f.write(str(self.outer_scale)+"\n")
+        f.write("double_tensor : ")
+        f.write(str(self.double_tensor)+"\n")
+        f.write("coherence_threshold : ")
+        f.write(str(self.coherence_threshold)+"\n")
+        f.write("focal_length : ")
+        f.write(str(self.focal_length)+"\n")
+        f.write("global_shifts : ")
+        f.write(str(self.global_shifts)+"\n")
+        f.write("base_line : ")
+        f.write(str(self.base_line)+"\n")
+        f.write("color_space : ")
+        f.write(str(self.color_space)+"\n")
+        f.write("prefilter_scale : ")
+        f.write(str(self.prefilter_scale)+"\n")
+        f.write("prefilter : ")
+        f.write(str(self.prefilter)+"\n")
+        f.write("median : ")
+        f.write(str(self.median)+"\n")
+        f.write("nonlinear_diffusion : ")
+        f.write(str(self.nonlinear_diffusion)+"\n")
+        f.write("selective_gaussian : ")
+        f.write(str(self.selective_gaussian)+"\n")
+        f.write("min_depth : ")
+        f.write(str(self.min_depth)+"\n")
+        f.write("max_depth : ")
+        f.write(str(self.max_depth)+"\n")
+        f.close()
 
 
 #============================================================================================================
@@ -166,6 +210,12 @@ def compute_vertical(lf3dv, shift, config):
     return orientation_v, coherence_v
 
 
+
+#============================================================================================================
+#============================================================================================================
+#============================================================================================================
+
+
 def structureTensor2D(config):
     if not config.result_path.endswith("/"):
         config.result_path += "/"
@@ -269,10 +319,10 @@ def structureTensor2D(config):
         print "apply nonlinear diffusion", config.nonlinear_diffusion[0], ",", config.nonlinear_diffusion[1],
         vigra.filters.nonlinearDiffusion(depth, config.nonlinear_diffusion[0], config.nonlinear_diffusion[1])
         print "ok"
-    if True:
+    if config.selective_gaussian > 0:
         print "apply masked gauss...",
         gauss = vigra.filters.Kernel2D()
-        vigra.filters.Kernel2D.initGaussian(gauss, 1.8)
+        vigra.filters.Kernel2D.initGaussian(gauss, config.selective_gaussian)
         gauss.setBorderTreatment(vigra.filters.BorderTreatmentMode.BORDER_TREATMENT_CLIP)
         depth = vigra.filters.normalizedConvolveImage(depth, mask, gauss)
         print "ok"
