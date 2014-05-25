@@ -56,6 +56,7 @@ config.prefilter_scale = 0.4                # scale of the prefilter [0.4]
 config.prefilter = st2d.PREFILTER.IMGD2     # type of the prefilter possible NO,IMGD, EPID, IMGD2, EPID2 [default IMGD2}
 config.median = 5                           # apply median filter on disparity map
 config.selective_gaussian = 2.0             # apply a selective gaussian post filter
+config.tv = {"alpha": 1.0, "steps": 1000}   # apply total variation to depth map [default {"alpha": 1.0, "steps": 1000}]
 
 config.min_depth = 0.01                     # minimum depth possible [default 0.01]
 config.max_depth = 1.0                      # maximum depth possible [default 1.0]

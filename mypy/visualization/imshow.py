@@ -1,9 +1,86 @@
 import vigra
 import numpy as np
 
-import pylab as plt
+import matplotlib.pyplot as plt
+from matplotlib import cm
 
 from mypy.lightfield import helpers as lfhelpers
+
+
+
+def finalsViewer(filename, ranges=None, save_at=None, fontsize=8):
+    # try:
+    t = vigra.readImage(filename)
+    disp = t[:, :, 0]
+    coh = t[:, :, 1]
+    depth = t[:, :, 2]
+
+    if ranges is not None:
+        assert isinstance(ranges, type({})), "ranges needs to be None or a dictionary"
+
+        if "disp" in ranges and isinstance(ranges["disp"], type([])):
+            np.place(disp, disp < ranges["disp"][0], ranges["disp"][0])
+            np.place(disp, disp > ranges["disp"][1], ranges["disp"][1])
+        if "coh" in ranges and isinstance(ranges["coh"], type([])):
+            np.place(coh, coh < ranges["coh"][0], ranges["coh"][0])
+            np.place(coh, coh > ranges["coh"][1], ranges["coh"][1])
+        if "depth" in ranges and isinstance(ranges["depth"], type([])):
+            np.place(depth, depth < ranges["depth"][0], ranges["depth"][0])
+            np.place(depth, depth > ranges["depth"][1], ranges["depth"][1])
+
+    plt.figure()
+
+    sb = plt.subplot(2, 2, 1)
+    plt.imshow(disp, interpolation='nearest', cmap=cm.jet)
+    plt.yticks(fontsize=fontsize)
+    plt.xticks(fontsize=fontsize)
+    plt.title('disparity')
+
+    amax = np.amax(disp)
+    amin = np.amin(disp)
+    num_range = np.linspace(amin, amax, num=20)
+
+    cb = plt.colorbar(ticks=num_range)
+    for t in cb.ax.get_yticklabels():
+        t.set_fontsize(fontsize)
+
+    plt.subplot(2, 2, 2)
+    plt.imshow(coh, interpolation='nearest', cmap=cm.hot)
+    plt.yticks(fontsize=fontsize)
+    plt.xticks(fontsize=fontsize)
+    plt.title('coherence')
+
+    amax = np.amax(coh)
+    amin = np.amin(coh)
+    num_range = np.linspace(amin, amax, num=20)
+
+    cb = plt.colorbar(ticks=num_range)
+    for t in cb.ax.get_yticklabels():
+        t.set_fontsize(10)
+
+    plt.subplot(2, 2, 3)
+    plt.imshow(depth, interpolation='nearest', cmap=cm.jet)
+    plt.yticks(fontsize=fontsize)
+    plt.xticks(fontsize=fontsize)
+    plt.title('depth')
+
+    amax = np.amax(depth)
+    amin = np.amin(depth)
+    num_range = np.linspace(amin, amax, num=20)
+
+    cb = plt.colorbar(ticks=num_range)
+    for t in cb.ax.get_yticklabels():
+        t.set_fontsize(fontsize)
+
+    if save_at is None:
+        plt.show()
+    elif isinstance(save_at, str):
+        if not save_at.endswith("/"):
+            save_at += "/"
+        save_at += "final.svg"
+        plt.savefig(save_at)
+
+
 
 def epishow(lf3d, position, direction, shift=0, cmap="gray"):
     """

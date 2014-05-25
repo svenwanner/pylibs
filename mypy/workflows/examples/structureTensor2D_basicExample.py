@@ -11,27 +11,25 @@ config = st2d.Config()
 #============================
 
 # path to store the results [necessary]
-config.result_path = "/home/swanner/Desktop/ZeissData/results"
+config.result_path = "/path/to/your/results"
 
 # name of the results folder [necessary]
-config.result_label = "results_nld_1_7"
+config.result_label = "myResults"
 
 # path to the horizontal images [default None]
-config.path_horizontal = "/home/swanner/Desktop/ZeissData/h"
+config.path_horizontal = "/path/to/your/horizontal/images"
 
 # path to the vertical images [default None]
-config.path_vertical = "/home/swanner/Desktop/ZeissData/v"
+config.path_vertical = "/path/to/your/vertical/images"
 
 # path to the center view image to get color for pointcloud [default None]
-config.centerview_path = "/home/swanner/Desktop/ZeissData/results/"+config.result_label+"/coherence_final.png"
-#config.centerview_path = "/home/swanner/Desktop/ZeissData/cv.png"
+config.centerview_path = "/path/to/your/image/that/should/be/mapped/onto/pointcloud/cv_img.png"
 
-#region of interest to process roi = {"pos":[y,x],"size":[sy,sx]
-config.roi = None
-#config.roi = {"pos": [110, 90], "size": [300, 434]}
+#region of interest to process roi = {"pos":[y,x],"size":[sy,sx]} [Default None]
+config.roi = {"pos": [10, 10], "size": [100, 100]}
 
 config.inner_scale = 0.6                    # structure tensor inner scale [default 0.6]
-config.outer_scale = 1.8                    # structure tensor outer scale [default 1.3]
+config.outer_scale = 1.3                    # structure tensor outer scale [default 1.3]
 config.double_tensor = 0.0                  # if > 0.0 a second structure tensor with the outerscale specified is applied
 config.coherence_threshold = 0.45           # if coherence less than value the disparity is set to invalid
 config.focal_length = 5740.38               # focal length in pixel [default Nikon D800 f=28mm]
@@ -44,6 +42,7 @@ config.prefilter = st2d.PREFILTER.IMGD2     # type of the prefilter possible NO,
 config.median = 3                           # apply median filter on disparity map
 config.nonlinear_diffusion = None           # apply nonlinear diffusion [0] edge threshold, [1] scale
 config.selective_gaussian = 2.0             # apply a selective gaussian post filter
+config.tv = {"alpha": 1.0, "steps": 1000}   # apply total variation to depth map [default {"alpha": 1.0, "steps": 1000}]
 
 config.min_depth = 0.01                     # minimum depth possible [default 0.01]
 config.max_depth = 1.0                      # maximum depth possible [default 1.0]

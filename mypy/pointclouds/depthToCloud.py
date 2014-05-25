@@ -29,8 +29,8 @@ def save_pointcloud(filename, depth_map=None, disparity_map=None, color=None, fo
     if depth_map is None:
         depth_map = disparity_to_depth(disparity_map, base_line, focal_length, min_depth, max_depth)
     else:
-        np.place(depth_map, depth_map < min_depth, 0)
-        np.place(depth_map, depth_map > max_depth, 0)
+        np.place(depth_map, depth_map < min_depth, min_depth)
+        np.place(depth_map, depth_map > max_depth, min_depth)
     cloud = cloud_from_depth(depth_map, focal_length)
     plyWriter = PlyWriter(filename, cloud, color)
 
@@ -42,7 +42,7 @@ def disparity_to_depth(disparity, base_line, focal_length, min_depth=0.1, max_de
         for x in range(disparity.shape[1]):
             depth[y, x] = focal_length*base_line/(disparity[y, x]+1e-16)
             if depth[y, x] > max_depth or depth[y, x] < min_depth or np.isinf(depth[y, x]):
-                depth[y, x] = 0
+                depth[y, x] = min_depth
     return depth
 
 
@@ -91,7 +91,6 @@ class PlyWriter(object):
         if self.colors is not None:
             colors = []
             assert isinstance(self.colors, np.ndarray)
-            print self.colors.shape,self.cloud.shape
             assert (self.colors.shape[0] == self.cloud.shape[0] and self.colors.shape[1] == self.cloud.shape[1]), "Shape mismatch between color and cloud!"
 
         if self.intensity is not None:

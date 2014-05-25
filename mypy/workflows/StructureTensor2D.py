@@ -12,7 +12,7 @@ from mypy.lightfield.helpers import enum
 import mypy.pointclouds.depthToCloud as dtc
 from mypy.lightfield import helpers as lfhelpers
 from mypy.lightfield.depth import structureTensor2D as st2d
-from mypy.visualization.imshow import epishow
+import mypy.visualization.imshow as myshow
 
 
 COLORSPACE = enum(RGB=0, LAB=1, LUV=2)
@@ -27,38 +27,39 @@ PREFILTER = enum(NO=0, IMGD=1, EPID=2, IMGD2=3, EPID2=4)
 class Config:
     def __init__(self):
 
-        self.result_path = None             # path to store the results
-        self.result_label = None            # name of the results folder
+        self.result_path = None                 # path to store the results
+        self.result_label = None                # name of the results folder
 
-        self.path_horizontal = None         # path to the horizontal images [optional]
-        self.path_vertical = None           # path to the vertical images [optional]
+        self.path_horizontal = None             # path to the horizontal images [optional]
+        self.path_vertical = None               # path to the vertical images [optional]
 
-        self.roi = None                     # region of interest
+        self.roi = None                         # region of interest
 
-        self.centerview_path = None         # path to the center view image to get color for pointcloud [optional]
+        self.centerview_path = None             # path to the center view image to get color for pointcloud [optional]
 
-        self.inner_scale = 0.6              # structure tensor inner scale
-        self.outer_scale = 0.9              # structure tensor outer scale
-        self.double_tensor = 2.0            # if > 0.0 a second structure tensor with the outerscale specified is applied
-        self.coherence_threshold = 0.7      # if coherence less than value the disparity is set to invalid
-        self.focal_length = 5740.38         # focal length in pixel [default Nikon D800 f=28mm]
-        self.global_shifts = [0]            # list of horopter shifts in pixel
-        self.base_line = 0.001              # camera baseline
+        self.inner_scale = 0.6                  # structure tensor inner scale
+        self.outer_scale = 0.9                  # structure tensor outer scale
+        self.double_tensor = 2.0                # if > 0.0 a second structure tensor with the outerscale specified is applied
+        self.coherence_threshold = 0.7          # if coherence less than value the disparity is set to invalid
+        self.focal_length = 5740.38             # focal length in pixel [default Nikon D800 f=28mm]
+        self.global_shifts = [0]                # list of horopter shifts in pixel
+        self.base_line = 0.001                  # camera baseline
 
-        self.color_space = COLORSPACE.RGB   # colorscape to convert the images into [RGB,LAB,LUV]
-        self.prefilter_scale = 0.4          # scale of the prefilter
-        self.prefilter = PREFILTER.IMGD2    # type of the prefilter [NO,IMGD, EPID, IMGD2, EPID2]
+        self.color_space = COLORSPACE.RGB       # colorscape to convert the images into [RGB,LAB,LUV]
+        self.prefilter_scale = 0.4              # scale of the prefilter
+        self.prefilter = PREFILTER.IMGD2        # type of the prefilter [NO,IMGD, EPID, IMGD2, EPID2]
 
-        self.median = 5                     # apply median filter on disparity map
-        self.nonlinear_diffusion = [0.5, 5] # apply nonlinear diffusion [0] edge threshold, [1] scale
-        self.selective_gaussian = 2.0       # apply a selective gaussian post filter
+        self.median = 5                         # apply median filter on disparity map
+        self.nonlinear_diffusion = [0.5, 5]     # apply nonlinear diffusion [0] edge threshold, [1] scale
+        self.selective_gaussian = 2.0           # apply a selective gaussian post filter
+        self.tv = {"alpha": 1.0, "steps": 1000} # apply total variation to depth map
 
-        self.min_depth = 0.01               # minimum depth possible
-        self.max_depth = 1.0                # maximum depth possible
+        self.min_depth = 0.01                   # minimum depth possible
+        self.max_depth = 1.0                    # maximum depth possible
 
-        self.rgb = True                     # forces grayscale if False
+        self.rgb = True                         # forces grayscale if False
 
-        self.output_level = 2               # level of detail for file output possible 1,2,3
+        self.output_level = 2                   # level of detail for file output possible 1,2,3
 
     def saveLog(self, filename=None):
         if filename is not None:
@@ -300,19 +301,25 @@ def structureTensor2D(config):
     depth = dtc.disparity_to_depth(orientation[lf_shape[0]/2, :, :], config.base_line, config.focal_length, config.min_depth, config.max_depth)
 
     if isinstance(config.nonlinear_diffusion, type([])):
-        print "apply nonlinear diffusion", config.nonlinear_diffusion[0], ",", config.nonlinear_diffusion[1],
+        print "apply nonlinear diffusion",
         vigra.filters.nonlinearDiffusion(depth, config.nonlinear_diffusion[0], config.nonlinear_diffusion[1])
         print "ok"
-    if config.selective_gaussian > 0:
+    if isinstance(config.selective_gaussian, float) and config.selective_gaussian > 0:
         print "apply masked gauss...",
         gauss = vigra.filters.Kernel2D()
         vigra.filters.Kernel2D.initGaussian(gauss, config.selective_gaussian)
         gauss.setBorderTreatment(vigra.filters.BorderTreatmentMode.BORDER_TREATMENT_CLIP)
         depth = vigra.filters.normalizedConvolveImage(depth, mask, gauss)
         print "ok"
-    if config.median > 0:
+    if isinstance(config.median, int) and config.median > 0:
         print "apply median filter ...",
         depth = median_filter(depth, config.median)
+        print "ok"
+    if isinstance(config.tv, type({})):
+        assert depth.shape == mask.shape
+        drange = config.max_depth-config.min_depth
+        print "apply total variation...",
+        depth = vigra.filters.totalVariationFilter(depth.astype(np.float64), mask.astype(np.float64), 0.01*drange*config.tv["alpha"], config.tv["steps"], 0)
         print "ok"
 
     invalids = np.where(mask == 0)
@@ -337,6 +344,7 @@ def structureTensor2D(config):
         tmp[:, :, 2] = depth[:]
         vim = vigra.RGBImage(tmp)
         vim.writeImage(config.result_path+config.result_label+"final.exr")
+        myshow.finalsViewer(config.result_path+config.result_label+"final.exr", save_at=config.result_path+config.result_label)
 
         print "make pointcloud...",
         if isinstance(color, np.ndarray):
