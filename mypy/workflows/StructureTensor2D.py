@@ -80,6 +80,7 @@ class Config:
         f.write("median : "); f.write(str(self.median)+"\n")
         f.write("nonlinear_diffusion : "); f.write(str(self.nonlinear_diffusion)+"\n")
         f.write("selective_gaussian : "); f.write(str(self.selective_gaussian)+"\n")
+        f.write("total variation : "); f.write(str(self.tv)+"\n")
         f.write("min_depth : "); f.write(str(self.min_depth)+"\n")
         f.write("max_depth : "); f.write(str(self.max_depth)+"\n")
         f.close()
@@ -316,9 +317,9 @@ def structureTensor2D(config):
         depth = median_filter(depth, config.median)
         print "ok"
     if isinstance(config.tv, type({})):
+        print "apply total variation...",
         assert depth.shape == mask.shape
         drange = config.max_depth-config.min_depth
-        print "apply total variation...",
         depth = vigra.filters.totalVariationFilter(depth.astype(np.float64), mask.astype(np.float64), 0.01*drange*config.tv["alpha"], config.tv["steps"], 0)
         print "ok"
 

@@ -1,12 +1,21 @@
 import numpy as np
-import scipy.ndimage as nd
-import vigra
-
-from mypy.image.io import loadEXR
 
 
-def save_pointcloud(filename, depth_map=None, disparity_map=None, color=None, focal_length=None, base_line=None, min_depth=0.01, max_depth=10.0):
+def save_pointcloud(filename, depth_map=None, disparity_map=None, color=None, intensity=None, confidence=None, focal_length=None, base_line=None, min_depth=0.01, max_depth=10.0):
+    """
+    saves a pointcloud from a passed depth or disparity map, one is obligatory.
 
+    :param filename: str filename of the resulting pointcloud
+    :param depth_map: ndarray depth image
+    :param disparity_map: ndarray disparity image
+    :param color: ndarray image to be mapped onto pointcloud
+    :param intensity: ndarray intensity array of the pointcloud
+    :param confidence: ndarray confidence array of the pointcloud
+    :param focal_length: float camera focal_length in px
+    :param base_line:float distance between two cameras
+    :param min_depth: float lower depth clipping value
+    :param max_depth: float upper depth clipping value
+    """
     assert isinstance(filename, str)
     if depth_map is not None:
         assert isinstance(depth_map, np.ndarray)
@@ -14,6 +23,10 @@ def save_pointcloud(filename, depth_map=None, disparity_map=None, color=None, fo
         assert isinstance(disparity_map, np.ndarray)
     if color is not None:
         assert isinstance(color, np.ndarray)
+    if intensity is not None:
+        assert isinstance(intensity, np.ndarray)
+    if confidence is not None:
+        assert isinstance(confidence, np.ndarray)
     if focal_length is not None:
         assert isinstance(focal_length, float)
     if base_line is not None:
@@ -32,11 +45,20 @@ def save_pointcloud(filename, depth_map=None, disparity_map=None, color=None, fo
         np.place(depth_map, depth_map < min_depth, min_depth)
         np.place(depth_map, depth_map > max_depth, min_depth)
     cloud = cloud_from_depth(depth_map, focal_length)
-    plyWriter = PlyWriter(filename, cloud, color)
-
+    plyWriter = PlyWriter(filename, cloud, color, intensity, confidence)
 
 
 def disparity_to_depth(disparity, base_line, focal_length, min_depth=0.1, max_depth=1):
+    """
+    computes depth from disparity map
+
+    :param disparity: ndarray disparity image
+    :param base_line: float distance between two cameras
+    :param focal_length: float camera focal_length in px
+    :param min_depth: float lower depth clipping value
+    :param max_depth: float upper depth clipping value
+    :return: ndarray depth image
+    """
     depth = np.zeros_like(disparity)
     for y in range(disparity.shape[0]):
         for x in range(disparity.shape[1]):
@@ -77,7 +99,6 @@ class PlyWriter(object):
 
         if name is not None and cloud is not None:
             self.save()
-
 
     def save(self):
         assert isinstance(self.cloud, np.ndarray)
@@ -123,7 +144,6 @@ class PlyWriter(object):
 
         f.close()
 
-
     def write_header(self, f, points):
         f.write('ply\n')
         f.write('format ascii 1.0\n')
@@ -139,20 +159,16 @@ class PlyWriter(object):
             self.add_confidence_header(f)
         f.write('end_header\n')
 
-
     def add_color_header(self, f):
         f.write('property uchar red\n')
         f.write('property uchar green\n')
         f.write('property uchar blue\n')
 
-
     def add_confidence_header(self, f):
         f.write('property float confidence\n')
 
-
     def add_intensity_header(self, f):
         f.write('property float intensity\n')
-
 
     def write_points(self, f, points, colors=None, confidence=None, intensity=None):
         for n, point in enumerate(points):

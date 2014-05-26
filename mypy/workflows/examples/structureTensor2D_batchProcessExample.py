@@ -8,7 +8,7 @@
 """
 
 
-import inspect,os
+import inspect, os
 import mypy.workflows.StructureTensor2D as st2d
 context = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 
