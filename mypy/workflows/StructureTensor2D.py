@@ -95,6 +95,13 @@ class Compute(threading.Thread):
     lock = threading.Lock()
 
     def __init__(self, lf3d, shift, config, direction):
+        """
+
+        :param lf3d: 
+        :param shift: 
+        :param config: 
+        :param direction: 
+        """
         threading.Thread.__init__(self)
         self.lf3d = lf3d
         self.shift = shift
@@ -111,8 +118,6 @@ class Compute(threading.Thread):
 
     def get_results(self):
         return self.orientation, self.coherence
-
-
 
 def compute_horizontal(lf3dh, shift, config):
     print "compute horizontal shift {0}".format(shift), "...",
