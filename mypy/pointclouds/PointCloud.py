@@ -62,7 +62,7 @@ class PlyWriter(object):
             if self.cloud.has_color:
                 f.write(" {0} {1} {2}".format(int(self.cloud.colors[n][0]), int(self.cloud.colors[n][1]), int(self.cloud.colors[n][2])))
             if self.cloud.has_intensities:
-                f.write(" {0}".format(float(self.cloud.intensity[n])))
+                f.write(" {0}".format(float(self.cloud.intensities[n])))
             if self.cloud.has_confidence:
                 f.write(" {0}".format(float(self.cloud.confidence[n])))
             f.write('\n')
@@ -83,16 +83,70 @@ class Cloud(object):
         self.mat_world = None
         self.mat_world_is_inverted = False
 
-    def save(self, filename):
+    def remove_color(self):
         """
-        save point cloud depending on filetype as .pcd or .ply
-        :param filename:
+        removes the color data
         """
-        assert isinstance(filename, str), "save point cloud from file failed, argument error!"
-        if filename.endswith(".pcd"):
-            self.points.to_file(filename)
-        if filename.endswith(".ply"):
-            writer = PlyWriter(filename, self)
+        self.colors = None
+        self.has_color = False
+
+    def remove_intensities(self):
+        """
+        removes the intensity data
+        """
+        self.intensities = None
+        self.has_intensities = False
+
+    def remove_confidence(self):
+        """
+        removes the confidence band
+        """
+        self.confidence = None
+        self.has_confidence = False
+
+    def merge(self, other):
+        """
+        merges the point cloud with another one passed as argument
+        :param other: Cloud to merge into
+        """
+        assert isinstance(other, Cloud), "failed to merge clouds, argument error!"
+        total_vertices = self.vertices + other.vertices
+        tmp_points = np.zeros((self.vertices+other.vertices, 3), dtype=np.float32)
+
+        n = 0
+        for x in xrange(self.vertices):
+            tmp_points[n, :] = self.points[x][:]
+            n += 1
+        for x in xrange(other.vertices):
+            tmp_points[n, :] = other.points[x][:]
+            n += 1
+        self.points.from_array(tmp_points)
+
+        if other.has_color and self.has_color:
+            self.colors = np.resize(self.colors, (total_vertices, 3))
+            self.colors[self.vertices:, :] = other.colors[:, :]
+        else:
+            self.colors = None
+            self.has_color = False
+            print "Warning: colors removed!"
+
+        if other.has_intensities and self.has_intensities:
+            self.intensities = np.resize(self.intensities, total_vertices)
+            self.intensities[self.vertices:] = other.intensities[:]
+        else:
+            self.intensities = None
+            self.has_intensities = False
+            print "Warning: intensities removed!"
+
+        if other.has_confidence and self.has_confidence:
+            self.confidence = np.resize(self.confidence, total_vertices)
+            self.confidence[self.vertices:] = other.confidence[:]
+        else:
+            self.confidence = None
+            self.has_confidence = False
+            print "Warning: confidence removed!"
+
+        self.vertices = total_vertices
 
     def set_world_matrix(self, matrix_world):
         """
@@ -241,7 +295,7 @@ class Cloud(object):
                     if self.has_confidence:
                         self.confidence[n] = confidence[y, x]
                     n += 1
-                    
+
             self.points.from_array(tmp_points)
 
     def from_file(self, filename):
@@ -259,8 +313,8 @@ class Cloud(object):
             f = open(filename, "r")
             found_x = 0; found_y = 0; found_z = 0
             found_red = 0; found_green = 0; found_blue = 0
-            intensity_index = 0
-            confidence_index = 0
+            color_offset = 0
+            intensity_offset = 0
 
             for line in f:
                 if line.startswith("element vertex"):
@@ -295,15 +349,12 @@ class Cloud(object):
                 tmp_points = np.zeros((self.vertices, 3), dtype=np.float32)
             if self.has_color:
                 self.colors = np.zeros((self.vertices, 3), dtype=int)
+                color_offset = 3
+            if self.has_intensities:
+                self.intensities = np.zeros(self.vertices, dtype=np.float32)
+                intensity_offset = 1
             if self.has_confidence:
                 self.confidence = np.zeros(self.vertices, dtype=np.float32)
-                if self.has_intensities:
-                    confidence_index = 5
-                else:
-                    confidence_index = 4
-            if self.has_intensities:
-                intensity_index = 4
-                self.intensities = np.zeros(self.vertices, dtype=np.float32)
 
             for line in f:
                 numbers = []
@@ -316,15 +367,26 @@ class Cloud(object):
                 if self.has_color:
                     for k in range(3):
                         self.colors[point_index, k] = int(numbers[k+3])
-                if self.intensities:
-                    self.intensities[point_index] = int(numbers[k+intensity_index])
+                if self.has_intensities:
+                    self.intensities[point_index] = float(numbers[3+color_offset])
                 if self.has_confidence:
-                    self.confidence[point_index] = int(numbers[k+confidence_index])
+                    self.confidence[point_index] = float(numbers[3+color_offset+intensity_offset])
 
                 point_index += 1
 
             self.points = pcl.PointCloud()
             self.points.from_array(tmp_points)
 
+
+    def save(self, filename):
+        """
+        save point cloud depending on filetype as .pcd or .ply
+        :param filename:
+        """
+        assert isinstance(filename, str), "save point cloud from file failed, argument error!"
+        if filename.endswith(".pcd"):
+            self.points.to_file(filename)
+        if filename.endswith(".ply"):
+            writer = PlyWriter(filename, self)
 
 
