@@ -28,9 +28,9 @@ config.centerview_path = "/path/to/your/image/that/should/be/mapped/onto/pointcl
 #region of interest to process roi = {"pos":[y,x],"size":[sy,sx]} [Default None]
 config.roi = {"pos": [10, 10], "size": [100, 100]}
 
+config.structure_tensor_type = "classic"    # type of the structure tensor class to be used
 config.inner_scale = 0.6                    # structure tensor inner scale [default 0.6]
 config.outer_scale = 1.3                    # structure tensor outer scale [default 1.3]
-config.double_tensor = 0.0                  # if > 0.0 a second structure tensor with the outerscale specified is applied
 config.coherence_threshold = 0.45           # if coherence less than value the disparity is set to invalid
 config.focal_length = 5740.38               # focal length in pixel [default Nikon D800 f=28mm]
 config.global_shifts = [8, 9]               # list of horopter shifts in pixel [default [0]]

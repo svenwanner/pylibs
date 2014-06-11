@@ -37,9 +37,9 @@ class Config:
 
         self.centerview_path = None             # path to the center view image to get color for pointcloud [optional]
 
+        self.structure_tensor_type = "classic"  # type of the structure tensor class to be used
         self.inner_scale = 0.6                  # structure tensor inner scale
         self.outer_scale = 0.9                  # structure tensor outer scale
-        self.double_tensor = 2.0                # if > 0.0 a second structure tensor with the outerscale specified is applied
         self.coherence_threshold = 0.7          # if coherence less than value the disparity is set to invalid
         self.focal_length = 5740.38             # focal length in pixel [default Nikon D800 f=28mm]
         self.global_shifts = [0]                # list of horopter shifts in pixel
@@ -137,12 +137,13 @@ def compute_horizontal(lf3dh, shift, config):
         if config.prefilter == PREFILTER.EPID2:
             lf3d = st2d.preEpiLaplace(lf3d, scale=config.prefilter_scale, direction='h')
 
+    structureTensor = None
+    if config.structure_tensor_type == "classic":
+        structureTensor = st2d.StructureTensorClassic()
 
-    st3d = st2d.structureTensor2D(lf3d, inner_scale=config.inner_scale, outer_scale=config.outer_scale, direction='h')
-    if config.double_tensor > 0.0:
-        tmp = st2d.structureTensor2D(lf3d, inner_scale=config.inner_scale, outer_scale=config.double_tensor, direction='h')
-        st3d[:] += tmp[:]
-        st3d /= 2.0
+    params = {"direction": 'h', "inner_scale": config.inner_scale, "outer_scale": config.outer_scale}
+    structureTensor.compute(lf3d, params)
+    st3d = structureTensor.get_result()
 
     orientation_h, coherence_h = st2d.evaluateStructureTensor(st3d)
     orientation_h[:] += shift
@@ -179,11 +180,13 @@ def compute_vertical(lf3dv, shift, config):
         if config.prefilter == PREFILTER.EPID2:
             lf3d = st2d.preEpiLaplace(lf3d, scale=config.prefilter_scale, direction='v')
 
-    st3d = st2d.structureTensor2D(lf3d, inner_scale=config.inner_scale, outer_scale=config.outer_scale, direction='v')
-    if config.double_tensor > 0.0:
-        tmp = st2d.structureTensor2D(lf3d, inner_scale=config.inner_scale, outer_scale=config.double_tensor, direction='v')
-        st3d[:] += tmp[:]
-        st3d /= 2.0
+    structureTensor = None
+    if config.structure_tensor_type == "classic":
+        structureTensor = st2d.StructureTensorClassic()
+
+    params = {"direction": 'v', "inner_scale": config.inner_scale, "outer_scale": config.outer_scale}
+    structureTensor.compute(lf3d, params)
+    st3d = structureTensor.get_result()
 
     orientation_v, coherence_v = st2d.evaluateStructureTensor(st3d)
     orientation_v[:] += shift

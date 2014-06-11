@@ -5,6 +5,152 @@ import numpy as np
 
 from mypy.visualization.imshow import imshow
 
+
+
+class StructureTensor(object):
+
+    def __init__(self):
+        self.st = None
+
+    def compute(self, lf3d, params):
+        """
+        call this method to compute the structure tensor subroutines in the order following:
+        - pre_filter
+        - inner_smoothing
+        - derivations
+        - outer_smoothing
+        - post_filter
+        - post_processing
+
+        overwrite these methods in your structure tensor class derivative to use them. Each
+        subroutine not overwritten is ignored
+        """
+        assert isinstance(lf3d, np.ndarray), "lf3d input is not a numpy array"
+        assert len(lf3d.shape) == 4, "lf3d need 4 dimensions"
+        assert isinstance(params, type({})), "params needs to be a dictionary"
+        assert params.has_key("direction"), "missing parameter direction"
+
+        self.st = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], 3), dtype=np.float32)
+
+        if params["direction"] == 'h':
+            for y in xrange(lf3d.shape[1]):
+                epis = []
+                for c in range(lf3d.shape[3]):
+                    epis.append(lf3d[:, y, :, c])
+                for n, epi in enumerate(epis):
+                    epis[n] = self.pre_filter(epi, params)
+                    epis[n] = self.inner_smoothing(epis[n], params)
+                    epis[n] = self.derivations(epis[n], params)
+                    epis[n] = self.outer_smoothing(epis[n], params)
+                    epis[n] = self.post_filter(epis[n], params)
+
+                for epi in epis:
+                    self.st[:, y, :, :] += epi[:, :, :]
+
+        elif params["direction"] == 'v':
+            for x in xrange(lf3d.shape[2]):
+                epis = []
+                for c in range(lf3d.shape[3]):
+                    epis.append(lf3d[:, :, x, c])
+                for n, epi in enumerate(epis):
+                    epis[n] = self.pre_filter(epi, params)
+                    epis[n] = self.inner_smoothing(epis[n], params)
+                    epis[n] = self.derivations(epis[n], params)
+                    epis[n] = self.outer_smoothing(epis[n], params)
+                    epis[n] = self.post_filter(epis[n], params)
+
+                for epi in epis:
+                    self.st[:, :, x, :] += epi[:, :, :]
+
+        self.st = self.post_processing(lf3d, params)
+
+    def post_processing(self, lf3d, params):
+        """
+        overwrite this method to do some post processing on
+        the structure tensor result
+        """
+        self.st[:] /= lf3d.shape[3]
+        return self.st
+
+    def pre_filter(self, epi, params):
+        """
+        overwrite this method to do some pre filtering on the
+        epi channels
+        """
+        assert isinstance(epi, np.ndarray)
+        assert isinstance(params, type({}))
+        return epi
+
+    def inner_smoothing(self, epi, params):
+        """
+        overwrite this method to do the inner smooting on the
+        epi channels
+        """
+        assert isinstance(epi, np.ndarray)
+        assert isinstance(params, type({}))
+        return epi
+
+    def derivations(self, epi, params):
+        """
+        overwrite this method to compute the derivatives on the
+        epi channels
+        """
+        assert isinstance(epi, np.ndarray)
+        assert isinstance(params, type({}))
+        return epi
+
+    def outer_smoothing(self, epi, params):
+        """
+        overwrite this method to do the outer smooting on the
+        epi channels
+        """
+        assert isinstance(epi, np.ndarray)
+        assert isinstance(params, type({}))
+        return epi
+
+    def post_filter(self, epi, params):
+        """
+        overwrite this method to do some post filtering on the
+        epi channels
+        """
+        assert isinstance(epi, np.ndarray)
+        assert isinstance(params, type({}))
+        return epi
+
+    def get_result(self):
+        return self.st
+
+
+class StructureTensorClassic(StructureTensor):
+
+    def __init__(self):
+        StructureTensor.__init__(self)
+
+    def derivations(self, epi, params):
+        assert isinstance(epi, np.ndarray)
+        assert params.has_key("inner_scale")
+        assert params.has_key("outer_scale")
+
+        return vigra.filters.structureTensor(epi, params["inner_scale"], params["outer_scale"])
+
+
+
+
+
+
+
+
+
+
+
+#############################################################################################################
+#############################################################################################################
+#############################################################################################################
+#############################################################################################################
+
+
+
+
 def structureTensor2D(lf3d, inner_scale=0.6, outer_scale=1.3, direction='h'):
 
     st3d = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], 3), dtype=np.float32)

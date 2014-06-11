@@ -43,9 +43,9 @@ config.centerview_path = context+"/h/0007.png"
 #region of interest to process roi = {"pos":[y,x],"size":[sy,sx]
 config.roi = None
 
+config.structure_tensor_type = "classic"    # type of the structure tensor class to be used
 config.inner_scale = 0.6                    # structure tensor inner scale [default 0.6]
 config.outer_scale = 1.3                    # structure tensor outer scale [default 1.3]
-config.double_tensor = 2.0                  # if > 0.0 a second structure tensor with the outerscale specified is applied
 config.coherence_threshold = 0.7            # if coherence less than value the disparity is set to invalid
 config.focal_length = 5740.38               # focal length in pixel [default Nikon D800 f=28mm]
 config.global_shifts = [8, 9]               # list of horopter shifts in pixel [default [0]]
