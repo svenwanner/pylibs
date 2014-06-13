@@ -25,6 +25,7 @@ def load_3d(path, rgb=False, roi=None):
     """
     load a 3d light field from filesequence. The images need to be in .png, .tif or .jpg
 
+    :rtype : light field 3D volume
     :param path: string path to load filesequence from
     :param rgb: bool to define number of channels in light field returned
     :param roi: dict to define a region of interest {"size":[h,w],"pos":[y,x]}

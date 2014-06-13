@@ -1,8 +1,31 @@
 import numpy as np
+import logging,sys
+
+# ============================================================================================================
+#======================              Activate Deugging modus with input argument          ====================
+#=============================================================================================================
+def checkDebug(argv):
+    if len(argv) > 1:
+        if argv[1] == 'debug':
+            logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
+    else:
+        logging.basicConfig(stream=sys.stderr, level=logging.INFO)
+
+    #logging.debug('Example')
+    #logging.info('Example')
+
+    return 0
+
+
+
 
 def enum(**enums):
     return type('Enum', (), enums)
 
+
+# ============================================================================================================
+#======================              Shift Light fied to horoptor depth                   ====================
+#=============================================================================================================
 
 def refocus_3d(lf, focus, lf_type='h'):
     """
