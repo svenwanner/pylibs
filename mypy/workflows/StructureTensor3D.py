@@ -71,8 +71,18 @@ def compute_horizontal(lf3dh, shift, config):
             lf3d = prefilter.preEpiLaplace(lf3d, scale=config.prefilter_scale, direction='h')
 
     print "compute 3D structure tensor"
-    st3d = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], 3), dtype=np.float32)
-    tmp = vigra.filters.structureTensor(lf3d,config.inner_scale,config.outer_scale)
+    tmp = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], 6), dtype=np.float32)
+    epiVol = []
+    for c in range(lf3d.shape[3]):
+        epiVol.append(lf3d[:, :, :, c])
+    for n, epi in enumerate(epiVol):
+        epiVol[n] = vigra.filters.structureTensor(lf3d,[0.6,0.6,0.6],[0.9,0.9,0.9])
+    st = np.zeros_like(epiVol[0])
+    for epi in epiVol:
+        st[:, :, :, :] += epi[:, :, :, :]
+
+    tmp[:, :, :, :] = st[:]/3
+    # tmp = vigra.filters.structureTensor(lf3d,[0.7,0.4,0.7],[1.7,0.7,1.7])
     logging.debug('Size of 3D structure Tensor: ' + str(tmp.shape))
 
     print "compute eigen vectors"
@@ -258,8 +268,20 @@ def compute_vertical(lf3dv, shift, config):
 
 
     print "compute 3D structure tensor"
-    st3d = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], 3), dtype=np.float32)
-    tmp = vigra.filters.structureTensor(lf3d,config.inner_scale,config.outer_scale)
+    tmp = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], 6), dtype=np.float32)
+    epiVol = []
+    for c in range(lf3d.shape[3]):
+        epiVol.append(lf3d[:, :, :, c])
+    for n, epi in enumerate(epiVol):
+        epiVol[n] = vigra.filters.structureTensor(lf3d,[0.6,0.6,0.6],[0.9,0.9,0.9])
+    st = np.zeros_like(epiVol[0])
+    for epi in epiVol:
+        st[:, :, :, :] += epi[:, :, :, :]
+    tmp[:, :, :, :] = st[:]/3
+
+
+    # tmp = vigra.filters.structureTensor(lf3d,[0.7,0.7,0.4],[1.7,1.7,0.7])
+
     logging.debug('Size of 3D structure Tensor: ' + str(tmp.shape))
 
     print "compute eigen vectors"
