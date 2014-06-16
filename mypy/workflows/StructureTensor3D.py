@@ -75,15 +75,12 @@ def compute_horizontal(lf3dh, shift, config):
     tmp = vigra.filters.structureTensor(lf3d,config.inner_scale,config.outer_scale)
     logging.debug('Size of 3D structure Tensor: ' + str(tmp.shape))
 
-    st3d[:,:,:,0] = tmp[:,:,:,0]
-    st3d[:,:,:,1] = tmp[:,:,:,2]
-    st3d[:,:,:,2] = tmp[:,:,:,5]
-
     print "compute eigen vectors"
 
 
     ### initialize output arrays
     orientation = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2]), dtype=np.float32)
+    coherence = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2]), dtype=np.float32)
 
     if config.output_level == 3:
         orientation_smallesteigenvector = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2]), dtype=np.float32)
@@ -164,15 +161,17 @@ def compute_horizontal(lf3dh, shift, config):
 
                 if c1[k,i,j] >= c2[k,i,j]:
                     orientation[k,i,j] = v[1, largest]/v[0, largest]
+                    coherence[k,i,j] = c1[k,i,j]
                 if c2[k,i,j] > c1[k,i,j]:
                     orientation[k,i,j] = -v[0, smallest]/v[1, smallest]
+                    coherence[k,i,j] = c2[k,i,j]
 
                 # orientation[k,i,j] = np.sqrt((v[0, pos]/v[1, pos]*v[0, pos]/v[1, pos]) + (v[2, pos]/v[1, pos]* v[2, pos]/v[1, pos]))
 
 
 
 
-    coherence = np.sqrt((st3d[:, :, :, 2]-st3d[:, :, :, 0])**2+2*st3d[:, :, :, 1]**2)/(st3d[:, :, :, 2]+st3d[:, :, :, 0] + 1e-16)
+    # coherence = np.sqrt((st3d[:, :, :, 2]-st3d[:, :, :, 0])**2+2*st3d[:, :, :, 1]**2)/(st3d[:, :, :, 2]+st3d[:, :, :, 0] + 1e-16)
     # orientation = 1/2.0*vigra.numpy.arctan2(2*st3d[:, :, :, 1], st3d[:, :, :, 2]-st3d[:, :, :, 0])
     # orientation = vigra.numpy.tan(orientation[:])
 
@@ -263,15 +262,11 @@ def compute_vertical(lf3dv, shift, config):
     tmp = vigra.filters.structureTensor(lf3d,config.inner_scale,config.outer_scale)
     logging.debug('Size of 3D structure Tensor: ' + str(tmp.shape))
 
-    st3d[:,:,:,0] = tmp[:,:,:,0]
-    st3d[:,:,:,1] = tmp[:,:,:,1]
-    st3d[:,:,:,2] = tmp[:,:,:,3]
-
-
     print "compute eigen vectors"
 
     ### initialize output arrays
     orientation = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2]), dtype=np.float32)
+    coherence = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2]), dtype=np.float32)
 
     if config.output_level == 3:
         orientation_smallesteigenvector = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2]), dtype=np.float32)
@@ -343,15 +338,17 @@ def compute_vertical(lf3dv, shift, config):
 
                 if c1[k,i,j] >= c2[k,i,j]:
                     orientation[k,i,j] = v[1, largest]/v[0, largest]
+                    coherence[k,i,j] = c1[k,i,j]
                 if c2[k,i,j] > c1[k,i,j]:
                     orientation[k,i,j] = -v[0, smallest]/v[1, smallest]
+                    coherence[k,i,j] = c2[k,i,j]
 
                 # orientation[k,i,j] = np.sqrt((v[0, pos]/v[1, pos]*v[0, pos]/v[1, pos]) + (v[2, pos]/v[1, pos]* v[2, pos]/v[1, pos]))
 
 
 
 
-    coherence = np.sqrt((st3d[:, :, :, 2]-st3d[:, :, :, 0])**2+2*st3d[:, :, :, 1]**2)/(st3d[:, :, :, 2]+st3d[:, :, :, 0] + 1e-16)
+    # coherence = np.sqrt((st3d[:, :, :, 2]-st3d[:, :, :, 0])**2+2*st3d[:, :, :, 1]**2)/(st3d[:, :, :, 2]+st3d[:, :, :, 0] + 1e-16)
 
     ### Remove outliers surpassing the measurable range in the disparity map
     invalid_ubounds = np.where(orientation > 1)
@@ -400,12 +397,6 @@ def compute_vertical(lf3dv, shift, config):
     logging.info('done!')
 
     return orientation, coherence
-
-
-
-
-
-
 
 
 
@@ -539,13 +530,6 @@ def structureTensor3D(config):
             dtc.save_pointcloud(config.result_path+config.result_label+"pointcloud.ply", depth_map=depth, focal_length=config.focal_length)
 
         print "ok"
-
-
-
-
-
-
-
 
 
 
