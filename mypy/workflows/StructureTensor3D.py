@@ -76,7 +76,7 @@ def compute_horizontal(lf3dh, shift, config):
     for c in range(lf3d.shape[3]):
         epiVol.append(lf3d[:, :, :, c])
     for n, epi in enumerate(epiVol):
-        epiVol[n] = vigra.filters.structureTensor(lf3d,[0.6,0.6,0.6],[0.9,0.9,0.9])
+        epiVol[n] = vigra.filters.structureTensor(lf3d,config.inner_scale_h,config.outer_scale_h)
     st = np.zeros_like(epiVol[0])
     for epi in epiVol:
         st[:, :, :, :] += epi[:, :, :, :]
@@ -273,7 +273,7 @@ def compute_vertical(lf3dv, shift, config):
     for c in range(lf3d.shape[3]):
         epiVol.append(lf3d[:, :, :, c])
     for n, epi in enumerate(epiVol):
-        epiVol[n] = vigra.filters.structureTensor(lf3d,[0.6,0.6,0.6],[0.9,0.9,0.9])
+        epiVol[n] = vigra.filters.structureTensor(lf3d,config.inner_scale_v,config.outer_scale_v)
     st = np.zeros_like(epiVol[0])
     for epi in epiVol:
         st[:, :, :, :] += epi[:, :, :, :]
@@ -573,8 +573,10 @@ class Config:
         self.centerview_path = None             # path to the center view image to get color for pointcloud [optional]
 
         self.structure_tensor_type = "classic"  # type of the structure tensor class to be used
-        self.inner_scale = 0.6                  # structure tensor inner scale
-        self.outer_scale = 0.9                  # structure tensor outer scale
+        self.inner_scale_v = 0.6                  # structure tensor inner scale
+        self.outer_scale_v = 0.9
+        self.inner_scale_h = 0.6                  # structure tensor inner scale
+        self.outer_scale_h = 0.9                 # structure tensor outer scale
         self.coherence_threshold = 0.7          # if coherence less than value the disparity is set to invalid
         self.focal_length = 5740.38             # focal length in pixel [default Nikon D800 f=28mm]
         self.global_shifts = [0]                # list of horopter shifts in pixel

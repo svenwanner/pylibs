@@ -346,13 +346,13 @@ def structureTensor2D(config):
                 eposy = config.roi["pos"][1] + config.roi["size"][1]
                 color = color[sposx:eposx, sposy:eposy, 0:3]
 
-        tmp = np.zeros((lf_shape[1], lf_shape[2], 4), dtype=np.float32)
-        tmp[:, :, 0] = orientation[lf_shape[0]/2, :, :]
-        tmp[:, :, 1] = coherence[lf_shape[0]/2, :, :]
-        tmp[:, :, 2] = depth[:]
-        vim = vigra.RGBImage(tmp)
-        vim.writeImage(config.result_path+config.result_label+"final.exr")
-        myshow.finalsViewer(config.result_path+config.result_label+"final.exr", save_at=config.result_path+config.result_label)
+        # tmp = np.zeros((lf_shape[1], lf_shape[2], 4), dtype=np.float32)
+        # tmp[:, :, 0] = orientation[lf_shape[0]/2, :, :]
+        # tmp[:, :, 1] = coherence[lf_shape[0]/2, :, :]
+        # tmp[:, :, 2] = depth[:]
+        # vim = vigra.RGBImage(tmp)
+        # vim.writeImage(config.result_path+config.result_label+"final.exr")
+        # myshow.finalsViewer(config.result_path+config.result_label+"final.exr", save_at=config.result_path+config.result_label)
 
         print "make pointcloud...",
         if isinstance(color, np.ndarray):
