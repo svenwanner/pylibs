@@ -40,6 +40,7 @@ class Config:
         self.structure_tensor_type = "classic"  # type of the structure tensor class to be used
         self.inner_scale = 0.6                  # structure tensor inner scale
         self.outer_scale = 0.9                  # structure tensor outer scale
+        self.hourglass_scale = 0
         self.coherence_threshold = 0.7          # if coherence less than value the disparity is set to invalid
         self.focal_length = 5740.38             # focal length in pixel [default Nikon D800 f=28mm]
         self.global_shifts = [0]                # list of horopter shifts in pixel
@@ -55,7 +56,7 @@ class Config:
         self.tv = {"alpha": 1.0, "steps": 1000} # apply total variation to depth map
 
         self.min_depth = 0.01                   # minimum depth possible
-        self.max_depth = 1.0                    # maximum depth possible
+        self.max_depth = 10.0                    # maximum depth possible
 
         self.rgb = True                         # forces grayscale if False
 
@@ -69,6 +70,8 @@ class Config:
         f.write("roi : "); f.write(str(self.roi)+"\n")
         f.write("inner_scale : "); f.write(str(self.inner_scale)+"\n")
         f.write("outer_scale : "); f.write(str(self.outer_scale)+"\n")
+        if self.structure_tensor_type == "hour-glass":
+            f.write("hourglass_scale : "); f.write(str(self.hourglass_scale)+"\n")
         f.write("coherence_threshold : "); f.write(str(self.coherence_threshold)+"\n")
         f.write("focal_length : "); f.write(str(self.focal_length)+"\n")
         f.write("global_shifts : "); f.write(str(self.global_shifts)+"\n")
@@ -139,8 +142,10 @@ def compute_horizontal(lf3dh, shift, config):
     structureTensor = None
     if config.structure_tensor_type == "classic":
         structureTensor = st2d.StructureTensorClassic()
+    if config.structure_tensor_type == "hour-glass":
+        structureTensor = st2d.StructureTensorHourGlass()
 
-    params = {"direction": 'h', "inner_scale": config.inner_scale, "outer_scale": config.outer_scale}
+    params = {"direction": 'h', "inner_scale": config.inner_scale, "outer_scale": config.outer_scale, "hour-glass": config.hourglass_scale}
     structureTensor.compute(lf3d, params)
     st3d = structureTensor.get_result()
 
@@ -152,9 +157,9 @@ def compute_horizontal(lf3dh, shift, config):
         coherence_h[invalids] = 0.0
 
     if config.output_level == 3:
-        misc.imsave(config.result_path+config.result_label+"orientation_h_shift_{0}.png".format(shift), orientation_h[lf_shape[0]/2, :, :])
+        misc.imsave(config.result_path+config.result_label+"orientation_h_shift_{0}.png".format(shift), orientation_h[orientation_h[0]/2, :, :])
     if config.output_level == 3:
-        misc.imsave(config.result_path+config.result_label+"coherence_h_{0}.png".format(shift), coherence_h[lf_shape[0]/2, :, :])
+        misc.imsave(config.result_path+config.result_label+"coherence_h_{0}.png".format(shift), coherence_h[coherence_h[0]/2, :, :])
     print "ok"
 
     return orientation_h, coherence_h
@@ -182,10 +187,14 @@ def compute_vertical(lf3dv, shift, config):
     structureTensor = None
     if config.structure_tensor_type == "classic":
         structureTensor = st2d.StructureTensorClassic()
+    if config.structure_tensor_type == "hour-glass":
+        structureTensor = st2d.StructureTensorHourGlass()
 
-    params = {"direction": 'v', "inner_scale": config.inner_scale, "outer_scale": config.outer_scale}
+    params = {"direction": 'v', "inner_scale": config.inner_scale, "outer_scale": config.outer_scale, "hour-glass": config.hourglass_scale}
     structureTensor.compute(lf3d, params)
     st3d = structureTensor.get_result()
+
+
 
     orientation_v, coherence_v = st2d.evaluateStructureTensor(st3d)
     orientation_v[:] += shift
@@ -195,9 +204,9 @@ def compute_vertical(lf3dv, shift, config):
         coherence_v[invalids] = 0.0
 
     if config.output_level == 3:
-        misc.imsave(config.result_path+config.result_label+"orientation_v_shift_{0}.png".format(shift), orientation_v[lf_shape[0]/2, :, :])
+        misc.imsave(config.result_path+config.result_label+"orientation_v_shift_{0}.png".format(shift), orientation_v[orientation_v[0]/2, :, :])
     if config.output_level == 3:
-        misc.imsave(config.result_path+config.result_label+"coherence_v_{0}.png".format(shift), coherence_v[lf_shape[0]/2, :, :])
+        misc.imsave(config.result_path+config.result_label+"coherence_v_{0}.png".format(shift), coherence_v[coherence_v[0]/2, :, :])
     print "ok"
 
     return orientation_v, coherence_v

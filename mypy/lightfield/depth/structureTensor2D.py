@@ -134,6 +134,30 @@ class StructureTensorClassic(StructureTensor):
         return vigra.filters.structureTensor(epi, params["inner_scale"], params["outer_scale"])
 
 
+class StructureTensorHourGlass(StructureTensor):
+
+    def __init__(self):
+        StructureTensor.__init__(self)
+
+    def derivations(self, epi, params):
+        assert isinstance(epi, np.ndarray)
+        assert params.has_key("inner_scale")
+        assert params.has_key("outer_scale")
+
+
+        # tmp_Grad = vigra.filters.gaussianGradient(epi,params["inner_scale"])
+        # print tmp_Grad.shape
+
+        tensor =  vigra.filters.structureTensor(epi, params["inner_scale"], params["outer_scale"])
+        # tensor = vigra.filters.vectorToTensor(tmp_Grad)
+        # print tensor.shape
+
+        strTen = vigra.filters.hourGlassFilter2D(tensor, params["hour-glass"], 0.4)
+        # print strTen.shape
+
+        return strTen
+
+
 
 
 
@@ -196,12 +220,12 @@ def evaluateStructureTensor(tensor):
     coherence = np.sqrt((tensor[:, :, :, 2]-tensor[:, :, :, 0])**2+2*tensor[:, :, :, 1]**2)/(tensor[:, :, :, 2]+tensor[:, :, :, 0] + 1e-16)
     orientation = 1/2.0*vigra.numpy.arctan2(2*tensor[:, :, :, 1], tensor[:, :, :, 2]-tensor[:, :, :, 0])
     orientation = vigra.numpy.tan(orientation[:])
-    invalid_ubounds = np.where(orientation > 1)
-    invalid_lbounds = np.where(orientation < -1)
+    invalid_ubounds = np.where(orientation > 1.0)
+    invalid_lbounds = np.where(orientation < -1.0)
     coherence[invalid_ubounds] = 0
     coherence[invalid_lbounds] = 0
-    orientation[invalid_ubounds] = -1
-    orientation[invalid_lbounds] = -1
+    orientation[invalid_ubounds] = -1.0
+    orientation[invalid_lbounds] = -1.0
     return orientation, coherence
 
 
@@ -297,4 +321,10 @@ def mergeOrientations_wta(orientation1, coherence1, orientation2, coherence2):
     winner = np.where(coherence2 > coherence1)
     orientation1[winner] = orientation2[winner]
     coherence1[winner] = coherence2[winner]
+    ### apply memory of coherence
+    winner = np.where(0.90 > coherence1)
+    coherence1[winner] =  coherence1[winner] * 1.05
+    winner = np.where(0.98 > coherence1)
+    coherence1[winner] =  coherence1[winner] * 1.07
+
     return orientation1, coherence1
