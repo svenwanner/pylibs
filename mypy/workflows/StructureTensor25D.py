@@ -129,13 +129,13 @@ def compute_vertical(lf3dv, shift, config):
 
     if config.prefilter > 0:
        if config.prefilter == prefilter.PREFILTER.IMGD:
-           lf3d = prefilter.preImgDerivation(lf3d, scale=config.prefilter_scale, direction='h')
+           lf3d = prefilter.preImgDerivation(lf3d, scale=config.prefilter_scale, direction='v')
        if config.prefilter == prefilter.PREFILTER.EPID:
-           lf3d = prefilter.preEpiDerivation(lf3d, scale=config.prefilter_scale, direction='h')
+           lf3d = prefilter.preEpiDerivation(lf3d, scale=config.prefilter_scale, direction='v')
        if config.prefilter == prefilter.PREFILTER.IMGD2:
             lf3d = prefilter.preImgLaplace(lf3d, scale=config.prefilter_scale)
        if config.prefilter == prefilter.PREFILTER.EPID2:
-            lf3d = prefilter.preEpiLaplace(lf3d, scale=config.prefilter_scale, direction='h')
+            lf3d = prefilter.preEpiLaplace(lf3d, scale=config.prefilter_scale, direction='v')
 
 
     print "compute 2.5D structure tensor"
