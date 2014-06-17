@@ -71,25 +71,34 @@ def compute_horizontal(lf3dh, shift, config):
             lf3d = prefilter.preEpiLaplace(lf3d, scale=config.prefilter_scale, direction='h')
 
     print "compute 3D structure tensor"
-    st3d = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], 3), dtype=np.float32)
-    tmp = vigra.filters.structureTensor(lf3d,config.inner_scale,config.outer_scale)
-    logging.debug('Size of 3D structure Tensor: ' + str(tmp.shape))
+    tmp = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], 6), dtype=np.float32)
+    epiVol = []
+    for c in range(lf3d.shape[3]):
+        epiVol.append(lf3d[:, :, :, c])
+    for n, epi in enumerate(epiVol):
+        epiVol[n] = vigra.filters.structureTensor(lf3d,[0.6,0.6,0.6],[0.9,0.9,0.9])
+    st = np.zeros_like(epiVol[0])
+    for epi in epiVol:
+        st[:, :, :, :] += epi[:, :, :, :]
 
-    st3d[:,:,:,0] = tmp[:,:,:,0]
-    st3d[:,:,:,1] = tmp[:,:,:,2]
-    st3d[:,:,:,2] = tmp[:,:,:,5]
+    tmp[:, :, :, :] = st[:]/3
+    # tmp = vigra.filters.structureTensor(lf3d,[0.7,0.4,0.7],[1.7,0.7,1.7])
+    logging.debug('Size of 3D structure Tensor: ' + str(tmp.shape))
 
     print "compute eigen vectors"
 
 
     ### initialize output arrays
     orientation = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2]), dtype=np.float32)
-    orientation_smallesteigenvector = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2]), dtype=np.float32)
-    orientation_largesteigenvector = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2]), dtype=np.float32)
+    coherence = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2]), dtype=np.float32)
 
-    eigwert_map_largest = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2]), dtype=np.float32)
-    eigwert_map_second = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2]), dtype=np.float32)
-    eigwert_map_smallest = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2]), dtype=np.float32)
+    if config.output_level == 3:
+        orientation_smallesteigenvector = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2]), dtype=np.float32)
+        orientation_largesteigenvector = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2]), dtype=np.float32)
+
+        eigwert_map_largest = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2]), dtype=np.float32)
+        eigwert_map_second = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2]), dtype=np.float32)
+        eigwert_map_smallest = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2]), dtype=np.float32)
 
     c1 = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2]), dtype=np.float32)
     c2 = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2]), dtype=np.float32)
@@ -144,10 +153,11 @@ def compute_horizontal(lf3dh, shift, config):
                 # print(smallest)
                 # print 'eigenvalue:'
                 # print(w)
+                if config.output_level == 3:
+                    eigwert_map_largest[k, i, j] = w[largest]
+                    eigwert_map_second[k, i, j] = w[second]
+                    eigwert_map_smallest[k, i, j] = w[smallest]
 
-                eigwert_map_largest[k, i, j] = w[largest]
-                eigwert_map_second[k, i, j] = w[second]
-                eigwert_map_smallest[k, i, j] = w[smallest]
                 c1[k,i,j] = (w[largest] - w[second] )/(w[largest] + w[second])
                 c2[k,i,j] = (w[second] - w[smallest])/(w[second] + w[smallest])
 
@@ -155,21 +165,23 @@ def compute_horizontal(lf3dh, shift, config):
                 # print(c1[k,i,j])
                 # print('position second: ')
                 # print(c2[k,i,j])
-
-                orientation_largesteigenvector[k,i,j] = v[1, largest]/v[0, largest]
-                orientation_smallesteigenvector[k, i, j] = -v[0, smallest]/v[1, smallest]
+                if config.output_level == 3:
+                    orientation_largesteigenvector[k,i,j] = v[1, largest]/v[0, largest]
+                    orientation_smallesteigenvector[k, i, j] = -v[0, smallest]/v[1, smallest]
 
                 if c1[k,i,j] >= c2[k,i,j]:
                     orientation[k,i,j] = v[1, largest]/v[0, largest]
+                    coherence[k,i,j] = c1[k,i,j]
                 if c2[k,i,j] > c1[k,i,j]:
                     orientation[k,i,j] = -v[0, smallest]/v[1, smallest]
+                    coherence[k,i,j] = c2[k,i,j]
 
                 # orientation[k,i,j] = np.sqrt((v[0, pos]/v[1, pos]*v[0, pos]/v[1, pos]) + (v[2, pos]/v[1, pos]* v[2, pos]/v[1, pos]))
 
 
 
 
-    coherence = np.sqrt((st3d[:, :, :, 2]-st3d[:, :, :, 0])**2+2*st3d[:, :, :, 1]**2)/(st3d[:, :, :, 2]+st3d[:, :, :, 0] + 1e-16)
+    # coherence = np.sqrt((st3d[:, :, :, 2]-st3d[:, :, :, 0])**2+2*st3d[:, :, :, 1]**2)/(st3d[:, :, :, 2]+st3d[:, :, :, 0] + 1e-16)
     # orientation = 1/2.0*vigra.numpy.arctan2(2*st3d[:, :, :, 1], st3d[:, :, :, 2]-st3d[:, :, :, 0])
     # orientation = vigra.numpy.tan(orientation[:])
 
@@ -182,22 +194,23 @@ def compute_horizontal(lf3dh, shift, config):
     coherence[invalid_ubounds] = 0
     coherence[invalid_lbounds] = 0
 
+    if config.output_level == 3:
     ### Remove outliers surpassing the measurable range in the disparity map
-    invalid_ubounds = np.where(orientation_smallesteigenvector > 1)
-    invalid_lbounds = np.where(orientation_smallesteigenvector < -1)
-    orientation_smallesteigenvector[invalid_ubounds] = -1
-    orientation_smallesteigenvector[invalid_lbounds] = -1
+        invalid_ubounds = np.where(orientation_smallesteigenvector > 1)
+        invalid_lbounds = np.where(orientation_smallesteigenvector < -1)
+        orientation_smallesteigenvector[invalid_ubounds] = -1
+        orientation_smallesteigenvector[invalid_lbounds] = -1
 
     ### Remove outliers surpassing the measurable range in the disparity map
-    invalid_ubounds = np.where(orientation_largesteigenvector > 1)
-    invalid_lbounds = np.where(orientation_largesteigenvector < -1)
-    orientation_largesteigenvector[invalid_ubounds] = -1
-    orientation_largesteigenvector[invalid_lbounds] = -1
+        invalid_ubounds = np.where(orientation_largesteigenvector > 1)
+        invalid_lbounds = np.where(orientation_largesteigenvector < -1)
+        orientation_largesteigenvector[invalid_ubounds] = -1
+        orientation_largesteigenvector[invalid_lbounds] = -1
 
-    ### apply coherence threshold, bad estimations get canceled out
-    # if config.coherence_threshold > 0.0:
-    #     invalids = np.where(coherence < config.coherence_threshold)
-    #     coherence[invalids] = 0.0
+    ## apply coherence threshold, bad estimations get canceled out
+    if config.coherence_threshold > 0.0:
+        invalids = np.where(coherence < config.coherence_threshold)
+        coherence[invalids] = 0.0
 
     ### save outputs in output_level 3
     if config.output_level == 3:
@@ -255,25 +268,35 @@ def compute_vertical(lf3dv, shift, config):
 
 
     print "compute 3D structure tensor"
-    st3d = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], 3), dtype=np.float32)
-    tmp = vigra.filters.structureTensor(lf3d,config.inner_scale,config.outer_scale)
+    tmp = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], 6), dtype=np.float32)
+    epiVol = []
+    for c in range(lf3d.shape[3]):
+        epiVol.append(lf3d[:, :, :, c])
+    for n, epi in enumerate(epiVol):
+        epiVol[n] = vigra.filters.structureTensor(lf3d,[0.6,0.6,0.6],[0.9,0.9,0.9])
+    st = np.zeros_like(epiVol[0])
+    for epi in epiVol:
+        st[:, :, :, :] += epi[:, :, :, :]
+    tmp[:, :, :, :] = st[:]/3
+
+
+    # tmp = vigra.filters.structureTensor(lf3d,[0.7,0.7,0.4],[1.7,1.7,0.7])
+
     logging.debug('Size of 3D structure Tensor: ' + str(tmp.shape))
-
-    st3d[:,:,:,0] = tmp[:,:,:,0]
-    st3d[:,:,:,1] = tmp[:,:,:,1]
-    st3d[:,:,:,2] = tmp[:,:,:,3]
-
 
     print "compute eigen vectors"
 
     ### initialize output arrays
     orientation = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2]), dtype=np.float32)
-    orientation_smallesteigenvector = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2]), dtype=np.float32)
-    orientation_largesteigenvector = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2]), dtype=np.float32)
+    coherence = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2]), dtype=np.float32)
 
-    eigwert_map_largest = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2]), dtype=np.float32)
-    eigwert_map_second = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2]), dtype=np.float32)
-    eigwert_map_smallest = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2]), dtype=np.float32)
+    if config.output_level == 3:
+        orientation_smallesteigenvector = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2]), dtype=np.float32)
+        orientation_largesteigenvector = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2]), dtype=np.float32)
+
+        eigwert_map_largest = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2]), dtype=np.float32)
+        eigwert_map_second = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2]), dtype=np.float32)
+        eigwert_map_smallest = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2]), dtype=np.float32)
 
     c1 = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2]), dtype=np.float32)
     c2 = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2]), dtype=np.float32)
@@ -319,9 +342,11 @@ def compute_vertical(lf3dv, shift, config):
                 # print 'eigenvalue:'
                 # print(w)
 
-                eigwert_map_largest[k, i, j] = w[largest]
-                eigwert_map_second[k, i, j] = w[second]
-                eigwert_map_smallest[k, i, j] = w[smallest]
+                if config.output_level == 3:
+                    eigwert_map_largest[k, i, j] = w[largest]
+                    eigwert_map_second[k, i, j] = w[second]
+                    eigwert_map_smallest[k, i, j] = w[smallest]
+
                 c1[k,i,j] = (w[largest] - w[second] )/(w[largest] + w[second])
                 c2[k,i,j] = (w[second] - w[smallest])/(w[second] + w[smallest])
 
@@ -329,23 +354,23 @@ def compute_vertical(lf3dv, shift, config):
                 # print(c1[k,i,j])
                 # print('position second: ')
                 # print(c2[k,i,j])
-
-                orientation_largesteigenvector[k,i,j] = v[1, largest]/v[0, largest]
-                orientation_smallesteigenvector[k, i, j] = -v[0, smallest]/v[1, smallest]
+                if config.output_level == 3:
+                    orientation_largesteigenvector[k,i,j] = v[1, largest]/v[0, largest]
+                    orientation_smallesteigenvector[k, i, j] = -v[0, smallest]/v[1, smallest]
 
                 if c1[k,i,j] >= c2[k,i,j]:
                     orientation[k,i,j] = v[1, largest]/v[0, largest]
+                    coherence[k,i,j] = c1[k,i,j]
                 if c2[k,i,j] > c1[k,i,j]:
                     orientation[k,i,j] = -v[0, smallest]/v[1, smallest]
+                    coherence[k,i,j] = c2[k,i,j]
 
                 # orientation[k,i,j] = np.sqrt((v[0, pos]/v[1, pos]*v[0, pos]/v[1, pos]) + (v[2, pos]/v[1, pos]* v[2, pos]/v[1, pos]))
 
 
 
 
-    coherence = np.sqrt((st3d[:, :, :, 2]-st3d[:, :, :, 0])**2+2*st3d[:, :, :, 1]**2)/(st3d[:, :, :, 2]+st3d[:, :, :, 0] + 1e-16)
-    # orientation = 1/2.0*vigra.numpy.arctan2(2*st3d[:, :, :, 1], st3d[:, :, :, 2]-st3d[:, :, :, 0])
-    # orientation = vigra.numpy.tan(orientation[:])
+    # coherence = np.sqrt((st3d[:, :, :, 2]-st3d[:, :, :, 0])**2+2*st3d[:, :, :, 1]**2)/(st3d[:, :, :, 2]+st3d[:, :, :, 0] + 1e-16)
 
     ### Remove outliers surpassing the measurable range in the disparity map
     invalid_ubounds = np.where(orientation > 1)
@@ -356,17 +381,18 @@ def compute_vertical(lf3dv, shift, config):
     coherence[invalid_ubounds] = 0
     coherence[invalid_lbounds] = 0
 
+    if config.output_level == 3:
     ### Remove outliers surpassing the measurable range in the disparity map
-    invalid_ubounds = np.where(orientation_smallesteigenvector > 1)
-    invalid_lbounds = np.where(orientation_smallesteigenvector < -1)
-    orientation_smallesteigenvector[invalid_ubounds] = -1
-    orientation_smallesteigenvector[invalid_lbounds] = -1
+        invalid_ubounds = np.where(orientation_smallesteigenvector > 1)
+        invalid_lbounds = np.where(orientation_smallesteigenvector < -1)
+        orientation_smallesteigenvector[invalid_ubounds] = -1
+        orientation_smallesteigenvector[invalid_lbounds] = -1
 
     ### Remove outliers surpassing the measurable range in the disparity map
-    invalid_ubounds = np.where(orientation_largesteigenvector > 1)
-    invalid_lbounds = np.where(orientation_largesteigenvector < -1)
-    orientation_largesteigenvector[invalid_ubounds] = -1
-    orientation_largesteigenvector[invalid_lbounds] = -1
+        invalid_ubounds = np.where(orientation_largesteigenvector > 1)
+        invalid_lbounds = np.where(orientation_largesteigenvector < -1)
+        orientation_largesteigenvector[invalid_ubounds] = -1
+        orientation_largesteigenvector[invalid_lbounds] = -1
 
     ### apply coherence threshold, bad estimations get canceled out
     # if config.coherence_threshold > 0.0:
@@ -393,12 +419,6 @@ def compute_vertical(lf3dv, shift, config):
     logging.info('done!')
 
     return orientation, coherence
-
-
-
-
-
-
 
 
 
@@ -507,38 +527,31 @@ def structureTensor3D(config):
 ## Light field computation has to be changed just to compute the core of the disparity and just transfer it here to the disparity map
 
     depth = dtc.disparity_to_depth(orientation[lf_shape[0]/2, :, :], config.base_line, config.focal_length, config.min_depth, config.max_depth)
-    # mask = coherence[lf_shape[0]/2, :, :]
-    #
-    # invalids = np.where(mask == 0)
-    # depth[invalids] = 0
-    #
-    # if config.output_level >= 1:
-    #     plt.imsave(config.result_path+config.result_label+"depth_final.png", depth, cmap=plt.cm.jet)
-    #
-    # if config.output_level >= 1:
-    #     if isinstance(config.centerview_path, str):
-    #         color = misc.imread(config.centerview_path)
-    #         if isinstance(config.roi, type({})):
-    #             sposx = config.roi["pos"][0]
-    #             eposx = config.roi["pos"][0] + config.roi["size"][0]
-    #             sposy = config.roi["pos"][1]
-    #             eposy = config.roi["pos"][1] + config.roi["size"][1]
-    #             color = color[sposx:eposx, sposy:eposy, 0:3]
-    #
-    #     print "make pointcloud...",
-    #     if isinstance(color, np.ndarray):
-    #         dtc.save_pointcloud(config.result_path+config.result_label+"pointcloud.ply", depth_map=depth, color=color, focal_length=config.focal_length)
-    #     else:
-    #         dtc.save_pointcloud(config.result_path+config.result_label+"pointcloud.ply", depth_map=depth, focal_length=config.focal_length)
-    #
-    #     print "ok"
+    mask = coherence[lf_shape[0]/2, :, :]
 
+    invalids = np.where(mask == 0)
+    depth[invalids] = 0
 
+    if config.output_level >= 1:
+        plt.imsave(config.result_path+config.result_label+"depth_final.png", depth, cmap=plt.cm.jet)
 
+    if config.output_level >= 1:
+        if isinstance(config.centerview_path, str):
+            color = misc.imread(config.centerview_path)
+            if isinstance(config.roi, type({})):
+                sposx = config.roi["pos"][0]
+                eposx = config.roi["pos"][0] + config.roi["size"][0]
+                sposy = config.roi["pos"][1]
+                eposy = config.roi["pos"][1] + config.roi["size"][1]
+                color = color[sposx:eposx, sposy:eposy, 0:3]
 
+        print "make pointcloud...",
+        if isinstance(color, np.ndarray):
+            dtc.save_pointcloud(config.result_path+config.result_label+"pointcloud.ply", depth_map=depth, color=color, focal_length=config.focal_length)
+        else:
+            dtc.save_pointcloud(config.result_path+config.result_label+"pointcloud.ply", depth_map=depth, focal_length=config.focal_length)
 
-
-
+        print "ok"
 
 
 
