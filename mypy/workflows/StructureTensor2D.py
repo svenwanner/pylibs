@@ -69,7 +69,6 @@ class Config:
         f.write("roi : "); f.write(str(self.roi)+"\n")
         f.write("inner_scale : "); f.write(str(self.inner_scale)+"\n")
         f.write("outer_scale : "); f.write(str(self.outer_scale)+"\n")
-        f.write("double_tensor : "); f.write(str(self.double_tensor)+"\n")
         f.write("coherence_threshold : "); f.write(str(self.coherence_threshold)+"\n")
         f.write("focal_length : "); f.write(str(self.focal_length)+"\n")
         f.write("global_shifts : "); f.write(str(self.global_shifts)+"\n")
@@ -357,8 +356,8 @@ def structureTensor2D(config):
 
         print "make pointcloud...",
         if isinstance(color, np.ndarray):
-            dtc.save_pointcloud(config.result_path+config.result_label+"pointcloud.ply", depth_map=depth, color=color, focal_length=config.focal_length)
+            dtc.save_pointcloud(config.result_path+config.result_label+"pointcloud.ply", depth_map=depth, color=color, confidence=coherence[lf_shape[0]/2, :, :], focal_length=config.focal_length)
         else:
-            dtc.save_pointcloud(config.result_path+config.result_label+"pointcloud.ply", depth_map=depth, focal_length=config.focal_length)
+            dtc.save_pointcloud(config.result_path+config.result_label+"pointcloud.ply", depth_map=depth, confidence=coherence[lf_shape[0]/2, :, :], focal_length=config.focal_length)
 
         print "ok"
