@@ -2,6 +2,7 @@ from __future__ import division
 
 import vigra
 import numpy as np
+import scipy.misc as misc
 
 from mypy.visualization.imshow import imshow
 
@@ -35,6 +36,8 @@ class StructureTensor(object):
         if params["direction"] == 'h':
             for y in xrange(lf3d.shape[1]):
                 epis = []
+                e = lf3d[:, y, :, :]
+                # misc.imsave("EPT_{0}.tiff".format(y),e)
                 for c in range(lf3d.shape[3]):
                     epis.append(lf3d[:, y, :, c])
                 for n, epi in enumerate(epis):
@@ -182,6 +185,7 @@ def structureTensor2D(lf3d, inner_scale=0.6, outer_scale=1.3, direction='h'):
     if direction == 'h':
         for y in xrange(lf3d.shape[1]):
             epis = []
+
             for c in range(lf3d.shape[3]):
                 epis.append(lf3d[:, y, :, c])
             for n, epi in enumerate(epis):
@@ -321,7 +325,7 @@ def mergeOrientations_wta(orientation1, coherence1, orientation2, coherence2):
     winner = np.where(coherence2 > coherence1)
     orientation1[winner] = orientation2[winner]
     coherence1[winner] = coherence2[winner]
-    ### apply memory of coherence
+    ### apply memory of coherence, good values get enhanced if they stay longer
     winner = np.where(0.90 > coherence1)
     coherence1[winner] =  coherence1[winner] * 1.05
     winner = np.where(0.98 > coherence1)

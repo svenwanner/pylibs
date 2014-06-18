@@ -157,9 +157,9 @@ def compute_horizontal(lf3dh, shift, config):
         coherence_h[invalids] = 0.0
 
     if config.output_level == 3:
-        misc.imsave(config.result_path+config.result_label+"orientation_h_shift_{0}.png".format(shift), orientation_h[orientation_h[0]/2, :, :])
+        misc.imsave(config.result_path+config.result_label+"orientation_h_shift_{0}.png".format(shift), orientation_h[orientation_h.shape[0]/2, :, :])
     if config.output_level == 3:
-        misc.imsave(config.result_path+config.result_label+"coherence_h_{0}.png".format(shift), coherence_h[coherence_h[0]/2, :, :])
+        misc.imsave(config.result_path+config.result_label+"coherence_h_{0}.png".format(shift), coherence_h[coherence_h.shape[0]/2, :, :])
     print "ok"
 
     return orientation_h, coherence_h
@@ -237,23 +237,26 @@ def structureTensor2D(config):
         if not config.path_horizontal.endswith("/"):
             config.path_horizontal += "/"
         lf3dh = lfio.load_3d(config.path_horizontal, rgb=config.rgb, roi=config.roi)
-        compute_h = True
         lf_shape = lf3dh.shape
+        print("horizontal data loaded successfully")
+        compute_h = True
     except:
-        pass
+        print("no horizontal data available")
 
     try:
         if not config.path_vertical.endswith("/"):
             config.path_vertical += "/"
-        compute_v = True
         lf3dv = lfio.load_3d(config.path_vertical, rgb=config.rgb, roi=config.roi)
         if lf_shape is None:
             lf_shape = lf3dv.shape
+        print("vertical data loaded successfully")
+        compute_v = True
     except:
-        pass
+        print("no vertical data available")
 
     orientation = np.zeros((lf_shape[0], lf_shape[1], lf_shape[2]), dtype=np.float32)
     coherence = np.zeros((lf_shape[0], lf_shape[1], lf_shape[2]), dtype=np.float32)
+
     print "ok"
 
     for shift in config.global_shifts:
@@ -278,12 +281,10 @@ def structureTensor2D(config):
         for x in threads:
             x.join()
             if x.direction == 'h':
+                print "get horizontal"
                 orientation_h, coherence_h = x.get_results()
             if x.direction == 'v':
                 orientation_v, coherence_v = x.get_results()
-
-
-
 
         if compute_h and compute_v:
             print "merge vertical/horizontal ...",
