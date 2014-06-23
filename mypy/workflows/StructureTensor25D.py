@@ -71,7 +71,20 @@ def compute_horizontal(lf3dh, shift, config):
 
     print "compute 3D structure tensor"
     st3d = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], 3), dtype=np.float32)
-    tmp = vigra.filters.structureTensor(lf3d,config.inner_scale,config.outer_scale)
+
+    tmp = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], 6), dtype=np.float32)
+    epiVol = []
+    for c in range(lf3d.shape[3]):
+        epiVol.append(lf3d[:, :, :, c])
+    for n, epi in enumerate(epiVol):
+        epiVol[n] = vigra.filters.structureTensor(epi,config.inner_scale_h,config.outer_scale_h)
+    st = np.zeros_like(epiVol[0])
+    for epi in epiVol:
+        st[:, :, :, :] += epi[:, :, :, :]
+
+    tmp[:, :, :, :] = st[:]/3
+
+    #tmp = vigra.filters.structureTensor(lf3d,config.inner_scale,config.outer_scale)
     logging.debug('Size of 3D structure Tensor: ' + str(tmp.shape))
 
     st3d[:,:,:,0] = tmp[:,:,:,0]
@@ -140,7 +153,21 @@ def compute_vertical(lf3dv, shift, config):
 
     print "compute 2.5D structure tensor"
     st3d = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], 3), dtype=np.float32)
-    tmp = vigra.filters.structureTensor(lf3d,config.inner_scale,config.outer_scale)
+
+    tmp = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], 6), dtype=np.float32)
+    epiVol = []
+    for c in range(lf3d.shape[3]):
+        epiVol.append(lf3d[:, :, :, c])
+    for n, epi in enumerate(epiVol):
+        epiVol[n] = vigra.filters.structureTensor(epi,config.inner_scale_h,config.outer_scale_h)
+    st = np.zeros_like(epiVol[0])
+    for epi in epiVol:
+        st[:, :, :, :] += epi[:, :, :, :]
+
+    tmp[:, :, :, :] = st[:]/3
+
+
+    #tmp = vigra.filters.structureTensor(lf3d,config.inner_scale,config.outer_scale)
     logging.debug('Size of 2.5D structure Tensor: ' + str(tmp.shape))
 
     st3d[:,:,:,0] = tmp[:,:,:,0]
@@ -278,8 +305,8 @@ def structureTensor25D(config):
     coherence[invalids] = 0
 
     if config.output_level >= 2:
-        plt.imsave(config.result_path+config.result_label+"orientation_final.png", orientation[lf_shape[0]/2, :, :], cmap=plt.cm.gray)
-        plt.imsave(config.result_path+config.result_label+"coherence_final.png", coherence[lf_shape[0]/2, :, :], cmap=plt.cm.gray)
+        plt.imsave(config.result_path+config.result_label+"orientation_final.png", orientation[lf_shape[0]/2, :, :], cmap=plt.cm.jet)
+        plt.imsave(config.result_path+config.result_label+"coherence_final.png", coherence[lf_shape[0]/2, :, :], cmap=plt.cm.jet)
 
     logging.info("Computed final disparity map!")
 
@@ -303,6 +330,13 @@ def structureTensor25D(config):
                 sposy = config.roi["pos"][1]
                 eposy = config.roi["pos"][1] + config.roi["size"][1]
                 color = color[sposx:eposx, sposy:eposy, 0:3]
+
+        tmp = np.zeros((lf_shape[1], lf_shape[2], 4), dtype=np.float32)
+        tmp[:, :, 0] = orientation[lf_shape[0]/2, :, :]
+        tmp[:, :, 1] = coherence[lf_shape[0]/2, :, :]
+        tmp[:, :, 2] = depth[:]
+        vim = vigra.RGBImage(tmp)
+        vim.writeImage(config.result_path+config.result_label+"final.exr")
 
         print "make pointcloud...",
         if isinstance(color, np.ndarray):

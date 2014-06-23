@@ -225,12 +225,12 @@ def evaluateStructureTensor(tensor):
     coherence = np.sqrt((tensor[:, :, :, 2]-tensor[:, :, :, 0])**2+2*tensor[:, :, :, 1]**2)/(tensor[:, :, :, 2]+tensor[:, :, :, 0] + 1e-16)
     orientation = 1/2.0*vigra.numpy.arctan2(2*tensor[:, :, :, 1], tensor[:, :, :, 2]-tensor[:, :, :, 0])
     orientation = vigra.numpy.tan(orientation[:])
-    invalid_ubounds = np.where(orientation > 1.0)
-    invalid_lbounds = np.where(orientation < -1.0)
+    invalid_ubounds = np.where(orientation > 1.2)
+    invalid_lbounds = np.where(orientation < -1.2)
     coherence[invalid_ubounds] = 0
     coherence[invalid_lbounds] = 0
-    orientation[invalid_ubounds] = -1.0
-    orientation[invalid_lbounds] = -1.0
+    orientation[invalid_ubounds] = -1.2
+    orientation[invalid_lbounds] = -1.2
     return orientation, coherence
 
 

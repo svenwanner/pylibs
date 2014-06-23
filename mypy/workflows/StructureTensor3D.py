@@ -76,7 +76,7 @@ def compute_horizontal(lf3dh, shift, config):
     for c in range(lf3d.shape[3]):
         epiVol.append(lf3d[:, :, :, c])
     for n, epi in enumerate(epiVol):
-        epiVol[n] = vigra.filters.structureTensor(lf3d,config.inner_scale_h,config.outer_scale_h)
+        epiVol[n] = vigra.filters.structureTensor(epi,config.inner_scale_h,config.outer_scale_h)
     st = np.zeros_like(epiVol[0])
     for epi in epiVol:
         st[:, :, :, :] += epi[:, :, :, :]
@@ -166,14 +166,14 @@ def compute_horizontal(lf3dh, shift, config):
                 # print('position second: ')
                 # print(c2[k,i,j])
                 if config.output_level == 3:
-                    orientation_largesteigenvector[k,i,j] = v[1, largest]/v[0, largest]
+                    orientation_largesteigenvector[k, i, j] = v[1, largest]/v[0, largest]
                     orientation_smallesteigenvector[k, i, j] = -v[0, smallest]/v[1, smallest]
 
                 if c1[k,i,j] >= c2[k,i,j]:
-                    orientation[k,i,j] = v[1, largest]/v[0, largest]
+                    orientation[k,i,j] = np.sqrt(v[1, largest]**2/v[0, largest]**2+v[2, largest]**2/v[0, largest]**2)
                     coherence[k,i,j] = c1[k,i,j]
                 if c2[k,i,j] > c1[k,i,j]:
-                    orientation[k,i,j] = -v[0, smallest]/v[1, smallest]
+                    orientation[k,i,j] = -np.sqrt(v[0, smallest]**2/v[1, smallest]**2+v[2, smallest]**2/v[1, smallest]**2)
                     coherence[k,i,j] = c2[k,i,j]
 
                 # orientation[k,i,j] = np.sqrt((v[0, pos]/v[1, pos]*v[0, pos]/v[1, pos]) + (v[2, pos]/v[1, pos]* v[2, pos]/v[1, pos]))
@@ -273,7 +273,7 @@ def compute_vertical(lf3dv, shift, config):
     for c in range(lf3d.shape[3]):
         epiVol.append(lf3d[:, :, :, c])
     for n, epi in enumerate(epiVol):
-        epiVol[n] = vigra.filters.structureTensor(lf3d,config.inner_scale_v,config.outer_scale_v)
+        epiVol[n] = vigra.filters.structureTensor(epi,config.inner_scale_v,config.outer_scale_v)
     st = np.zeros_like(epiVol[0])
     for epi in epiVol:
         st[:, :, :, :] += epi[:, :, :, :]
@@ -519,8 +519,8 @@ def structureTensor3D(config):
     coherence[invalids] = 0
 
     if config.output_level >= 2:
-        plt.imsave(config.result_path+config.result_label+"orientation_final.png", orientation[lf_shape[0]/2, :, :], cmap=plt.cm.gray)
-        plt.imsave(config.result_path+config.result_label+"coherence_final.png", coherence[lf_shape[0]/2, :, :], cmap=plt.cm.gray)
+        plt.imsave(config.result_path+config.result_label+"orientation_final.png", orientation[lf_shape[0]/2, :, :], cmap=plt.cm.jet)
+        plt.imsave(config.result_path+config.result_label+"coherence_final.png", coherence[lf_shape[0]/2, :, :], cmap=plt.cm.jet)
 
     logging.info("Computed final disparity map!")
 
@@ -544,6 +544,13 @@ def structureTensor3D(config):
                 sposy = config.roi["pos"][1]
                 eposy = config.roi["pos"][1] + config.roi["size"][1]
                 color = color[sposx:eposx, sposy:eposy, 0:3]
+
+        tmp = np.zeros((lf_shape[1], lf_shape[2], 4), dtype=np.float32)
+        tmp[:, :, 0] = orientation[lf_shape[0]/2, :, :]
+        tmp[:, :, 1] = coherence[lf_shape[0]/2, :, :]
+        tmp[:, :, 2] = depth[:]
+        vim = vigra.RGBImage(tmp)
+        vim.writeImage(config.result_path+config.result_label+"final.exr")
 
         print "make pointcloud...",
         if isinstance(color, np.ndarray):
