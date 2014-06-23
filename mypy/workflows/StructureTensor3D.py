@@ -76,7 +76,7 @@ def compute_horizontal(lf3dh, shift, config):
     for c in range(lf3d.shape[3]):
         epiVol.append(lf3d[:, :, :, c])
     for n, epi in enumerate(epiVol):
-        epiVol[n] = vigra.filters.structureTensor(lf3d,config.inner_scale_h,config.outer_scale_h)
+        epiVol[n] = vigra.filters.structureTensor(epi,config.inner_scale_h,config.outer_scale_h)
     st = np.zeros_like(epiVol[0])
     for epi in epiVol:
         st[:, :, :, :] += epi[:, :, :, :]
@@ -166,14 +166,14 @@ def compute_horizontal(lf3dh, shift, config):
                 # print('position second: ')
                 # print(c2[k,i,j])
                 if config.output_level == 3:
-                    orientation_largesteigenvector[k,i,j] = v[1, largest]/v[0, largest]
+                    orientation_largesteigenvector[k, i, j] = v[1, largest]/v[0, largest]
                     orientation_smallesteigenvector[k, i, j] = -v[0, smallest]/v[1, smallest]
 
                 if c1[k,i,j] >= c2[k,i,j]:
-                    orientation[k,i,j] = v[1, largest]/v[0, largest]
+                    orientation[k,i,j] = np.sqrt(v[1, largest]**2/v[0, largest]**2+v[2, largest]**2/v[0, largest]**2)
                     coherence[k,i,j] = c1[k,i,j]
                 if c2[k,i,j] > c1[k,i,j]:
-                    orientation[k,i,j] = -v[0, smallest]/v[1, smallest]
+                    orientation[k,i,j] = -np.sqrt(v[0, smallest]**2/v[1, smallest]**2+v[2, smallest]**2/v[1, smallest]**2)
                     coherence[k,i,j] = c2[k,i,j]
 
                 # orientation[k,i,j] = np.sqrt((v[0, pos]/v[1, pos]*v[0, pos]/v[1, pos]) + (v[2, pos]/v[1, pos]* v[2, pos]/v[1, pos]))
@@ -273,7 +273,7 @@ def compute_vertical(lf3dv, shift, config):
     for c in range(lf3d.shape[3]):
         epiVol.append(lf3d[:, :, :, c])
     for n, epi in enumerate(epiVol):
-        epiVol[n] = vigra.filters.structureTensor(lf3d,config.inner_scale_v,config.outer_scale_v)
+        epiVol[n] = vigra.filters.structureTensor(epi,config.inner_scale_v,config.outer_scale_v)
     st = np.zeros_like(epiVol[0])
     for epi in epiVol:
         st[:, :, :, :] += epi[:, :, :, :]
