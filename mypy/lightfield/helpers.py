@@ -81,12 +81,14 @@ def refocus_3d_subpixel(lf, focus, lf_type='h', config = None):
             for h in range(lf.shape[0]):
                 for c in range(lf.shape[3]):
                     lf[h, :, :, c] = sp.ndimage.interpolation.shift(tmp[h, :, :, c], [0 , (h - lf.shape[0] / 2) * focus])
+                    lf[h, :, :, c] = lf[h, :, :, c]/np.amax(lf[h, :, :, c])
                 if config.output_level == 3:
                     misc.imsave(config.result_path+config.result_label+"refocusedH_{0}.png".format(h),lf[h, :, :, :])
         elif lf_type == 'v':
             for v in range(lf.shape[0]):
                 for c in range(lf.shape[3]):
                     lf[v, :, :, c] = sp.ndimage.interpolation.shift(tmp[v, :, :, c], [(v - lf.shape[0] / 2) * focus , 0])
+                    lf[v, :, :, c] = lf[v, :, :, c]/np.amax(lf[v, :, :, c])
                 if config.output_level == 3:
                     misc.imsave(config.result_path+config.result_label+"refocusedV_{0}.png".format(v),lf[v, :, :, :])
         else:

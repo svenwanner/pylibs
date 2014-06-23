@@ -130,7 +130,7 @@ def compute_horizontal(lf3dh, shift, config):
             print("Normal pixelwise shift")
             lf3d = lfhelpers.refocus_3d(lf3d, shift, 'h',config)
         if config.interpolation == INTERPOLATE.SPLINE:
-            print("subpixel shift spline interpolation")
+            print("\nsubpixel shift spline interpolation")
             lf3d = lfhelpers.refocus_3d_subpixel(lf3d, shift, 'h',config)
 
     if config.color_space:
@@ -151,6 +151,8 @@ def compute_horizontal(lf3dh, shift, config):
         structureTensor = st2d.StructureTensorClassic()
     if config.structure_tensor_type == "hour-glass":
         structureTensor = st2d.StructureTensorHourGlass()
+    if config.structure_tensor_type == "hour-glass-extended":
+        structureTensor = st2d.StructureTensorHourGlass_extended()
 
     params = {"direction": 'h', "inner_scale": config.inner_scale, "outer_scale": config.outer_scale, "hour-glass": config.hourglass_scale}
     structureTensor.compute(lf3d, params)
@@ -181,7 +183,6 @@ def compute_vertical(lf3dv, shift, config):
         if config.interpolation == INTERPOLATE.NONE:
             lf3d = lfhelpers.refocus_3d(lf3d, shift, 'v',config)
         if config.interpolation == INTERPOLATE.SPLINE:
-            print("spline")
             lf3d = lfhelpers.refocus_3d_subpixel(lf3d, shift, 'v',config)
 
     if config.color_space:
@@ -202,12 +203,12 @@ def compute_vertical(lf3dv, shift, config):
         structureTensor = st2d.StructureTensorClassic()
     if config.structure_tensor_type == "hour-glass":
         structureTensor = st2d.StructureTensorHourGlass()
+    if config.structure_tensor_type == "hour-glass-extended":
+        structureTensor = st2d.StructureTensorHourGlass_extended()
 
     params = {"direction": 'v', "inner_scale": config.inner_scale, "outer_scale": config.outer_scale, "hour-glass": config.hourglass_scale}
     structureTensor.compute(lf3d, params)
     st3d = structureTensor.get_result()
-
-
 
     orientation_v, coherence_v = st2d.evaluateStructureTensor(st3d)
     orientation_v[:] += shift
@@ -217,9 +218,9 @@ def compute_vertical(lf3dv, shift, config):
         coherence_v[invalids] = 0.0
 
     if config.output_level == 3:
-        misc.imsave(config.result_path+config.result_label+"orientation_v_shift_{0}.png".format(shift), orientation_v[orientation_v[0]/2, :, :])
+        misc.imsave(config.result_path+config.result_label+"orientation_v_shift_{0}.png".format(shift), orientation_v[orientation_v.shape[0]/2, :, :])
     if config.output_level == 3:
-        misc.imsave(config.result_path+config.result_label+"coherence_v_{0}.png".format(shift), coherence_v[coherence_v[0]/2, :, :])
+        misc.imsave(config.result_path+config.result_label+"coherence_v_{0}.png".format(shift), coherence_v[coherence_v.shape[0]/2, :, :])
     print "ok"
 
     return orientation_v, coherence_v
@@ -294,7 +295,6 @@ def structureTensor2D(config):
         for x in threads:
             x.join()
             if x.direction == 'h':
-                print "get horizontal"
                 orientation_h, coherence_h = x.get_results()
             if x.direction == 'v':
                 orientation_v, coherence_v = x.get_results()
@@ -305,7 +305,7 @@ def structureTensor2D(config):
             orientation, coherence = st2d.mergeOrientations_wta(orientation, coherence, orientation_tmp, coherence_tmp)
 
             if config.output_level >= 2:
-                plt.imsave(config.result_path+config.result_label+"orientation_merged_shift_{0}.png".format(shift), orientation[lf_shape[0]/2, :, :], cmap=plt.cm.jet)
+                plt.imsave(config.result_path+config.result_label+"orientation_merged_shift_{0}.png".format(shift), orientation[lf_shape[0]/2, :, :], cmap=plt.cm.gray)
             print "ok"
 
         else:
@@ -315,8 +315,8 @@ def structureTensor2D(config):
             if compute_v:
                 orientation, coherence = st2d.mergeOrientations_wta(orientation, coherence, orientation_v, coherence_v)
             if config.output_level >= 2:
-                plt.imsave(config.result_path+config.result_label+"orientation_merged_shift_{0}.png".format(shift), orientation[lf_shape[0]/2, :, :], cmap=plt.cm.jet)
-                plt.imsave(config.result_path+config.result_label+"coherence_merged_shift_{0}.png".format(shift), coherence[lf_shape[0]/2, :, :], cmap=plt.cm.jet)
+                plt.imsave(config.result_path+config.result_label+"orientation_merged_shift_{0}.png".format(shift), orientation[lf_shape[0]/2, :, :], cmap=plt.cm.gray)
+                plt.imsave(config.result_path+config.result_label+"coherence_merged_shift_{0}.png".format(shift), coherence[lf_shape[0]/2, :, :], cmap=plt.cm.gray)
             print "ok"
 
     invalids = np.where(coherence < config.coherence_threshold)
@@ -326,8 +326,8 @@ def structureTensor2D(config):
     mask = coherence[lf_shape[0]/2, :, :]
 
     if config.output_level >= 2:
-        plt.imsave(config.result_path+config.result_label+"orientation_final.png", orientation[lf_shape[0]/2, :, :], cmap=plt.cm.jet)
-        plt.imsave(config.result_path+config.result_label+"coherence_final.png", mask, cmap=plt.cm.jet)
+        plt.imsave(config.result_path+config.result_label+"orientation_final.png", orientation[lf_shape[0]/2, :, :], cmap=plt.cm.gray)
+        plt.imsave(config.result_path+config.result_label+"coherence_final.png", mask, cmap=plt.cm.gray)
 
     depth = dtc.disparity_to_depth(orientation[lf_shape[0]/2, :, :], config.base_line, config.focal_length, config.min_depth, config.max_depth)
 
@@ -357,7 +357,7 @@ def structureTensor2D(config):
     depth[invalids] = 0
 
     if config.output_level >= 1:
-        plt.imsave(config.result_path+config.result_label+"depth_final.png", depth, cmap=plt.cm.jet)
+        plt.imsave(config.result_path+config.result_label+"depth_final.png", depth, cmap=plt.cm.gray)
 
     if config.output_level >= 1:
         if isinstance(config.centerview_path, str):
