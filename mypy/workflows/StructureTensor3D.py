@@ -519,8 +519,8 @@ def structureTensor3D(config):
     coherence[invalids] = 0
 
     if config.output_level >= 2:
-        plt.imsave(config.result_path+config.result_label+"orientation_final.png", orientation[lf_shape[0]/2, :, :], cmap=plt.cm.gray)
-        plt.imsave(config.result_path+config.result_label+"coherence_final.png", coherence[lf_shape[0]/2, :, :], cmap=plt.cm.gray)
+        plt.imsave(config.result_path+config.result_label+"orientation_final.png", orientation[lf_shape[0]/2, :, :], cmap=plt.cm.jet)
+        plt.imsave(config.result_path+config.result_label+"coherence_final.png", coherence[lf_shape[0]/2, :, :], cmap=plt.cm.jet)
 
     logging.info("Computed final disparity map!")
 
@@ -544,6 +544,13 @@ def structureTensor3D(config):
                 sposy = config.roi["pos"][1]
                 eposy = config.roi["pos"][1] + config.roi["size"][1]
                 color = color[sposx:eposx, sposy:eposy, 0:3]
+
+        tmp = np.zeros((lf_shape[1], lf_shape[2], 4), dtype=np.float32)
+        tmp[:, :, 0] = orientation[lf_shape[0]/2, :, :]
+        tmp[:, :, 1] = coherence[lf_shape[0]/2, :, :]
+        tmp[:, :, 2] = depth[:]
+        vim = vigra.RGBImage(tmp)
+        vim.writeImage(config.result_path+config.result_label+"final.exr")
 
         print "make pointcloud...",
         if isinstance(color, np.ndarray):

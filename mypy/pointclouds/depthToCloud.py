@@ -28,7 +28,7 @@ def save_pointcloud(filename, depth_map=None, disparity_map=None, color=None, in
     if confidence is not None:
         assert isinstance(confidence, np.ndarray)
     if focal_length is not None:
-        assert isinstance(focal_length, float)
+        assert isinstance(focal_length, float) or isinstance(focal_length, int)
     if base_line is not None:
         assert isinstance(base_line, float)
 
