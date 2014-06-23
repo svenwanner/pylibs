@@ -17,7 +17,7 @@ import mypy.visualization.imshow as myshow
 
 COLORSPACE = enum(RGB=0, LAB=1, LUV=2)
 PREFILTER = enum(NO=0, IMGD=1, EPID=2, IMGD2=3, EPID2=4)
-
+INTERPOLATE = enum(NO=0, NONE=1, SPLINE=2)
 
 
 #============================================================================================================
@@ -49,6 +49,7 @@ class Config:
         self.color_space = COLORSPACE.RGB       # colorscape to convert the images into [RGB,LAB,LUV]
         self.prefilter_scale = 0.4              # scale of the prefilter
         self.prefilter = PREFILTER.IMGD2        # type of the prefilter [NO,IMGD, EPID, IMGD2, EPID2]
+        self.interpolation = INTERPOLATE.NONE   # {NONE,SPLINE} while NONE is pixelwise shift
 
         self.median = 5                         # apply median filter on disparity map
         self.nonlinear_diffusion = [0.5, 5]     # apply nonlinear diffusion [0] edge threshold, [1] scale
@@ -124,7 +125,13 @@ class Compute(threading.Thread):
 def compute_horizontal(lf3dh, shift, config):
     print "compute horizontal shift {0}".format(shift), "...",
     lf3d = np.copy(lf3dh)
-    lf3d = lfhelpers.refocus_3d(lf3d, shift, 'h')
+    if config.interpolation > 0:
+        if config.interpolation == INTERPOLATE.NONE:
+            print("Normal pixelwise shift")
+            lf3d = lfhelpers.refocus_3d(lf3d, shift, 'h',config)
+        if config.interpolation == INTERPOLATE.SPLINE:
+            print("subpixel shift spline interpolation")
+            lf3d = lfhelpers.refocus_3d_subpixel(lf3d, shift, 'h',config)
 
     if config.color_space:
         lf3d = st2d.changeColorSpace(lf3d, config.color_space)
@@ -169,7 +176,13 @@ def compute_horizontal(lf3dh, shift, config):
 def compute_vertical(lf3dv, shift, config):
     print "compute vertical shift {0}".format(shift), "...",
     lf3d = np.copy(lf3dv)
-    lf3d = lfhelpers.refocus_3d(lf3d, shift, 'v')
+
+    if config.interpolation > 0:
+        if config.interpolation == INTERPOLATE.NONE:
+            lf3d = lfhelpers.refocus_3d(lf3d, shift, 'v',config)
+        if config.interpolation == INTERPOLATE.SPLINE:
+            print("spline")
+            lf3d = lfhelpers.refocus_3d_subpixel(lf3d, shift, 'v',config)
 
     if config.color_space:
         lf3d = st2d.changeColorSpace(lf3d, config.color_space)

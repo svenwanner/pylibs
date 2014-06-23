@@ -37,7 +37,7 @@ class StructureTensor(object):
             for y in xrange(lf3d.shape[1]):
                 epis = []
                 e = lf3d[:, y, :, :]
-                # misc.imsave("EPT_{0}.tiff".format(y),e)
+                #misc.imsave("EPT_{0}.tiff".format(y),e)
                 for c in range(lf3d.shape[3]):
                     epis.append(lf3d[:, y, :, c])
                 for n, epi in enumerate(epis):
@@ -146,6 +146,7 @@ class StructureTensorHourGlass(StructureTensor):
         assert isinstance(epi, np.ndarray)
         assert params.has_key("inner_scale")
         assert params.has_key("outer_scale")
+        assert params.has_key("hour-glass")
 
 
         # tmp_Grad = vigra.filters.gaussianGradient(epi,params["inner_scale"])
