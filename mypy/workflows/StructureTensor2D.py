@@ -163,6 +163,7 @@ def compute_horizontal(lf3dh, shift, config):
 
     orientation_h, coherence_h = st2d.evaluateStructureTensor(st3d)
     orientation_h[:] += shift
+    print("shift_h: " + str(shift))
 
     if config.coherence_threshold > 0.0:
         invalids = np.where(coherence_h < config.coherence_threshold)
@@ -219,6 +220,7 @@ def compute_vertical(lf3dv, shift, config):
 
     orientation_v, coherence_v = st2d.evaluateStructureTensor(st3d)
     orientation_v[:] += shift
+    print("shift_v: " + str(shift))
 
     if config.coherence_threshold > 0.0:
         invalids = np.where(coherence_v < config.coherence_threshold)

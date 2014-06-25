@@ -191,24 +191,31 @@ class StructureTensorScharr_extended(StructureTensor):
         assert params.has_key("outer_scale")
         assert params.has_key("hour-glass")
 
-        grad = np.ndarray([epi.shape[0],epi.shape[1],2],dtype=np.float32)
+        # grad = np.ndarray([epi.shape[0],epi.shape[1],2],dtype=np.float32)
+        # #
+        # epi = vigra.filters.gaussianSmoothing(epi,sigma = params["inner_scale"])
+        #
+        # epi = vscharr(epi)
 
-        epi = vigra.filters.gaussianSmoothing(epi,sigma = params["inner_scale"])
-
-        epi = vscharr(epi)
-
-        tmp_a = vscharr(epi)  ## in direction of first dimension
-        tmp_b = hscharr(epi)  ## in direction of second dimension
-
-        grad[:,:,1] = tmp_a[:,:]
-        grad[:,:,0] = tmp_b[:,:]
-
+        # tmp_a = vscharr(epi)  ## in direction of first dimension
+        # tmp_b = hscharr(epi)  ## in direction of second dimension
+        #
+        # grad[:,:,1] = -tmp_a[:,:]
+        # grad[:,:,0] = -tmp_b[:,:]
+        grad = vigra.filters.gaussianGradient(epi,0.6)
+        #
         tensor = vigra.filters.vectorToTensor(grad)
+        # print(tensor.shape)
 
-        tensor = vigra.filters.hourGlassFilter2D(tensor, sigma = params["hour-glass"], rho = 0.3)
-        strTen = vigra.filters.hourGlassFilter2D(tensor, sigma = 0.9, rho = 0.2)
+        # tensor[:, :, 0] = vigra.filters.gaussianSmoothing(tensor[:,:,0],sigma = 1.3)
+        # tensor[:, :, 1] = vigra.filters.gaussianSmoothing(tensor[:,:,1],sigma = 1.3)
+        # tensor[:, :, 2] = vigra.filters.gaussianSmoothing(tensor[:,:,2],sigma = 1.3)
 
-        return strTen
+        # tensor =  vigra.filters.structureTensor(epi, params["inner_scale"], 1.3)
+        smoothed_Tensor = vigra.filters.hourGlassFilter2D(tensor, sigma = params["hour-glass"], rho = 0.4)
+        # tensor = vigra.filters.hourGlassFilter2D(tensor, sigma = 0.9, rho = 0.2)
+
+        return smoothed_Tensor
 
 
 class StructureTensor_experimental(StructureTensor):
@@ -462,14 +469,16 @@ def mergeOrientations_wta_scharr(orientation1, coherence1, orientation2, coheren
     assert isinstance(coherence1,np.ndarray)
     assert isinstance(coherence2,np.ndarray)
 
+    print("Scharr Merge")
+
     winner = np.where(coherence2 > coherence1)
     orientation1[winner] = orientation2[winner]
     coherence1[winner] = coherence2[winner]
     ### apply memory of coherence, good values get enhanced if they stay longer
-    winner = np.where(0.965 > coherence1)
-    coherence1[winner] =  coherence1[winner] * 1.02
-    winner = np.where(0.9995 > coherence1)
-    coherence1[winner] =  coherence1[winner] * 1.1
+    # winner = np.where(0.965 > coherence1)
+    # coherence1[winner] =  coherence1[winner] * 1.02
+    # winner = np.where(0.9995 > coherence1)
+    # coherence1[winner] =  coherence1[winner] * 1.1
 
     return orientation1, coherence1
 

@@ -56,7 +56,7 @@ def pyramide_downscaling(config):
     # img[:] = img[:] * 255
 
     # img = img.astype(dtype=np.uint8)
-
+    img = img[0:img.shape[0],0:img.shape[1]]
     img = vigra.Image(img)
 
 
@@ -69,10 +69,8 @@ def pyramide_downscaling(config):
     print(pyr[0].shape)
     print(pyr[1].shape)
 
-
-    img = img[0:img.shape[0]-1,0:img.shape[1]]
-    pyr2 = vigra.sampling.ImagePyramid(img,0,0,2)
-    pyr2.reduce(0,1)
+    pyr2 = vigra.sampling.ImagePyramid(pyr[1],1,0,1)
+    pyr2.expand(1,0)
     print("shape of reduced image")
     print(pyr2[0].shape)
     print(pyr2[1].shape)
@@ -80,9 +78,9 @@ def pyramide_downscaling(config):
 
     import matplotlib.pyplot as plt
     fig, ax = plt.subplots()
-    ax.imshow(pyr[1])
+    ax.imshow(pyr[0])
     fig, ax = plt.subplots()
-    ax.imshow(pyr2[1])
+    ax.imshow(pyr2[0])
 
     img1 = pyr[1]
     img2 = pyr2[1]
