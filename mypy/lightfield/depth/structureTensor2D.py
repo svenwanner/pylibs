@@ -180,8 +180,38 @@ class StructureTensorHourGlass(StructureTensor):
         return strTen
 
 
+class StructureTensorScharr_extended(StructureTensor):
 
-class StructureTensorHourGlass_extended(StructureTensor):
+    def __init__(self):
+        StructureTensor.__init__(self)
+
+    def derivations(self, epi, params):
+        assert isinstance(epi, np.ndarray)
+        assert params.has_key("inner_scale")
+        assert params.has_key("outer_scale")
+        assert params.has_key("hour-glass")
+
+        grad = np.ndarray([epi.shape[0],epi.shape[1],2],dtype=np.float32)
+
+        epi = vigra.filters.gaussianSmoothing(epi,sigma = params["inner_scale"])
+
+        epi = vscharr(epi)
+
+        tmp_a = vscharr(epi)  ## in direction of first dimension
+        tmp_b = hscharr(epi)  ## in direction of second dimension
+
+        grad[:,:,1] = tmp_a[:,:]
+        grad[:,:,0] = tmp_b[:,:]
+
+        tensor = vigra.filters.vectorToTensor(grad)
+
+        tensor = vigra.filters.hourGlassFilter2D(tensor, sigma = params["hour-glass"], rho = 0.3)
+        strTen = vigra.filters.hourGlassFilter2D(tensor, sigma = 0.9, rho = 0.2)
+
+        return strTen
+
+
+class StructureTensor_experimental(StructureTensor):
 
     def __init__(self):
         StructureTensor.__init__(self)
@@ -200,7 +230,7 @@ class StructureTensorHourGlass_extended(StructureTensor):
         # print(np.amax(epi))
         # print(np.amin(epi))
 
-        epi = vigra.filters.gaussianSmoothing(epi,params["inner_scale"])
+        epi = vigra.filters.gaussianSmoothing(epi,sigma = params["inner_scale"])
 
         # print(tmp_Grad.shape)
         #
@@ -237,7 +267,11 @@ class StructureTensorHourGlass_extended(StructureTensor):
         # print tensor.shape
 
         # print(params["hour-glass"])
-        strTen = vigra.filters.hourGlassFilter2D(tensor, params["hour-glass"], 0.4)
+        tensor = vigra.filters.hourGlassFilter2D(tensor, sigma = params["hour-glass"], rho = 0.3)
+        strTen = vigra.filters.hourGlassFilter2D(tensor, sigma = 0.9, rho = 0.2)
+
+        # vigra.filters.nonlinearDiffusion(strTen,0.2)
+
         # print strTen.shape
 
         return strTen
@@ -300,14 +334,18 @@ def structureTensor2D(lf3d, inner_scale=0.6, outer_scale=1.3, direction='h'):
 def evaluateStructureTensor(tensor):
     assert isinstance(tensor, np.ndarray)
     coherence = np.sqrt((tensor[:, :, :, 2]-tensor[:, :, :, 0])**2+2*tensor[:, :, :, 1]**2)/(tensor[:, :, :, 2]+tensor[:, :, :, 0] + 1e-16)
-    orientation = 1/2.0*vigra.numpy.arctan2(2*tensor[:, :, :, 1], tensor[:, :, :, 2]-tensor[:, :, :, 0])
+    orientation = 1/2.0*vigra.numpy.arctan2(2*tensor[:, :, :, 1], tensor[:, :, :, 2]-tensor[:, :, :, 0] + 1e-16)
     orientation = vigra.numpy.tan(orientation[:])
     invalid_ubounds = np.where(orientation > 1.0)
     invalid_lbounds = np.where(orientation < -1.0)
     coherence[invalid_ubounds] = 0
     coherence[invalid_lbounds] = 0
-    orientation[invalid_ubounds] = -1.0
+    orientation[invalid_ubounds] = 1.0
     orientation[invalid_lbounds] = -1.0
+
+    mask = np.isnan(coherence)
+    coherence[mask] = 0
+
     return orientation, coherence
 
 
@@ -398,15 +436,56 @@ def preEpiLaplace(lf3d, scale=0.1, direction='h'):
 
     return lf3d
 
+def preImageScharr(lf3d, direction='h'):
+    print("use Scharr prefilter")
+    assert isinstance(lf3d, np.ndarray)
 
-def mergeOrientations_wta(orientation1, coherence1, orientation2, coherence2):
+    if direction == 'h':
+        for y in xrange(lf3d.shape[1]):
+            for c in xrange(lf3d.shape[3]):
+                scharr = vscharr(lf3d[:, y, :, c])
+                lf3d[:, y, :, c] = scharr[:]
+
+    elif direction == 'v':
+        for x in xrange(lf3d.shape[2]):
+            for c in xrange(lf3d.shape[3]):
+                scharr = vscharr(lf3d[:, :, x, c])
+                lf3d[:, :, x, c] = scharr[:]
+    else:
+        assert False, "unknown lightfield direction!"
+
+    return lf3d
+
+
+def mergeOrientations_wta_scharr(orientation1, coherence1, orientation2, coherence2):
+
+    assert isinstance(coherence1,np.ndarray)
+    assert isinstance(coherence2,np.ndarray)
+
     winner = np.where(coherence2 > coherence1)
     orientation1[winner] = orientation2[winner]
     coherence1[winner] = coherence2[winner]
     ### apply memory of coherence, good values get enhanced if they stay longer
-    winner = np.where(0.95 > coherence1)
+    winner = np.where(0.965 > coherence1)
     coherence1[winner] =  coherence1[winner] * 1.02
     winner = np.where(0.9995 > coherence1)
-    coherence1[winner] =  coherence1[winner] * 1.08
+    coherence1[winner] =  coherence1[winner] * 1.1
+
+    return orientation1, coherence1
+
+
+def mergeOrientations_wta(orientation1, coherence1, orientation2, coherence2):
+
+    assert isinstance(coherence1,np.ndarray)
+    assert isinstance(coherence2,np.ndarray)
+
+    winner = np.where(coherence2 > coherence1)
+    orientation1[winner] = orientation2[winner]
+    coherence1[winner] = coherence2[winner]
+    ### apply memory of coherence, good values get enhanced if they stay longer
+    winner = np.where(0.85 > coherence1)
+    coherence1[winner] =  coherence1[winner] * 1.02
+    winner = np.where(0.95 > coherence1)
+    coherence1[winner] =  coherence1[winner] * 1.1
 
     return orientation1, coherence1

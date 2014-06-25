@@ -6,7 +6,6 @@ import scipy.misc as misc
 import threading
 from scipy.ndimage.filters import median_filter
 
-
 from mypy.lightfield import io as lfio
 from mypy.lightfield.helpers import enum
 import mypy.pointclouds.depthToCloud as dtc
@@ -16,7 +15,7 @@ import mypy.visualization.imshow as myshow
 
 
 COLORSPACE = enum(RGB=0, LAB=1, LUV=2)
-PREFILTER = enum(NO=0, IMGD=1, EPID=2, IMGD2=3, EPID2=4)
+PREFILTER = enum(NO=0, IMGD=1, EPID=2, IMGD2=3, EPID2=4, SCHARR=5)
 INTERPOLATE = enum(NO=0, NONE=1, SPLINE=2)
 
 
@@ -145,14 +144,18 @@ def compute_horizontal(lf3dh, shift, config):
             lf3d = st2d.preImgLaplace(lf3d, scale=config.prefilter_scale)
         if config.prefilter == PREFILTER.EPID2:
             lf3d = st2d.preEpiLaplace(lf3d, scale=config.prefilter_scale, direction='h')
+        if config.prefilter == PREFILTER.SCHARR:
+            lf3d = st2d.preImageScharr(lf3d, direction='h')
 
     structureTensor = None
     if config.structure_tensor_type == "classic":
         structureTensor = st2d.StructureTensorClassic()
     if config.structure_tensor_type == "hour-glass":
         structureTensor = st2d.StructureTensorHourGlass()
-    if config.structure_tensor_type == "hour-glass-extended":
-        structureTensor = st2d.StructureTensorHourGlass_extended()
+    if config.structure_tensor_type == "Scharr":
+        structureTensor = st2d.StructureTensorScharr_extended()
+    if config.structure_tensor_type == "Experimental":
+        structureTensor = st2d.StructureTensor_experimental()
 
     params = {"direction": 'h', "inner_scale": config.inner_scale, "outer_scale": config.outer_scale, "hour-glass": config.hourglass_scale}
     structureTensor.compute(lf3d, params)
@@ -197,14 +200,18 @@ def compute_vertical(lf3dv, shift, config):
             lf3d = st2d.preImgLaplace(lf3d, scale=config.prefilter_scale)
         if config.prefilter == PREFILTER.EPID2:
             lf3d = st2d.preEpiLaplace(lf3d, scale=config.prefilter_scale, direction='v')
+        if config.prefilter == PREFILTER.SCHARR:
+            lf3d = st2d.preImageScharr(lf3d, direction='v')
 
     structureTensor = None
     if config.structure_tensor_type == "classic":
         structureTensor = st2d.StructureTensorClassic()
     if config.structure_tensor_type == "hour-glass":
         structureTensor = st2d.StructureTensorHourGlass()
-    if config.structure_tensor_type == "hour-glass-extended":
-        structureTensor = st2d.StructureTensorHourGlass_extended()
+    if config.structure_tensor_type == "Scharr":
+        structureTensor = st2d.StructureTensorScharr_extended()
+    if config.structure_tensor_type == "Experimental":
+        structureTensor = st2d.StructureTensor_experimental()
 
     params = {"direction": 'v', "inner_scale": config.inner_scale, "outer_scale": config.outer_scale, "hour-glass": config.hourglass_scale}
     structureTensor.compute(lf3d, params)
@@ -299,25 +306,50 @@ def structureTensor2D(config):
             if x.direction == 'v':
                 orientation_v, coherence_v = x.get_results()
 
-        if compute_h and compute_v:
-            print "merge vertical/horizontal ...",
-            orientation_tmp, coherence_tmp = st2d.mergeOrientations_wta(orientation_h, coherence_h, orientation_v, coherence_v)
-            orientation, coherence = st2d.mergeOrientations_wta(orientation, coherence, orientation_tmp, coherence_tmp)
+### This separation is needed, because the scharr coherence values are in a totally different range, also the coherence-menory has to be different
+        if config.structure_tensor_type == "Scharr":
 
-            if config.output_level >= 2:
-                plt.imsave(config.result_path+config.result_label+"orientation_merged_shift_{0}.png".format(shift), orientation[lf_shape[0]/2, :, :], cmap=plt.cm.gray)
-            print "ok"
+            if compute_h and compute_v:
+                print "merge vertical/horizontal ...",
+                orientation_tmp, coherence_tmp = st2d.mergeOrientations_wta_scharr(orientation_h, coherence_h, orientation_v, coherence_v)
+                orientation, coherence = st2d.mergeOrientations_wta_scharr(orientation, coherence, orientation_tmp, coherence_tmp)
+
+                if config.output_level >= 2:
+                    plt.imsave(config.result_path+config.result_label+"orientation_merged_shift_{0}.png".format(shift), orientation[lf_shape[0]/2, :, :], cmap=plt.cm.gray)
+                print "ok"
+
+            else:
+                print "merge shifts"
+                if compute_h:
+                    orientation, coherence = st2d.mergeOrientations_wta_scharr(orientation, coherence, orientation_h, coherence_h)
+                if compute_v:
+                    orientation, coherence = st2d.mergeOrientations_wta_scharr(orientation, coherence, orientation_v, coherence_v)
+                if config.output_level >= 2:
+                    plt.imsave(config.result_path+config.result_label+"orientation_merged_shift_{0}.png".format(shift), orientation[lf_shape[0]/2, :, :], cmap=plt.cm.gray)
+                    plt.imsave(config.result_path+config.result_label+"coherence_merged_shift_{0}.png".format(shift), coherence[lf_shape[0]/2, :, :], cmap=plt.cm.gray)
+                print "ok"
 
         else:
-            print "merge shifts"
-            if compute_h:
-                orientation, coherence = st2d.mergeOrientations_wta(orientation, coherence, orientation_h, coherence_h)
-            if compute_v:
-                orientation, coherence = st2d.mergeOrientations_wta(orientation, coherence, orientation_v, coherence_v)
-            if config.output_level >= 2:
-                plt.imsave(config.result_path+config.result_label+"orientation_merged_shift_{0}.png".format(shift), orientation[lf_shape[0]/2, :, :], cmap=plt.cm.gray)
-                plt.imsave(config.result_path+config.result_label+"coherence_merged_shift_{0}.png".format(shift), coherence[lf_shape[0]/2, :, :], cmap=plt.cm.gray)
-            print "ok"
+
+            if compute_h and compute_v:
+                print "merge vertical/horizontal ...",
+                orientation_tmp, coherence_tmp = st2d.mergeOrientations_wta(orientation_h, coherence_h, orientation_v, coherence_v)
+                orientation, coherence = st2d.mergeOrientations_wta(orientation, coherence, orientation_tmp, coherence_tmp)
+
+                if config.output_level >= 2:
+                    plt.imsave(config.result_path+config.result_label+"orientation_merged_shift_{0}.png".format(shift), orientation[lf_shape[0]/2, :, :], cmap=plt.cm.gray)
+                print "ok"
+
+            else:
+                print "merge shifts"
+                if compute_h:
+                    orientation, coherence = st2d.mergeOrientations_wta(orientation, coherence, orientation_h, coherence_h)
+                if compute_v:
+                    orientation, coherence = st2d.mergeOrientations_wta(orientation, coherence, orientation_v, coherence_v)
+                if config.output_level >= 2:
+                    plt.imsave(config.result_path+config.result_label+"orientation_merged_shift_{0}.png".format(shift), orientation[lf_shape[0]/2, :, :], cmap=plt.cm.gray)
+                    plt.imsave(config.result_path+config.result_label+"coherence_merged_shift_{0}.png".format(shift), coherence[lf_shape[0]/2, :, :], cmap=plt.cm.gray)
+                print "ok"
 
     invalids = np.where(coherence < config.coherence_threshold)
     orientation[invalids] = 0
@@ -375,6 +407,7 @@ def structureTensor2D(config):
         tmp[:, :, 2] = depth[:]
         vim = vigra.RGBImage(tmp)
         vim.writeImage(config.result_path+config.result_label+"final.exr")
+        # tiff.imsave(config.result_path+config.result_label+"depth_final.exr",depth)
         # myshow.finalsViewer(config.result_path+config.result_label+"final.exr", save_at=config.result_path+config.result_label)
 
         print "make pointcloud...",

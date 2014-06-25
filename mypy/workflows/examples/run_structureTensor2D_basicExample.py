@@ -28,7 +28,7 @@ config.centerview_path = "/path/to/your/image/that/should/be/mapped/onto/pointcl
 #region of interest to process roi = {"pos":[y,x],"size":[sy,sx]} [Default None]
 config.roi = {"pos": [10, 10], "size": [100, 100]}
 
-config.structure_tensor_type = "hour-glass" # type of the structure tensor class to be used ["classic" , "hour-glass"]
+config.structure_tensor_type = "hour-glass" # type of the structure tensor class to be used ["classic" , "hour-glass", "Scharr" , "Experimental"]
 
 config.inner_scale = 0.6                    # structure tensor inner scale [default 0.6]
 config.outer_scale = 1.3                    # structure tensor outer scale [default 1.3]
@@ -42,7 +42,7 @@ config.base_line = 0.001                    # camera baseline [default 0.001]
 
 config.color_space = st2d.COLORSPACE.RGB    # colorscape to convert the images into possible RGB,LAB,LUV [default RGB]
 config.prefilter_scale = 0.4                # scale of the prefilter [0.4]
-config.prefilter = st2d.PREFILTER.IMGD2     # type of the prefilter possible NO,IMGD, EPID, IMGD2, EPID2 [default IMGD2}
+config.prefilter = st2d.PREFILTER.IMGD2     # type of the prefilter possible NO,IMGD, EPID, IMGD2, EPID2, SCHARR [default IMGD2}
 
 
 config.interpolation = st2d.INTERPOLATE.SPLINE  # {NONE,SPLINE} while NONE is pixelwise shift
