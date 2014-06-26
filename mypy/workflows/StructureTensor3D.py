@@ -11,7 +11,7 @@ from mypy.utils import tiff
 import mypy.pointclouds.depthToCloud as dtc
 from mypy.lightfield import helpers as lfhelpers
 
-
+from multiprocessing import Process
 
 
 
@@ -106,9 +106,9 @@ def compute_horizontal(lf3dh, shift, config):
 
     ### construct structure tensor with vigra structure tensor vector and compute the eigenvalues and vectors
     ### for the 3D structure tensor evaluation.
-    for k in range(lf3d.shape[0]):
-        for i in range(lf3d.shape[1]):
-            for j in range(lf3d.shape[2]):
+    for k in xrange(lf3d.shape[0]):
+        for i in xrange(lf3d.shape[1]):
+            for j in xrange(lf3d.shape[2]):
 
                 ###generate structure tensor using vigra components
                 tensor = np.zeros((3, 3), dtype=np.float32)
@@ -166,14 +166,16 @@ def compute_horizontal(lf3dh, shift, config):
                 # print('position second: ')
                 # print(c2[k,i,j])
                 if config.output_level == 3:
-                    orientation_largesteigenvector[k, i, j] = v[1, largest]/v[0, largest]
+                    #orientation_largesteigenvector[k, i, j] = np.sqrt(v[1, largest]**2/v[0, largest]**2+v[2, largest]**2/v[0, largest]**2)
+                    #orientation_smallesteigenvector[k, i, j] = -np.sqrt(v[0, smallest]**2/v[1, smallest]**2+v[2, smallest]**2/v[1, smallest]**2)
+                    orientation_largesteigenvector[k, i, j] = v[1, largest]**2/v[0, largest]
                     orientation_smallesteigenvector[k, i, j] = -v[0, smallest]/v[1, smallest]
 
                 if c1[k,i,j] >= c2[k,i,j]:
-                    orientation[k,i,j] = np.sqrt(v[1, largest]**2/v[0, largest]**2+v[2, largest]**2/v[0, largest]**2)
+                    orientation[k,i,j] = v[1, largest]/v[0, largest]
                     coherence[k,i,j] = c1[k,i,j]
                 if c2[k,i,j] > c1[k,i,j]:
-                    orientation[k,i,j] = -np.sqrt(v[0, smallest]**2/v[1, smallest]**2+v[2, smallest]**2/v[1, smallest]**2)
+                    orientation[k,i,j] = -v[0, smallest]/v[1, smallest]
                     coherence[k,i,j] = c2[k,i,j]
 
                 # orientation[k,i,j] = np.sqrt((v[0, pos]/v[1, pos]*v[0, pos]/v[1, pos]) + (v[2, pos]/v[1, pos]* v[2, pos]/v[1, pos]))

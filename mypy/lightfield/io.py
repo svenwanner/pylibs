@@ -45,6 +45,9 @@ def load_3d(path, rgb=False, roi=None):
     if len(fnames) == 0:
         for f in glob(path + "*.tif"):
             fnames.append(f)
+    if len(fnames) == 0:
+        for f in glob(path + "*.ppm"):
+            fnames.append(f)
     fnames.sort()
 
 
