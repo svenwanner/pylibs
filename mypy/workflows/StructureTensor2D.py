@@ -6,7 +6,6 @@ import scipy.misc as misc
 import threading
 from scipy.ndimage.filters import median_filter
 
-
 from mypy.lightfield import io as lfio
 from mypy.lightfield.helpers import enum
 import mypy.pointclouds.depthToCloud as dtc
@@ -16,8 +15,8 @@ import mypy.visualization.imshow as myshow
 
 
 COLORSPACE = enum(RGB=0, LAB=1, LUV=2)
-PREFILTER = enum(NO=0, IMGD=1, EPID=2, IMGD2=3, EPID2=4)
-
+PREFILTER = enum(NO=0, IMGD=1, EPID=2, IMGD2=3, EPID2=4, SCHARR=5)
+INTERPOLATE = enum(NO=0, NONE=1, SPLINE=2)
 
 
 #============================================================================================================
@@ -49,6 +48,7 @@ class Config:
         self.color_space = COLORSPACE.RGB       # colorscape to convert the images into [RGB,LAB,LUV]
         self.prefilter_scale = 0.4              # scale of the prefilter
         self.prefilter = PREFILTER.IMGD2        # type of the prefilter [NO,IMGD, EPID, IMGD2, EPID2]
+        self.interpolation = INTERPOLATE.NONE   # {NONE,SPLINE} while NONE is pixelwise shift
 
         self.median = 5                         # apply median filter on disparity map
         self.nonlinear_diffusion = [0.5, 5]     # apply nonlinear diffusion [0] edge threshold, [1] scale
@@ -124,7 +124,13 @@ class Compute(threading.Thread):
 def compute_horizontal(lf3dh, shift, config):
     print "compute horizontal shift {0}".format(shift), "...",
     lf3d = np.copy(lf3dh)
-    lf3d = lfhelpers.refocus_3d(lf3d, shift, 'h')
+    if config.interpolation > 0:
+        if config.interpolation == INTERPOLATE.NONE:
+            print("Normal pixelwise shift")
+            lf3d = lfhelpers.refocus_3d(lf3d, shift, 'h',config)
+        if config.interpolation == INTERPOLATE.SPLINE:
+            print("\nsubpixel shift spline interpolation")
+            lf3d = lfhelpers.refocus_3d_subpixel(lf3d, shift, 'h',config)
 
     if config.color_space:
         lf3d = st2d.changeColorSpace(lf3d, config.color_space)
@@ -138,12 +144,18 @@ def compute_horizontal(lf3dh, shift, config):
             lf3d = st2d.preImgLaplace(lf3d, scale=config.prefilter_scale)
         if config.prefilter == PREFILTER.EPID2:
             lf3d = st2d.preEpiLaplace(lf3d, scale=config.prefilter_scale, direction='h')
+        if config.prefilter == PREFILTER.SCHARR:
+            lf3d = st2d.preImageScharr(lf3d, direction='h')
 
     structureTensor = None
     if config.structure_tensor_type == "classic":
         structureTensor = st2d.StructureTensorClassic()
     if config.structure_tensor_type == "hour-glass":
         structureTensor = st2d.StructureTensorHourGlass()
+    if config.structure_tensor_type == "Scharr":
+        structureTensor = st2d.StructureTensorScharr_extended()
+    if config.structure_tensor_type == "Experimental":
+        structureTensor = st2d.StructureTensor_experimental()
 
     params = {"direction": 'h', "inner_scale": config.inner_scale, "outer_scale": config.outer_scale, "hour-glass": config.hourglass_scale}
     structureTensor.compute(lf3d, params)
@@ -151,6 +163,7 @@ def compute_horizontal(lf3dh, shift, config):
 
     orientation_h, coherence_h = st2d.evaluateStructureTensor(st3d)
     orientation_h[:] += shift
+    print("shift_h: " + str(shift))
 
     if config.coherence_threshold > 0.0:
         invalids = np.where(coherence_h < config.coherence_threshold)
@@ -169,7 +182,12 @@ def compute_horizontal(lf3dh, shift, config):
 def compute_vertical(lf3dv, shift, config):
     print "compute vertical shift {0}".format(shift), "...",
     lf3d = np.copy(lf3dv)
-    lf3d = lfhelpers.refocus_3d(lf3d, shift, 'v')
+
+    if config.interpolation > 0:
+        if config.interpolation == INTERPOLATE.NONE:
+            lf3d = lfhelpers.refocus_3d(lf3d, shift, 'v',config)
+        if config.interpolation == INTERPOLATE.SPLINE:
+            lf3d = lfhelpers.refocus_3d_subpixel(lf3d, shift, 'v',config)
 
     if config.color_space:
         lf3d = st2d.changeColorSpace(lf3d, config.color_space)
@@ -183,30 +201,35 @@ def compute_vertical(lf3dv, shift, config):
             lf3d = st2d.preImgLaplace(lf3d, scale=config.prefilter_scale)
         if config.prefilter == PREFILTER.EPID2:
             lf3d = st2d.preEpiLaplace(lf3d, scale=config.prefilter_scale, direction='v')
+        if config.prefilter == PREFILTER.SCHARR:
+            lf3d = st2d.preImageScharr(lf3d, direction='v')
 
     structureTensor = None
     if config.structure_tensor_type == "classic":
         structureTensor = st2d.StructureTensorClassic()
     if config.structure_tensor_type == "hour-glass":
         structureTensor = st2d.StructureTensorHourGlass()
+    if config.structure_tensor_type == "Scharr":
+        structureTensor = st2d.StructureTensorScharr_extended()
+    if config.structure_tensor_type == "Experimental":
+        structureTensor = st2d.StructureTensor_experimental()
 
     params = {"direction": 'v', "inner_scale": config.inner_scale, "outer_scale": config.outer_scale, "hour-glass": config.hourglass_scale}
     structureTensor.compute(lf3d, params)
     st3d = structureTensor.get_result()
 
-
-
     orientation_v, coherence_v = st2d.evaluateStructureTensor(st3d)
     orientation_v[:] += shift
+    print("shift_v: " + str(shift))
 
     if config.coherence_threshold > 0.0:
         invalids = np.where(coherence_v < config.coherence_threshold)
         coherence_v[invalids] = 0.0
 
     if config.output_level == 3:
-        misc.imsave(config.result_path+config.result_label+"orientation_v_shift_{0}.png".format(shift), orientation_v[orientation_v[0]/2, :, :])
+        misc.imsave(config.result_path+config.result_label+"orientation_v_shift_{0}.png".format(shift), orientation_v[orientation_v.shape[0]/2, :, :])
     if config.output_level == 3:
-        misc.imsave(config.result_path+config.result_label+"coherence_v_{0}.png".format(shift), coherence_v[coherence_v[0]/2, :, :])
+        misc.imsave(config.result_path+config.result_label+"coherence_v_{0}.png".format(shift), coherence_v[coherence_v.shape[0]/2, :, :])
     print "ok"
 
     return orientation_v, coherence_v
@@ -281,30 +304,54 @@ def structureTensor2D(config):
         for x in threads:
             x.join()
             if x.direction == 'h':
-                print "get horizontal"
                 orientation_h, coherence_h = x.get_results()
             if x.direction == 'v':
                 orientation_v, coherence_v = x.get_results()
 
-        if compute_h and compute_v:
-            print "merge vertical/horizontal ...",
-            orientation_tmp, coherence_tmp = st2d.mergeOrientations_wta(orientation_h, coherence_h, orientation_v, coherence_v)
-            orientation, coherence = st2d.mergeOrientations_wta(orientation, coherence, orientation_tmp, coherence_tmp)
+### This separation is needed, because the scharr coherence values are in a totally different range, also the coherence-menory has to be different
+        if config.structure_tensor_type == "Scharr":
 
-            if config.output_level >= 2:
-                plt.imsave(config.result_path+config.result_label+"orientation_merged_shift_{0}.png".format(shift), orientation[lf_shape[0]/2, :, :], cmap=plt.cm.jet)
-            print "ok"
+            if compute_h and compute_v:
+                print "merge vertical/horizontal ...",
+                orientation_tmp, coherence_tmp = st2d.mergeOrientations_wta_scharr(orientation_h, coherence_h, orientation_v, coherence_v)
+                orientation, coherence = st2d.mergeOrientations_wta_scharr(orientation, coherence, orientation_tmp, coherence_tmp)
+
+                if config.output_level >= 2:
+                    plt.imsave(config.result_path+config.result_label+"orientation_merged_shift_{0}.png".format(shift), orientation[lf_shape[0]/2, :, :], cmap=plt.cm.gray)
+                print "ok"
+
+            else:
+                print "merge shifts"
+                if compute_h:
+                    orientation, coherence = st2d.mergeOrientations_wta_scharr(orientation, coherence, orientation_h, coherence_h)
+                if compute_v:
+                    orientation, coherence = st2d.mergeOrientations_wta_scharr(orientation, coherence, orientation_v, coherence_v)
+                if config.output_level >= 2:
+                    plt.imsave(config.result_path+config.result_label+"orientation_merged_shift_{0}.png".format(shift), orientation[lf_shape[0]/2, :, :], cmap=plt.cm.gray)
+                    plt.imsave(config.result_path+config.result_label+"coherence_merged_shift_{0}.png".format(shift), coherence[lf_shape[0]/2, :, :], cmap=plt.cm.gray)
+                print "ok"
 
         else:
-            print "merge shifts"
-            if compute_h:
-                orientation, coherence = st2d.mergeOrientations_wta(orientation, coherence, orientation_h, coherence_h)
-            if compute_v:
-                orientation, coherence = st2d.mergeOrientations_wta(orientation, coherence, orientation_v, coherence_v)
-            if config.output_level >= 2:
-                plt.imsave(config.result_path+config.result_label+"orientation_merged_shift_{0}.png".format(shift), orientation[lf_shape[0]/2, :, :], cmap=plt.cm.jet)
-                plt.imsave(config.result_path+config.result_label+"coherence_merged_shift_{0}.png".format(shift), coherence[lf_shape[0]/2, :, :], cmap=plt.cm.jet)
-            print "ok"
+
+            if compute_h and compute_v:
+                print "merge vertical/horizontal ...",
+                orientation_tmp, coherence_tmp = st2d.mergeOrientations_wta(orientation_h, coherence_h, orientation_v, coherence_v)
+                orientation, coherence = st2d.mergeOrientations_wta(orientation, coherence, orientation_tmp, coherence_tmp)
+
+                if config.output_level >= 2:
+                    plt.imsave(config.result_path+config.result_label+"orientation_merged_shift_{0}.png".format(shift), orientation[lf_shape[0]/2, :, :], cmap=plt.cm.gray)
+                print "ok"
+
+            else:
+                print "merge shifts"
+                if compute_h:
+                    orientation, coherence = st2d.mergeOrientations_wta(orientation, coherence, orientation_h, coherence_h)
+                if compute_v:
+                    orientation, coherence = st2d.mergeOrientations_wta(orientation, coherence, orientation_v, coherence_v)
+                if config.output_level >= 2:
+                    plt.imsave(config.result_path+config.result_label+"orientation_merged_shift_{0}.png".format(shift), orientation[lf_shape[0]/2, :, :], cmap=plt.cm.gray)
+                    plt.imsave(config.result_path+config.result_label+"coherence_merged_shift_{0}.png".format(shift), coherence[lf_shape[0]/2, :, :], cmap=plt.cm.gray)
+                print "ok"
 
     invalids = np.where(coherence < config.coherence_threshold)
     orientation[invalids] = 0
@@ -313,8 +360,8 @@ def structureTensor2D(config):
     mask = coherence[lf_shape[0]/2, :, :]
 
     if config.output_level >= 2:
-        plt.imsave(config.result_path+config.result_label+"orientation_final.png", orientation[lf_shape[0]/2, :, :], cmap=plt.cm.jet)
-        plt.imsave(config.result_path+config.result_label+"coherence_final.png", mask, cmap=plt.cm.jet)
+        plt.imsave(config.result_path+config.result_label+"orientation_final.png", orientation[lf_shape[0]/2, :, :], cmap=plt.cm.gray)
+        plt.imsave(config.result_path+config.result_label+"coherence_final.png", mask, cmap=plt.cm.gray)
 
     depth = dtc.disparity_to_depth(orientation[lf_shape[0]/2, :, :], config.base_line, config.focal_length, config.min_depth, config.max_depth)
 
@@ -344,7 +391,7 @@ def structureTensor2D(config):
     depth[invalids] = 0
 
     if config.output_level >= 1:
-        plt.imsave(config.result_path+config.result_label+"depth_final.png", depth, cmap=plt.cm.jet)
+        plt.imsave(config.result_path+config.result_label+"depth_final.png", depth, cmap=plt.cm.gray)
 
     if config.output_level >= 1:
         if isinstance(config.centerview_path, str):
@@ -362,6 +409,7 @@ def structureTensor2D(config):
         tmp[:, :, 2] = depth[:]
         vim = vigra.RGBImage(tmp)
         vim.writeImage(config.result_path+config.result_label+"final.exr")
+        # tiff.imsave(config.result_path+config.result_label+"depth_final.exr",depth)
         # myshow.finalsViewer(config.result_path+config.result_label+"final.exr", save_at=config.result_path+config.result_label)
 
         print "make pointcloud...",
