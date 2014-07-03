@@ -123,8 +123,7 @@ class Compute(threading.Thread):
 
 def compute_horizontal(lf3dh, shift, config):
     print "compute horizontal shift {0}".format(shift), "..."
-    lf3d = np.copy(lf3dh)
-    lf3d = lfhelpers.refocus_3d(lf3d, shift, 'h')
+    lf3d = lfhelpers.refocus_3d(lf3dh, shift, 'h')
 
     if config.color_space:
         lf3d = st2d.changeColorSpace(lf3d, config.color_space)
@@ -172,8 +171,7 @@ def compute_horizontal(lf3dh, shift, config):
 
 def compute_vertical(lf3dv, shift, config):
     print "compute vertical shift {0}".format(shift), "..."
-    lf3d = np.copy(lf3dv)
-    lf3d = lfhelpers.refocus_3d(lf3d, shift, 'v')
+    lf3d = lfhelpers.refocus_3d(lf3dv, shift, 'v')
 
     if config.color_space:
         lf3d = st2d.changeColorSpace(lf3d, config.color_space)

@@ -46,17 +46,17 @@ def refocus_3d(lf, focus, lf_type='h'):
         for h in range(lf.shape[0]):
             for c in range(lf.shape[3]):
                 if isinstance(focus, float):
-                    lf[h, :, :, c] = shift(tmp[h, :, :, c], shift=[0, (h - lf.shape[0] / 2) * focus] )
+                    tmp[h, :, :, c] = shift(lf[h, :, :, c], shift=[0, (h - lf.shape[0] / 2) * focus] )
                 elif isinstance(focus, int):
-                    lf[h, :, :, c] = np.roll(tmp[h, :, :, c], shift=(h - lf.shape[0] / 2) * focus, axis=1)
+                    tmp[h, :, :, c] = np.roll(lf[h, :, :, c], shift=(h - lf.shape[0] / 2) * focus, axis=1)
     elif lf_type == 'v':
         for v in range(lf.shape[0]):
             for c in range(lf.shape[3]):
                 if isinstance(focus, float):
-                    lf[v, :, :, c] = shift(tmp[v, :, :, c], shift=[(v - lf.shape[0] / 2) * focus, 0])
-                elif isinstance(focus,int):
-                    lf[v, :, :, c] = np.roll(tmp[v, :, :, c], shift=(v - lf.shape[0] / 2) * focus, axis=0)
+                    tmp[v, :, :, c] = shift(lf[v, :, :, c], shift=[(v - lf.shape[0] / 2) * focus, 0])
+                elif isinstance(focus, int):
+                    tmp[v, :, :, c] = np.roll(lf[v, :, :, c], shift=(v - lf.shape[0] / 2) * focus, axis=0)
     else:
         print "refocus undefined"
 
-    return lf
+    return tmp

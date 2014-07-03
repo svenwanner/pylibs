@@ -345,23 +345,23 @@ def preEpiLaplace(lf3d, scale=0.1, direction='h'):
     return lf3d
 
 
-def mergeOrientations_wta(orientation1, coherence1, orientation2, coherence2):
-    print "merge orientations wta..."
-    winner = np.where(coherence2 > coherence1)
-    orientation1[winner] = orientation2[winner]
-    coherence1[winner] = coherence2[winner]
-    return orientation1, coherence1
-
-
 # def mergeOrientations_wta(orientation1, coherence1, orientation2, coherence2):
 #     print "merge orientations wta..."
 #     winner = np.where(coherence2 > coherence1)
 #     orientation1[winner] = orientation2[winner]
 #     coherence1[winner] = coherence2[winner]
-#     ### apply memory of coherence
-#     winner = np.where(0.90 < coherence1)
-#     coherence1[winner] =  coherence1[winner] * 1.05
-#     winner = np.where(0.98 < coherence1)
-#     coherence1[winner] =  coherence1[winner] * 1.07
-#
 #     return orientation1, coherence1
+
+
+def mergeOrientations_wta(orientation1, coherence1, orientation2, coherence2):
+    print "merge orientations wta..."
+    winner = np.where(coherence2 > coherence1)
+    orientation1[winner] = orientation2[winner]
+    coherence1[winner] = coherence2[winner]
+    ### apply memory of coherence
+    winner = np.where(0.90 < coherence1)
+    coherence1[winner] =  coherence1[winner] * 1.05
+    winner = np.where(0.98 < coherence1)
+    coherence1[winner] =  coherence1[winner] * 1.07
+
+    return orientation1, coherence1
