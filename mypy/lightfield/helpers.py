@@ -1,5 +1,6 @@
 import numpy as np
 import logging,sys
+from scipy.ndimage import shift
 
 # ============================================================================================================
 #======================              Activate Deugging modus with input argument          ====================
@@ -37,20 +38,25 @@ def refocus_3d(lf, focus, lf_type='h'):
     :return lf: numpy array of structure [num_of_cams,height,width,channels]
     """
     assert isinstance(lf, np.ndarray)
-    assert isinstance(focus, int)
+    assert isinstance(focus, int) or isinstance(focus, float)
     assert isinstance(lf_type, type(''))
 
-    if focus > 0:
-        tmp = np.copy(lf)
-        if lf_type == 'h':
-            for h in range(lf.shape[0]):
-                for c in range(lf.shape[3]):
+    tmp = np.copy(lf)
+    if lf_type == 'h':
+        for h in range(lf.shape[0]):
+            for c in range(lf.shape[3]):
+                if isinstance(focus, float):
+                    lf[h, :, :, c] = shift(tmp[h, :, :, c], shift=[0, (h - lf.shape[0] / 2) * focus] )
+                elif isinstance(focus, int):
                     lf[h, :, :, c] = np.roll(tmp[h, :, :, c], shift=(h - lf.shape[0] / 2) * focus, axis=1)
-        elif lf_type == 'v':
-            for v in range(lf.shape[0]):
-                for c in range(lf.shape[3]):
+    elif lf_type == 'v':
+        for v in range(lf.shape[0]):
+            for c in range(lf.shape[3]):
+                if isinstance(focus, float):
+                    lf[v, :, :, c] = shift(tmp[v, :, :, c], shift=[(v - lf.shape[0] / 2) * focus, 0])
+                elif isinstance(focus,int):
                     lf[v, :, :, c] = np.roll(tmp[v, :, :, c], shift=(v - lf.shape[0] / 2) * focus, axis=0)
-        else:
-            print "refocus undefined"
+    else:
+        print "refocus undefined"
 
     return lf

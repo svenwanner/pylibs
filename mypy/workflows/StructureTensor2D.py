@@ -142,6 +142,8 @@ def compute_horizontal(lf3dh, shift, config):
     structureTensor = None
     if config.structure_tensor_type == "classic":
         structureTensor = st2d.StructureTensorClassic()
+    if config.structure_tensor_type == "scharr":
+        structureTensor = st2d.StructureTensorScharr()
     if config.structure_tensor_type == "hour-glass":
         structureTensor = st2d.StructureTensorHourGlass()
 
@@ -187,6 +189,8 @@ def compute_vertical(lf3dv, shift, config):
     structureTensor = None
     if config.structure_tensor_type == "classic":
         structureTensor = st2d.StructureTensorClassic()
+    if config.structure_tensor_type == "scharr":
+        structureTensor = st2d.StructureTensorScharr()
     if config.structure_tensor_type == "hour-glass":
         structureTensor = st2d.StructureTensorHourGlass()
 

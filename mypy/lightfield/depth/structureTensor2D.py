@@ -4,7 +4,13 @@ import vigra
 import numpy as np
 
 from mypy.visualization.imshow import imshow
+from scipy.ndimage import convolve
 
+HSCHARR_WEIGHTS = np.array([[ 3,  10,  3],
+                            [ 0,   0,  0],
+                            [-3, -10, -3]]) / 32.0
+
+VSCHARR_WEIGHTS = HSCHARR_WEIGHTS.T
 
 
 class StructureTensor(object):
@@ -132,6 +138,28 @@ class StructureTensorClassic(StructureTensor):
         assert params.has_key("outer_scale")
 
         return vigra.filters.structureTensor(epi, params["inner_scale"], params["outer_scale"])
+
+
+class StructureTensorScharr(StructureTensor):
+
+    def __init__(self):
+        StructureTensor.__init__(self)
+
+    def derivations(self, epi, params):
+        assert isinstance(epi, np.ndarray)
+        assert params.has_key("inner_scale")
+        assert params.has_key("outer_scale")
+
+        tmp = vigra.filters.gaussianSmoothing(epi, params["inner_scale"])
+        d = np.zeros((tmp.shape[0], tmp.shape[1], 2), dtype=np.float32)
+
+        d[:, :, 0] = convolve(tmp, HSCHARR_WEIGHTS)
+        d[:, :, 1] = convolve(tmp, VSCHARR_WEIGHTS)
+        st = vigra.filters.vectorToTensor(d)
+        for c in range(3):
+            st[:, :, c] = vigra.gaussianSmoothing(st[:, :, c], params["outer_scale"])
+        return st
+
 
 
 class StructureTensorHourGlass(StructureTensor):
@@ -322,9 +350,9 @@ def mergeOrientations_wta(orientation1, coherence1, orientation2, coherence2):
     orientation1[winner] = orientation2[winner]
     coherence1[winner] = coherence2[winner]
     ### apply memory of coherence
-    winner = np.where(0.90 > coherence1)
+    winner = np.where(0.90 < coherence1)
     coherence1[winner] =  coherence1[winner] * 1.05
-    winner = np.where(0.98 > coherence1)
+    winner = np.where(0.98 < coherence1)
     coherence1[winner] =  coherence1[winner] * 1.07
 
     return orientation1, coherence1
