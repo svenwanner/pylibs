@@ -122,7 +122,7 @@ class Compute(threading.Thread):
         return self.orientation, self.coherence
 
 def compute_horizontal(lf3dh, shift, config):
-    print "compute horizontal shift {0}".format(shift), "...",
+    print "compute horizontal shift {0}".format(shift), "..."
     lf3d = np.copy(lf3dh)
     lf3d = lfhelpers.refocus_3d(lf3d, shift, 'h')
 
@@ -141,10 +141,13 @@ def compute_horizontal(lf3dh, shift, config):
 
     structureTensor = None
     if config.structure_tensor_type == "classic":
+        print "use vigra structure tensor..."
         structureTensor = st2d.StructureTensorClassic()
     if config.structure_tensor_type == "scharr":
+        print "use scharr structure tensor..."
         structureTensor = st2d.StructureTensorScharr()
     if config.structure_tensor_type == "hour-glass":
+        print "use scharr hour-glass tensor..."
         structureTensor = st2d.StructureTensorHourGlass()
 
     params = {"direction": 'h', "inner_scale": config.inner_scale, "outer_scale": config.outer_scale, "hour-glass": config.hourglass_scale}
@@ -162,14 +165,13 @@ def compute_horizontal(lf3dh, shift, config):
         misc.imsave(config.result_path+config.result_label+"orientation_h_shift_{0}.png".format(shift), orientation_h[orientation_h[0]/2, :, :])
     if config.output_level == 3:
         misc.imsave(config.result_path+config.result_label+"coherence_h_{0}.png".format(shift), coherence_h[coherence_h[0]/2, :, :])
-    print "ok"
 
     return orientation_h, coherence_h
 
 
 
 def compute_vertical(lf3dv, shift, config):
-    print "compute vertical shift {0}".format(shift), "...",
+    print "compute vertical shift {0}".format(shift), "..."
     lf3d = np.copy(lf3dv)
     lf3d = lfhelpers.refocus_3d(lf3d, shift, 'v')
 
@@ -188,10 +190,13 @@ def compute_vertical(lf3dv, shift, config):
 
     structureTensor = None
     if config.structure_tensor_type == "classic":
+        print "use vigra structure tensor..."
         structureTensor = st2d.StructureTensorClassic()
     if config.structure_tensor_type == "scharr":
+        print "use scharr structure tensor..."
         structureTensor = st2d.StructureTensorScharr()
     if config.structure_tensor_type == "hour-glass":
+        print "use scharr hour-glass tensor..."
         structureTensor = st2d.StructureTensorHourGlass()
 
     params = {"direction": 'v', "inner_scale": config.inner_scale, "outer_scale": config.outer_scale, "hour-glass": config.hourglass_scale}
@@ -211,7 +216,6 @@ def compute_vertical(lf3dv, shift, config):
         misc.imsave(config.result_path+config.result_label+"orientation_v_shift_{0}.png".format(shift), orientation_v[orientation_v[0]/2, :, :])
     if config.output_level == 3:
         misc.imsave(config.result_path+config.result_label+"coherence_v_{0}.png".format(shift), coherence_v[coherence_v[0]/2, :, :])
-    print "ok"
 
     return orientation_v, coherence_v
 
@@ -258,7 +262,7 @@ def structureTensor2D(config):
 
     orientation = np.zeros((lf_shape[0], lf_shape[1], lf_shape[2]), dtype=np.float32)
     coherence = np.zeros((lf_shape[0], lf_shape[1], lf_shape[2]), dtype=np.float32)
-    print "ok"
+    print "done"
 
     for shift in config.global_shifts:
 
@@ -290,16 +294,16 @@ def structureTensor2D(config):
 
 
         if compute_h and compute_v:
-            print "merge vertical/horizontal ...",
+            print "merge vertical/horizontal ..."
             orientation_tmp, coherence_tmp = st2d.mergeOrientations_wta(orientation_h, coherence_h, orientation_v, coherence_v)
             orientation, coherence = st2d.mergeOrientations_wta(orientation, coherence, orientation_tmp, coherence_tmp)
 
             if config.output_level >= 2:
                 plt.imsave(config.result_path+config.result_label+"orientation_merged_shift_{0}.png".format(shift), orientation[lf_shape[0]/2, :, :], cmap=plt.cm.jet)
-            print "ok"
+
 
         else:
-            print "merge shifts"
+            print "merge shifts..."
             if compute_h:
                 orientation, coherence = st2d.mergeOrientations_wta(orientation, coherence, orientation_h, coherence_h)
             if compute_v:
@@ -307,10 +311,10 @@ def structureTensor2D(config):
             if config.output_level >= 2:
                 plt.imsave(config.result_path+config.result_label+"orientation_merged_shift_{0}.png".format(shift), orientation[lf_shape[0]/2, :, :], cmap=plt.cm.jet)
                 plt.imsave(config.result_path+config.result_label+"coherence_merged_shift_{0}.png".format(shift), coherence[lf_shape[0]/2, :, :], cmap=plt.cm.jet)
-            print "ok"
+
 
     invalids = np.where(coherence < config.coherence_threshold)
-    orientation[invalids] = 0
+    orientation[invalids] = -10
     coherence[invalids] = 0
 
     mask = coherence[lf_shape[0]/2, :, :]
@@ -322,29 +326,25 @@ def structureTensor2D(config):
     depth = dtc.disparity_to_depth(orientation[lf_shape[0]/2, :, :], config.base_line, config.focal_length, config.min_depth, config.max_depth)
 
     if isinstance(config.nonlinear_diffusion, type([])):
-        print "apply nonlinear diffusion",
+        print "apply nonlinear diffusion"
         vigra.filters.nonlinearDiffusion(depth, config.nonlinear_diffusion[0], config.nonlinear_diffusion[1])
-        print "ok"
     if isinstance(config.selective_gaussian, float) and config.selective_gaussian > 0:
-        print "apply masked gauss...",
+        print "apply masked gauss..."
         gauss = vigra.filters.Kernel2D()
         vigra.filters.Kernel2D.initGaussian(gauss, config.selective_gaussian)
         gauss.setBorderTreatment(vigra.filters.BorderTreatmentMode.BORDER_TREATMENT_CLIP)
         depth = vigra.filters.normalizedConvolveImage(depth, mask, gauss)
-        print "ok"
     if isinstance(config.median, int) and config.median > 0:
-        print "apply median filter ...",
+        print "apply median filter ..."
         depth = median_filter(depth, config.median)
-        print "ok"
     if isinstance(config.tv, type({})):
-        print "apply total variation...",
+        print "apply total variation..."
         assert depth.shape == mask.shape
         drange = config.max_depth-config.min_depth
         depth = vigra.filters.totalVariationFilter(depth.astype(np.float64), mask.astype(np.float64), 0.01*drange*config.tv["alpha"], config.tv["steps"], 0)
-        print "ok"
 
     invalids = np.where(mask == 0)
-    depth[invalids] = 0
+    depth[invalids] = -1.0
 
     if config.output_level >= 1:
         plt.imsave(config.result_path+config.result_label+"depth_final.png", depth, cmap=plt.cm.jet)
@@ -367,10 +367,9 @@ def structureTensor2D(config):
         # vim.writeImage(config.result_path+config.result_label+"final.exr")
         # myshow.finalsViewer(config.result_path+config.result_label+"final.exr", save_at=config.result_path+config.result_label)
 
-        print "make pointcloud...",
+        print "make pointcloud..."
         if isinstance(color, np.ndarray):
-            dtc.save_pointcloud(config.result_path+config.result_label+"pointcloud.ply", depth_map=depth, color=color, confidence=coherence[lf_shape[0]/2, :, :], focal_length=config.focal_length)
+            dtc.save_pointcloud(config.result_path+config.result_label+"pointcloud.ply", depth_map=depth, color=color, confidence=coherence[lf_shape[0]/2, :, :], focal_length=config.focal_length, min_depth=config.min_depth, max_depth=config.max_depth)
         else:
-            dtc.save_pointcloud(config.result_path+config.result_label+"pointcloud.ply", depth_map=depth, confidence=coherence[lf_shape[0]/2, :, :], focal_length=config.focal_length)
+            dtc.save_pointcloud(config.result_path+config.result_label+"pointcloud.ply", depth_map=depth, confidence=coherence[lf_shape[0]/2, :, :], focal_length=config.focal_length, min_depth=config.min_depth, max_depth=config.max_depth)
 
-        print "ok"
