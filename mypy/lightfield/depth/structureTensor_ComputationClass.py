@@ -159,6 +159,8 @@ def compute_vertical(lf3dv, shift, config):
             lf3d = st2d.preImgLaplace(lf3d, scale=config.prefilter_scale)
         if config.prefilter == PREFILTER.EPID2:
             lf3d = st2d.preEpiLaplace(lf3d, scale=config.prefilter_scale, direction='v')
+        if config.prefilter == PREFILTER.SCHARR:
+            lf3d = prefilter.preImgScharr(lf3d, config, direction='v')
 
     structureTensor = None
     if config.structure_tensor_type == "classic":
@@ -180,9 +182,9 @@ def compute_vertical(lf3dv, shift, config):
         coherence_v[invalids] = 0.0
 
     if config.output_level > 3:
-        misc.imsave(config.result_path+config.result_label+"orientation_v_shift_{0}.png".format(shift), orientation_v[orientation_v[0]/2, :, :])
+        misc.imsave(config.result_path+config.result_label+"orientation_v_shift_{0}.png".format(shift), orientation_v[orientation_v.shape[0]/2, :, :])
     if config.output_level > 3:
-        misc.imsave(config.result_path+config.result_label+"coherence_v_{0}.png".format(shift), coherence_v[coherence_v[0]/2, :, :])
+        misc.imsave(config.result_path+config.result_label+"coherence_v_{0}.png".format(shift), coherence_v[coherence_v.shape[0]/2, :, :])
 
 
     return orientation_v, coherence_v

@@ -35,7 +35,7 @@ def preImgDerivation(lf3d, scale=0.1, direction='h'):
     assert isinstance(lf3d, np.ndarray)
     assert isinstance(scale, float)
 
-    logging.debug("apply image derivative prefilter")
+    print("apply image derivative prefilter")
     for i in xrange(lf3d.shape[0]):
         for c in xrange(lf3d.shape[3]):
             grad = vigra.filters.gaussianGradient(lf3d[i, :, :, c], scale)
@@ -52,7 +52,7 @@ def preImgLaplace(lf3d, scale=0.1, direction='h'):
     assert isinstance(lf3d, np.ndarray)
     assert isinstance(scale, float)
 
-    logging.debug("apply image laplace prefilter")
+    print("apply image laplace prefilter")
     for i in xrange(lf3d.shape[0]):
         for c in xrange(lf3d.shape[3]):
             laplace = vigra.filters.laplacianOfGaussian(lf3d[i, :, :, c], scale)
@@ -65,7 +65,7 @@ def preEpiDerivation(lf3d, scale=0.1, direction='h'):
     assert isinstance(lf3d, np.ndarray)
     assert isinstance(scale, float)
 
-    logging.debug("apply epi derivative prefilter")
+    print("apply epi derivative prefilter")
     if direction == 'h':
         for y in xrange(lf3d.shape[1]):
             for c in xrange(lf3d.shape[3]):
@@ -95,7 +95,7 @@ def preEpiLaplace(lf3d, scale=0.1, direction='h'):
     assert isinstance(lf3d, np.ndarray)
     assert isinstance(scale, float)
 
-    logging.debug("apply epi laplace prefilter")
+    print("apply epi laplace prefilter")
     if direction == 'h':
         for y in xrange(lf3d.shape[1]):
             for c in xrange(lf3d.shape[3]):
@@ -117,7 +117,7 @@ def preImgScharr(lf3d, config = None, direction='h'):
 
     assert isinstance(lf3d, np.ndarray)
 
-    logging.debug("apply image scharr prefilter")
+    print("apply image scharr prefilter")
     if direction == 'h':
         Kernel = np.array([[-3, 0, 3], [-10, 0, 10], [-3, 0, 3]]) / 32.0
         scharr = vigra.filters.Kernel2D()
