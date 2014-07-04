@@ -164,6 +164,7 @@ def structureTensor2D(config):
 
         threads = []
 
+    
     ### generate one thread for the horizontal computation ###
         if compute_h:
             thread = Compute(lf3dh, shift, config, direction='h')
