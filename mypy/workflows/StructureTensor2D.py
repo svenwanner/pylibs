@@ -2,6 +2,10 @@ import os
 import vigra
 import numpy as np
 import pylab as plt
+
+import scipy.misc as misc
+from scipy.ndimage import median_filter
+
 from mypy.lightfield.depth import structureTensor2D as st2d
 
 import mypy.pointclouds.depthToCloud as dtc
@@ -85,8 +89,8 @@ class Config:
 #============================================================================================================
 
 
-
 def structureTensor2D(config):
+
 
 ########################################################################################################################
 ##################################   Check the correctness of the parent path
@@ -141,8 +145,8 @@ def structureTensor2D(config):
     except:
         pass
 
+    print "done"
 
-    print "ok"
 
 ########################################################################################################################
 ##################################  Initialize memory for disparity and coherence values
@@ -166,10 +170,10 @@ def structureTensor2D(config):
             threads += [thread]
             thread.start()
 
-    #    if compute_v:
-    #        thread = Compute(lf3dv, shift, config, direction='v')
-    #        threads += [thread]
-    #        thread.start()
+        if compute_v:
+           thread = Compute(lf3dv, shift, config, direction='v')
+           threads += [thread]
+           thread.start()
 
     ### Initialize Pointer for Solution Array ###
 
@@ -187,19 +191,16 @@ def structureTensor2D(config):
                 orientation_v, coherence_v = x.get_results()
 
         if compute_h and compute_v:
-
-            print("merge vertical/horizontal ...")
-
+            print "merge vertical/horizontal ..."
             orientation_tmp, coherence_tmp = st2d.mergeOrientations_wta(orientation_h, coherence_h, orientation_v, coherence_v)
             orientation, coherence = st2d.mergeOrientations_wta(orientation, coherence, orientation_tmp, coherence_tmp)
 
             if config.output_level >= 2:
+
                 plt.imsave(config.result_path+config.result_label+"orientation_merged_shift_{0}.png".format(shift), orientation[lf_shape[0]/2, :, :])
                 plt.imsave(config.result_path+config.result_label+"coherence_merged_shift_{0}.png".format(shift), coherence[lf_shape[0]/2, :, :], cmap=plt.cm.jet)
-            print "ok"
 
         else:
-
             print("merge shifts")
 
             if compute_h:
@@ -211,8 +212,15 @@ def structureTensor2D(config):
             if config.output_level >= 2:
                 plt.imsave(config.result_path+config.result_label+"orientation_merged_shift_{0}.png".format(shift), orientation[lf_shape[0]/2, :, :], cmap=plt.cm.jet)
                 plt.imsave(config.result_path+config.result_label+"coherence_merged_shift_{0}.png".format(shift), coherence[lf_shape[0]/2, :, :], cmap=plt.cm.jet)
-            print "ok"
 
+
+# <<<<<<< HEAD
+# =======
+#     invalids = np.where(coherence < config.coherence_threshold)
+#     orientation[invalids] = -10
+#     coherence[invalids] = 0
+#
+# >>>>>>> 92e67af7707454cf933ba7e975279e0334367f5f
     mask = coherence[lf_shape[0]/2, :, :]
 
     if config.output_level >= 2:
@@ -221,56 +229,54 @@ def structureTensor2D(config):
 
     depth = dtc.disparity_to_depth(orientation[lf_shape[0]/2, :, :], config.base_line, config.focal_length, config.min_depth, config.max_depth)
 
-    #if isinstance(config.nonlinear_diffusion, type([])):
-    #    print "apply nonlinear diffusion",
-    #    vigra.filters.nonlinearDiffusion(depth, config.nonlinear_diffusion[0], config.nonlinear_diffusion[1])
-    #    print "ok"
-    #if isinstance(config.selective_gaussian, float) and config.selective_gaussian > 0:
-    #    print "apply masked gauss...",
-    #    gauss = vigra.filters.Kernel2D()
-    #    vigra.filters.Kernel2D.initGaussian(gauss, config.selective_gaussian)
-    #    gauss.setBorderTreatment(vigra.filters.BorderTreatmentMode.BORDER_TREATMENT_CLIP)
-    #    depth = vigra.filters.normalizedConvolveImage(depth, mask, gauss)
-    #    print "ok"
-    #if isinstance(config.median, int) and config.median > 0:
-    #    print "apply median filter ...",
-    #    depth = median_filter(depth, config.median)
-    #    print "ok"
-    #if isinstance(config.tv, type({})):
-    #    print "apply total variation...",
-    #    assert depth.shape == mask.shape
-    #    drange = config.max_depth-config.min_depth
-    #    depth = vigra.filters.totalVariationFilter(depth.astype(np.float64), mask.astype(np.float64), 0.01*drange*config.tv["alpha"], config.tv["steps"], 0)
-    #    print "ok"
+    if isinstance(config.nonlinear_diffusion, type([])):
+        print "apply nonlinear diffusion"
+        vigra.filters.nonlinearDiffusion(depth, config.nonlinear_diffusion[0], config.nonlinear_diffusion[1])
+    if isinstance(config.selective_gaussian, float) and config.selective_gaussian > 0:
+        print "apply masked gauss..."
+        gauss = vigra.filters.Kernel2D()
+        vigra.filters.Kernel2D.initGaussian(gauss, config.selective_gaussian)
+        gauss.setBorderTreatment(vigra.filters.BorderTreatmentMode.BORDER_TREATMENT_CLIP)
+        depth = vigra.filters.normalizedConvolveImage(depth, mask, gauss)
+    if isinstance(config.median, int) and config.median > 0:
+        print "apply median filter ..."
+        depth = median_filter(depth, config.median)
+    if isinstance(config.tv, type({})):
+        print "apply total variation..."
+        assert depth.shape == mask.shape
+        drange = config.max_depth-config.min_depth
+        depth = vigra.filters.totalVariationFilter(depth.astype(np.float64), mask.astype(np.float64), 0.01*drange*config.tv["alpha"], config.tv["steps"], 0)
+
 
     invalids = np.where(mask == 0)
-    depth[invalids] = 0
+    depth[invalids] = -1.0
 
     if config.output_level >= 1:
         plt.imsave(config.result_path+config.result_label+"depth_final.png", depth, cmap=plt.cm.jet)
 
-    #if config.output_level >= 1:
-    #    if isinstance(config.centerview_path, str):
-    #        color = misc.imread(config.centerview_path)
-    #        if isinstance(config.roi, type({})):
-    #            sposx = config.roi["pos"][0]
-    #            eposx = config.roi["pos"][0] + config.roi["size"][0]
-    #            sposy = config.roi["pos"][1]
-    #            eposy = config.roi["pos"][1] + config.roi["size"][1]
-    #            color = color[sposx:eposx, sposy:eposy, 0:3]
+    if config.output_level >= 1:
 
-        # tmp = np.zeros((lf_shape[1], lf_shape[2], 4), dtype=np.float32)
-        # tmp[:, :, 0] = orientation[lf_shape[0]/2, :, :]
-        # tmp[:, :, 1] = coherence[lf_shape[0]/2, :, :]
-        # tmp[:, :, 2] = depth[:]
-        # vim = vigra.RGBImage(tmp)
-        # vim.writeImage(config.result_path+config.result_label+"final.exr")
-        # myshow.finalsViewer(config.result_path+config.result_label+"final.exr", save_at=config.result_path+config.result_label)
+        if isinstance(config.centerview_path, str):
+            color = misc.imread(config.centerview_path)
+            if isinstance(config.roi, type({})):
+                sposx = config.roi["pos"][0]
+                eposx = config.roi["pos"][0] + config.roi["size"][0]
+                sposy = config.roi["pos"][1]
+                eposy = config.roi["pos"][1] + config.roi["size"][1]
+                color = color[sposx:eposx, sposy:eposy, 0:3]
 
-    #    print "make pointcloud...",
-    #    if isinstance(color, np.ndarray):
-    #        dtc.save_pointcloud(config.result_path+config.result_label+"pointcloud.ply", depth_map=depth, color=color, confidence=coherence[lf_shape[0]/2, :, :], focal_length=config.focal_length)
-    #    else:
-    #        dtc.save_pointcloud(config.result_path+config.result_label+"pointcloud.ply", depth_map=depth, confidence=coherence[lf_shape[0]/2, :, :], focal_length=config.focal_length)
 
-    #    print "ok"
+
+        tmp = np.zeros((lf_shape[1], lf_shape[2], 4), dtype=np.float32)
+        tmp[:, :, 0] = orientation[lf_shape[0]/2, :, :]
+        tmp[:, :, 1] = coherence[lf_shape[0]/2, :, :]
+        tmp[:, :, 2] = depth[:]
+        vim = vigra.RGBImage(tmp)
+        vim.writeImage(config.result_path+config.result_label+"final.exr")
+        #myshow.finalsViewer(config.result_path+config.result_label+"final.exr", save_at=config.result_path+config.result_label)
+
+        print "make pointcloud..."
+        if isinstance(color, np.ndarray):
+            dtc.save_pointcloud(config.result_path+config.result_label+"pointcloud.ply", depth_map=depth, color=color, confidence=coherence[lf_shape[0]/2, :, :], focal_length=config.focal_length, min_depth=config.min_depth, max_depth=config.max_depth)
+        else:
+            dtc.save_pointcloud(config.result_path+config.result_label+"pointcloud.ply", depth_map=depth, confidence=coherence[lf_shape[0]/2, :, :], focal_length=config.focal_length, min_depth=config.min_depth, max_depth=config.max_depth)

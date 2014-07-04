@@ -1,7 +1,6 @@
 import numpy as np
 import logging, sys
-import pylab as plt
-import scipy as sp
+from scipy.ndimage import shift
 
 # ============================================================================================================
 #======================              Activate Deugging modus with input argument          ====================
@@ -29,7 +28,7 @@ def enum(**enums):
 #======================              Shift Light fied to horoptor depth                   ====================
 #=============================================================================================================
 
-def refocus_3d(lf, focus, lf_type='h', config = None):
+def refocus_3d(lf, focus, lf_type='h'):
     """
     refocus a 3D light field by an integer pixel shift
     
@@ -39,24 +38,25 @@ def refocus_3d(lf, focus, lf_type='h', config = None):
     :return lf: numpy array of structure [num_of_cams,height,width,channels]
     """
     assert isinstance(lf, np.ndarray)
-    assert isinstance(focus, float)
+    assert isinstance(focus, int) or isinstance(focus, float)
     assert isinstance(lf_type, type(''))
 
-    if focus > 0:
-        tmp = np.copy(lf)
-        if lf_type == 'h':
-            for h in range(lf.shape[0]):
-                for c in range(lf.shape[3]):
-                    lf[h, :, :, c] = sp.ndimage.interpolation.shift(tmp[h, :, :, c], [0 , (h - int(lf.shape[0] / 2)) * focus])
-                if config.output_level >3:
-                    plt.imsave(config.result_path+config.result_label+"Horizontal_Shifted_Image_{0}.png".format(h), lf[h, :, :, :])
-        elif lf_type == 'v':
-            for v in range(lf.shape[0]):
-                for c in range(lf.shape[3]):
-                    lf[v, :, :, c] = sp.ndimage.interpolation.shift(tmp[v, :, :, c], [(v - int(lf.shape[0] / 2)) * focus , 0])
-                if config.output_level >3:
-                    plt.imsave(config.result_path+config.result_label+"Vertical_Shifted_Image_{0}.png".format(v), lf[v, :, :, :])
-        else:
-            print "refocus undefined"
+    tmp = np.copy(lf)
+    if lf_type == 'h':
+        for h in range(lf.shape[0]):
+            for c in range(lf.shape[3]):
+                if isinstance(focus, float):
+                    tmp[h, :, :, c] = shift(lf[h, :, :, c], shift=[0, (h - lf.shape[0] / 2) * focus] )
+                elif isinstance(focus, int):
+                    tmp[h, :, :, c] = np.roll(lf[h, :, :, c], shift=(h - lf.shape[0] / 2) * focus, axis=1)
+    elif lf_type == 'v':
+        for v in range(lf.shape[0]):
+            for c in range(lf.shape[3]):
+                if isinstance(focus, float):
+                    tmp[v, :, :, c] = shift(lf[v, :, :, c], shift=[(v - lf.shape[0] / 2) * focus, 0])
+                elif isinstance(focus, int):
+                    tmp[v, :, :, c] = np.roll(lf[v, :, :, c], shift=(v - lf.shape[0] / 2) * focus, axis=0)
+    else:
+        print "refocus undefined"
 
-    return lf
+    return tmp

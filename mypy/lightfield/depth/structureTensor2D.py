@@ -4,7 +4,6 @@ import vigra
 import numpy as np
 
 
-
 class StructureTensor(object):
 
     def __init__(self):
@@ -142,16 +141,8 @@ class StructureTensorHourGlass(StructureTensor):
         assert params.has_key("inner_scale")
         assert params.has_key("outer_scale")
 
-
-        # tmp_Grad = vigra.filters.gaussianGradient(epi,params["inner_scale"])
-        # print tmp_Grad.shape
-
         tensor =  vigra.filters.structureTensor(epi, params["inner_scale"], params["outer_scale"])
-        # tensor = vigra.filters.vectorToTensor(tmp_Grad)
-        # print tensor.shape
-
         strTen = vigra.filters.hourGlassFilter2D(tensor, params["hour-glass"], 0.4)
-        # print strTen.shape
 
         return strTen
 
@@ -195,10 +186,6 @@ class StructureTensorScharr(StructureTensor):
 
 
 
-
-
-
-
 #############################################################################################################
 ############# Computation of disparity and coherence map and merge to global solution
 #############################################################################################################
@@ -210,7 +197,7 @@ def evaluateStructureTensor(tensor):
 
     ### compute coherence value ###
     up = np.sqrt((tensor[:, :, :, 2]-tensor[:, :, :, 0])**2 + 4*tensor[:, :, :, 1]**2)
-    down = (tensor[:, :, :, 2]+tensor[:, :, :, 0])
+    down = (tensor[:, :, :, 2]+tensor[:, :, :, 0] + 1e-25)
     coherence = up / down
 
     ### compute disparity value ###
@@ -218,31 +205,34 @@ def evaluateStructureTensor(tensor):
     orientation = vigra.numpy.tan(orientation[:])
 
     ### mark out of boundary orientation estimation ###
-    invalid_ubounds = np.where(orientation > 1.0)
-    invalid_lbounds = np.where(orientation < -1.0)
+    invalid_ubounds = np.where(orientation > 1.1)
+    invalid_lbounds = np.where(orientation < -1.1)
 
     ### set coherence of invalid values to zero ###
     coherence[invalid_ubounds] = 0
     coherence[invalid_lbounds] = 0
 
+
     ### set orientation of invalid values to related maximum/minimum value
-    orientation[invalid_ubounds] = 1.0
-    orientation[invalid_lbounds] = -1.0
+    orientation[invalid_ubounds] = 1.1
+    orientation[invalid_lbounds] = -1.1
 
     return orientation, coherence
+
 
 def mergeOrientations_wta(orientation1, coherence1, orientation2, coherence2):
 
     ### replace orientation/coherence values, where coherence 1 > coherence 2 ###
+    print "merge orientations wta..."
     winner = np.where(coherence2 > coherence1)
 
     orientation1[winner] = orientation2[winner]
     coherence1[winner] = coherence2[winner]
 
-    ### apply value memory ###
-    winner = np.where(0.95 > coherence1)
+    ### apply memory of coherence
+    winner = np.where(0.99 < coherence1)
     coherence1[winner] =  coherence1[winner] * 1.01
-    winner = np.where(0.995 > coherence1)
+    winner = np.where(0.9995 < coherence1)
     coherence1[winner] =  coherence1[winner] * 1.05
 
     return orientation1, coherence1

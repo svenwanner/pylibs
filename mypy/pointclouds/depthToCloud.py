@@ -1,5 +1,5 @@
 import numpy as np
-
+import pylab as plt
 
 def save_pointcloud(filename, depth_map=None, disparity_map=None, color=None, intensity=None, confidence=None, focal_length=None, base_line=None, min_depth=0.01, max_depth=10.0):
     """
@@ -17,6 +17,8 @@ def save_pointcloud(filename, depth_map=None, disparity_map=None, color=None, in
     :param max_depth: float upper depth clipping value
     """
     assert isinstance(filename, str)
+
+    print "save point cloud..."
     if depth_map is not None:
         assert isinstance(depth_map, np.ndarray)
     if disparity_map is not None:
@@ -41,9 +43,9 @@ def save_pointcloud(filename, depth_map=None, disparity_map=None, color=None, in
 
     if depth_map is None:
         depth_map = disparity_to_depth(disparity_map, base_line, focal_length, min_depth, max_depth)
-    else:
-        np.place(depth_map, depth_map < min_depth, min_depth)
-        np.place(depth_map, depth_map > max_depth, min_depth)
+
+    np.place(depth_map, depth_map < min_depth, -1.0)
+    np.place(depth_map, depth_map > max_depth, -1.0)
     cloud = cloud_from_depth(depth_map, focal_length)
     plyWriter = PlyWriter(filename, cloud, color, intensity, confidence)
 
@@ -59,12 +61,14 @@ def disparity_to_depth(disparity, base_line, focal_length, min_depth=0.1, max_de
     :param max_depth: float upper depth clipping value
     :return: ndarray depth image
     """
+
+    print "convert disparity to depth..."
     depth = np.zeros_like(disparity)
     for y in range(disparity.shape[0]):
         for x in range(disparity.shape[1]):
             depth[y, x] = focal_length*base_line/(disparity[y, x]+1e-16)
             if depth[y, x] > max_depth or depth[y, x] < min_depth or np.isinf(depth[y, x]):
-                depth[y, x] = min_depth
+                depth[y, x] = -1.0
     return depth
 
 
@@ -78,13 +82,17 @@ def cloud_from_depth(depth_map, focal_length):
     :param focal_length: float focal length in px
     :rtype : ndarray cloud
     """
-
+    print "make cloud from depth..."
     cloud = np.zeros((depth_map.shape[0], depth_map.shape[1], 3), dtype=np.float32)
     cloud[:, :, 2] = depth_map[:]
-    for y in xrange(depth_map.shape[0]):
-        for x in xrange(depth_map.shape[1]):
-            cloud[y, x, 0] = (x-depth_map.shape[1]/2.0)*depth_map[y, x]/focal_length
-            cloud[y, x, 1] = (y-depth_map.shape[0]/2.0)*depth_map[y, x]/focal_length
+
+    for y in xrange(cloud.shape[0]):
+        for x in xrange(cloud.shape[1]):
+            if cloud[y, x, 2] > 0.0:
+                cloud[y, x, 0] = (x-depth_map.shape[1]/2.0)*depth_map[y, x]/focal_length
+                cloud[y, x, 1] = (y-depth_map.shape[0]/2.0)*depth_map[y, x]/focal_length
+            else:
+                cloud[y, x, 2] = -1.0
 
     return cloud
 
@@ -124,10 +132,11 @@ class PlyWriter(object):
             assert isinstance(self.confidence, np.ndarray)
             assert (self.confidence.shape[0] == self.cloud.shape[0] and self.confidence.shape[1] == self.cloud.shape[1]), "Shape mismatch between confidence and cloud!"
 
+
         for y in xrange(self.cloud.shape[0]):
             for x in xrange(self.cloud.shape[1]):
 
-                if self.cloud[y, x, 2] > 0:
+                if self.cloud[y, x, 2] > 0.0:
                     points.append([self.cloud[y, x, 0], self.cloud[y, x, 1], self.cloud[y, x, 2]])
 
                     if self.colors is not None:
