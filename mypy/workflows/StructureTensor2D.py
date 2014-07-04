@@ -38,6 +38,7 @@ class Config:
         self.centerview_path = None             # path to the center view image to get color for pointcloud [optional]
 
         self.structure_tensor_type = "classic"  # type of the structure tensor class to be used
+        self.shift_correction = {"classic":0.96, "scharr":0.91}
         self.inner_scale = 0.6                  # structure tensor inner scale
         self.outer_scale = 0.9                  # structure tensor outer scale
         self.hourglass_scale = 0
@@ -154,7 +155,9 @@ def compute_horizontal(lf3dh, shift, config):
     st3d = structureTensor.get_result()
 
     orientation_h, coherence_h = st2d.evaluateStructureTensor(st3d)
-    orientation_h[:] += shift
+
+    #TODO: check this strange linaer shift factor
+    orientation_h[:] += (shift*config.shift_correction[config.structure_tensor_type])
 
     if config.coherence_threshold > 0.0:
         invalids = np.where(coherence_h < config.coherence_threshold)
@@ -204,7 +207,9 @@ def compute_vertical(lf3dv, shift, config):
 
 
     orientation_v, coherence_v = st2d.evaluateStructureTensor(st3d)
-    orientation_v[:] += shift
+
+    #TODO: check this strange linaer shift factor
+    orientation_v[:] += (shift*config.shift_correction[config.structure_tensor_type])
 
     if config.coherence_threshold > 0.0:
         invalids = np.where(coherence_v < config.coherence_threshold)
@@ -289,8 +294,6 @@ def structureTensor2D(config):
                 orientation_v, coherence_v = x.get_results()
 
 
-
-
         if compute_h and compute_v:
             print "merge vertical/horizontal ..."
             orientation_tmp, coherence_tmp = st2d.mergeOrientations_wta(orientation_h, coherence_h, orientation_v, coherence_v)
@@ -321,6 +324,8 @@ def structureTensor2D(config):
         plt.imsave(config.result_path+config.result_label+"orientation_final.png", orientation[lf_shape[0]/2, :, :], cmap=plt.cm.jet)
         plt.imsave(config.result_path+config.result_label+"coherence_final.png", mask, cmap=plt.cm.jet)
 
+    #TODO: check this strange shift correction factor
+    orientation *= (1.0+(1.0-config.shift_correction[config.structure_tensor_type]))
     depth = dtc.disparity_to_depth(orientation[lf_shape[0]/2, :, :], config.base_line, config.focal_length, config.min_depth, config.max_depth)
 
     if isinstance(config.nonlinear_diffusion, type([])):

@@ -248,12 +248,12 @@ def evaluateStructureTensor(tensor):
     coherence = np.sqrt((tensor[:, :, :, 2]-tensor[:, :, :, 0])**2+2*tensor[:, :, :, 1]**2)/(tensor[:, :, :, 2]+tensor[:, :, :, 0] + 1e-16)
     orientation = 1/2.0*vigra.numpy.arctan2(2*tensor[:, :, :, 1], tensor[:, :, :, 2]-tensor[:, :, :, 0])
     orientation = vigra.numpy.tan(orientation[:])
-    invalid_ubounds = np.where(orientation > 1.0)
-    invalid_lbounds = np.where(orientation < -1.0)
+    invalid_ubounds = np.where(orientation > 1.1)
+    invalid_lbounds = np.where(orientation < -1.1)
     coherence[invalid_ubounds] = 0
     coherence[invalid_lbounds] = 0
-    orientation[invalid_ubounds] = -10
-    orientation[invalid_lbounds] = -10
+    orientation[invalid_ubounds] = -1.1
+    orientation[invalid_lbounds] = -1.1
     return orientation, coherence
 
 
@@ -345,23 +345,23 @@ def preEpiLaplace(lf3d, scale=0.1, direction='h'):
     return lf3d
 
 
-# def mergeOrientations_wta(orientation1, coherence1, orientation2, coherence2):
-#     print "merge orientations wta..."
-#     winner = np.where(coherence2 > coherence1)
-#     orientation1[winner] = orientation2[winner]
-#     coherence1[winner] = coherence2[winner]
-#     return orientation1, coherence1
-
-
 def mergeOrientations_wta(orientation1, coherence1, orientation2, coherence2):
     print "merge orientations wta..."
     winner = np.where(coherence2 > coherence1)
     orientation1[winner] = orientation2[winner]
     coherence1[winner] = coherence2[winner]
-    ### apply memory of coherence
-    winner = np.where(0.90 < coherence1)
-    coherence1[winner] =  coherence1[winner] * 1.05
-    winner = np.where(0.98 < coherence1)
-    coherence1[winner] =  coherence1[winner] * 1.07
-
     return orientation1, coherence1
+
+
+# def mergeOrientations_wta(orientation1, coherence1, orientation2, coherence2):
+#     print "merge orientations wta..."
+#     winner = np.where(coherence2 > coherence1)
+#     orientation1[winner] = orientation2[winner]
+#     coherence1[winner] = coherence2[winner]
+#     ### apply memory of coherence
+#     winner = np.where(0.90 < coherence1)
+#     coherence1[winner] =  coherence1[winner] * 1.05
+#     winner = np.where(0.98 < coherence1)
+#     coherence1[winner] =  coherence1[winner] * 1.07
+#
+#     return orientation1, coherence1
