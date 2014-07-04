@@ -264,6 +264,7 @@ def structureTensor2D(config):
 
     for shift in config.global_shifts:
 
+        
         threads = []
 
         if compute_h:
