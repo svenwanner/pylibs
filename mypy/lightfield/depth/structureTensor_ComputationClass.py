@@ -115,10 +115,13 @@ def compute_horizontal(lf3dh, shift, config):
     ### compute structure tensor ###
     structureTensor = None
     if config.structure_tensor_type == "classic":
+        print "use vigra structure tensor..."
         structureTensor = st2d.StructureTensorClassic()
     if config.structure_tensor_type == "hour-glass":
+        print "use hour-glass structure tensor..."
         structureTensor = st2d.StructureTensorHourGlass()
     if config.structure_tensor_type == "scharr":
+        print "use scharr structure tensor..."
         structureTensor = st2d.StructureTensorScharr()
 
     params = {"direction": 'h', "inner_scale": config.inner_scale, "outer_scale": config.outer_scale, "hour-glass": config.hourglass_scale}
@@ -162,10 +165,13 @@ def compute_vertical(lf3dv, shift, config):
 
     structureTensor = None
     if config.structure_tensor_type == "classic":
+        print "use vigra structure tensor..."
         structureTensor = st2d.StructureTensorClassic()
     if config.structure_tensor_type == "hour-glass":
+        print "use hour-glass structure tensor..."
         structureTensor = st2d.StructureTensorHourGlass()
     if config.structure_tensor_type == "scharr":
+        print "use scharr structure tensor..."
         structureTensor = st2d.StructureTensorScharr()
 
     params = {"direction": 'v', "inner_scale": config.inner_scale, "outer_scale": config.outer_scale, "hour-glass": config.hourglass_scale}
@@ -180,9 +186,9 @@ def compute_vertical(lf3dv, shift, config):
         coherence_v[invalids] = 0.0
 
     if config.output_level > 3:
-        misc.imsave(config.result_path+config.result_label+"orientation_v_shift_{0}.png".format(shift), orientation_v[orientation_v[0]/2, :, :])
+        misc.imsave(config.result_path+config.result_label+"orientation_v_shift_{0}.png".format(shift), orientation_v[orientation_v.shape[0]/2, :, :])
     if config.output_level > 3:
-        misc.imsave(config.result_path+config.result_label+"coherence_v_{0}.png".format(shift), coherence_v[coherence_v[0]/2, :, :])
+        misc.imsave(config.result_path+config.result_label+"coherence_v_{0}.png".format(shift), coherence_v[coherence_v.shape[0]/2, :, :])
 
 
     return orientation_v, coherence_v

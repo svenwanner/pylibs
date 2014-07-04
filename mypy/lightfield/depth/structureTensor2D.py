@@ -141,7 +141,7 @@ class StructureTensorHourGlass(StructureTensor):
         assert params.has_key("inner_scale")
         assert params.has_key("outer_scale")
 
-        tensor =  vigra.filters.structureTensor(epi, params["inner_scale"], params["outer_scale"])
+        tensor = vigra.filters.structureTensor(epi, params["inner_scale"], params["outer_scale"])
         strTen = vigra.filters.hourGlassFilter2D(tensor, params["hour-glass"], 0.4)
 
         return strTen
