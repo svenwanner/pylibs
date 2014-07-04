@@ -162,6 +162,8 @@ def compute_vertical(lf3dv, shift, config):
             lf3d = st2d.preImgLaplace(lf3d, scale=config.prefilter_scale)
         if config.prefilter == PREFILTER.EPID2:
             lf3d = st2d.preEpiLaplace(lf3d, scale=config.prefilter_scale, direction='v')
+        if config.prefilter == PREFILTER.SCHARR:
+            lf3d = prefilter.preImgScharr(lf3d, config, direction='v')
 
     structureTensor = None
     if config.structure_tensor_type == "classic":
