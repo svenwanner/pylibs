@@ -27,20 +27,21 @@ def changeColorSpace(lf3d, cspace=0):
 #============================================================================================================
 #==========================                     prefiltering methods (derivatives)             ===========================
 #============================================================================================================
-PREFILTER = enum(NO=0, IMGD=1, EPID=2, IMGD2=3, EPID2=4)
+PREFILTER = enum(NO=0, IMGD=1, EPID=2, IMGD2=3, EPID2=4, SCHARR = 5)
+
+
 
 def preImgDerivation(lf3d, scale=0.1, direction='h'):
     assert isinstance(lf3d, np.ndarray)
     assert isinstance(scale, float)
 
-    logging.debug("apply image derivative prefilter")
     for i in xrange(lf3d.shape[0]):
         for c in xrange(lf3d.shape[3]):
             grad = vigra.filters.gaussianGradient(lf3d[i, :, :, c], scale)
             if direction == 'h':
-                tmp = grad[:, :, 0]
+                tmp = vigra.colors.linearRangeMapping(grad[:, :, 0], newRange=(0.0, 1.0))
             if direction == 'v':
-                tmp = grad[:, :, 1]
+                tmp = vigra.colors.linearRangeMapping(grad[:, :, 1], newRange=(0.0, 1.0))
             lf3d[i, :, :, c] = tmp
 
     return lf3d
@@ -50,7 +51,6 @@ def preImgLaplace(lf3d, scale=0.1, direction='h'):
     assert isinstance(lf3d, np.ndarray)
     assert isinstance(scale, float)
 
-    logging.debug("apply image laplace prefilter")
     for i in xrange(lf3d.shape[0]):
         for c in xrange(lf3d.shape[3]):
             laplace = vigra.filters.laplacianOfGaussian(lf3d[i, :, :, c], scale)
@@ -63,25 +63,24 @@ def preEpiDerivation(lf3d, scale=0.1, direction='h'):
     assert isinstance(lf3d, np.ndarray)
     assert isinstance(scale, float)
 
-    logging.debug("apply epi derivative prefilter")
     if direction == 'h':
         for y in xrange(lf3d.shape[1]):
             for c in xrange(lf3d.shape[3]):
                 grad = vigra.filters.gaussianGradient(lf3d[:, y, :, c], scale)
-                # try:
-                #     tmp = vigra.colors.linearRangeMapping(grad[:, :, 0], newRange=(0.0, 1.0))
-                # except:
-                tmp = grad[:, :, 0]
+                try:
+                    tmp = vigra.colors.linearRangeMapping(grad[:, :, 0], newRange=(0.0, 1.0))
+                except:
+                    tmp = grad[:, :, 0]
                 lf3d[:, y, :, c] = tmp[:]
 
     elif direction == 'v':
         for x in xrange(lf3d.shape[2]):
             for c in xrange(lf3d.shape[3]):
                 grad = vigra.filters.gaussianGradient(lf3d[:, :, x, c], scale)
-                # try:
-                #     tmp = vigra.colors.linearRangeMapping(grad[:, :, 0], newRange=(0.0, 1.0))
-                # except:
-                tmp = grad[:, :, 0]
+                try:
+                    tmp = vigra.colors.linearRangeMapping(grad[:, :, 0], newRange=(0.0, 1.0))
+                except:
+                    tmp = grad[:, :, 0]
                 lf3d[:, :, x, c] = tmp[:]
     else:
         assert False, "unknown lightfield direction!"
@@ -93,7 +92,6 @@ def preEpiLaplace(lf3d, scale=0.1, direction='h'):
     assert isinstance(lf3d, np.ndarray)
     assert isinstance(scale, float)
 
-    logging.debug("apply epi laplace prefilter")
     if direction == 'h':
         for y in xrange(lf3d.shape[1]):
             for c in xrange(lf3d.shape[3]):
@@ -105,6 +103,33 @@ def preEpiLaplace(lf3d, scale=0.1, direction='h'):
             for c in xrange(lf3d.shape[3]):
                 laplace = vigra.filters.laplacianOfGaussian(lf3d[:, :, x, c], scale)
                 lf3d[:, :, x, c] = laplace[:]
+    else:
+        assert False, "unknown lightfield direction!"
+
+    return lf3d
+
+def preImgScharr(lf3d, direction='h'):
+
+    assert isinstance(lf3d, np.ndarray)
+
+    print("apply image scharr prefilter")
+    if direction == 'h':
+        Kernel = np.array([[-3, 0, 3], [-10, 0, 10], [-3, 0, 3]]) / 32.0
+        scharr = vigra.filters.Kernel2D()
+        scharr.initExplicitly((-1,-1), (1,1), Kernel)
+        for t in xrange(lf3d.shape[0]):
+            for c in xrange(lf3d.shape[3]):
+                lf3d[t, :, :, c] = vigra.filters.convolve(lf3d[t, :, :, c], scharr)
+
+
+    elif direction == 'v':
+        Kernel = np.array([[-3, -10, -3], [0, 0, 0], [3, 10, 3]]) / 32.0
+        scharr = vigra.filters.Kernel2D()
+        scharr.initExplicitly((-1,-1), (1,1), Kernel)
+        for t in xrange(lf3d.shape[0]):
+            for c in xrange(lf3d.shape[3]):
+                lf3d[t, :, :, c] = vigra.filters.convolve(lf3d[t, :, :, c], scharr)
+
     else:
         assert False, "unknown lightfield direction!"
 

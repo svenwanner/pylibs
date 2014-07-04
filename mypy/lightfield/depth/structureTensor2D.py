@@ -6,12 +6,6 @@ import numpy as np
 from mypy.visualization.imshow import imshow
 from scipy.ndimage import convolve
 
-HSCHARR_WEIGHTS = np.array([[ 3,  10,  3],
-                            [ 0,   0,  0],
-                            [-3, -10, -3]]) / 32.0
-
-VSCHARR_WEIGHTS = HSCHARR_WEIGHTS.T
-
 
 class StructureTensor(object):
 
@@ -140,29 +134,6 @@ class StructureTensorClassic(StructureTensor):
         return vigra.filters.structureTensor(epi, params["inner_scale"], params["outer_scale"])
 
 
-# class StructureTensorScharr(StructureTensor):
-#
-#     def __init__(self):
-#         StructureTensor.__init__(self)
-#
-#     def derivations(self, epi, params):
-#         assert isinstance(epi, np.ndarray)
-#         assert params.has_key("inner_scale")
-#         assert params.has_key("outer_scale")
-#
-#         tmp = vigra.filters.gaussianSmoothing(epi, params["inner_scale"])
-#         d = np.zeros((tmp.shape[0], tmp.shape[1], 2), dtype=np.float32)
-#
-#         tmp = convolve(tmp, VSCHARR_WEIGHTS)
-#         d[:, :, 0] = convolve(tmp, HSCHARR_WEIGHTS)
-#         d[:, :, 1] = convolve(tmp, VSCHARR_WEIGHTS)
-#         st = vigra.filters.vectorToTensor(d)
-#         for c in range(3):
-#             st[:, :, c] = vigra.gaussianSmoothing(st[:, :, c], params["outer_scale"])
-#         return st
-
-
-
 class StructureTensorScharr(StructureTensor):
 
     def __init__(self):
@@ -173,8 +144,8 @@ class StructureTensorScharr(StructureTensor):
         assert params.has_key("inner_scale")
         assert params.has_key("outer_scale")
 
-        KernelV = np.array([[ 3,  10,  3],
-                            [ 0,   0,  0],
+        KernelV = np.array([[3,  10,  3],
+                            [0,   0,  0],
                             [-3, -10, -3]]) / 32.0
         KernelH = KernelV.T
 
@@ -197,6 +168,8 @@ class StructureTensorScharr(StructureTensor):
         tensor[:, :, 0] = vigra.filters.gaussianSmoothing(tensor[:, :, 0], params["outer_scale"])
         tensor[:, :, 1] = vigra.filters.gaussianSmoothing(tensor[:, :, 1], params["outer_scale"])
         tensor[:, :, 2] = vigra.filters.gaussianSmoothing(tensor[:, :, 2], params["outer_scale"])
+
+        tensor = vigra.filters.hourGlassFilter2D(tensor, params["hour-glass"], 0.4)
 
         return tensor
 
@@ -247,93 +220,6 @@ def evaluateStructureTensor(tensor):
     orientation[invalid_lbounds] = -1.1
     return orientation, coherence
 
-
-def changeColorSpace(lf3d, cspace=0):
-    if lf3d.shape[3] == 3 and cspace > 0:
-        for n in range(lf3d.shape[0]):
-            if cspace == 1:
-                lf3d[n, :, :, :] = vigra.colors.transform_RGB2Lab(lf3d[n, :, :, :])
-            if cspace == 2:
-                lf3d[n, :, :, :] = vigra.colors.transform_RGB2Luv(lf3d[n, :, :, :])
-    return lf3d
-
-
-def preImgDerivation(lf3d, scale=0.1, direction='h'):
-    assert isinstance(lf3d, np.ndarray)
-    assert isinstance(scale, float)
-
-    for i in xrange(lf3d.shape[0]):
-        for c in xrange(lf3d.shape[3]):
-            grad = vigra.filters.gaussianGradient(lf3d[i, :, :, c], scale)
-            if direction == 'h':
-                tmp = vigra.colors.linearRangeMapping(grad[:, :, 0], newRange=(0.0, 1.0))
-            if direction == 'v':
-                tmp = vigra.colors.linearRangeMapping(grad[:, :, 1], newRange=(0.0, 1.0))
-            lf3d[i, :, :, c] = tmp
-
-    return lf3d
-
-
-def preImgLaplace(lf3d, scale=0.1, direction='h'):
-    assert isinstance(lf3d, np.ndarray)
-    assert isinstance(scale, float)
-
-    for i in xrange(lf3d.shape[0]):
-        for c in xrange(lf3d.shape[3]):
-            laplace = vigra.filters.laplacianOfGaussian(lf3d[i, :, :, c], scale)
-            lf3d[i, :, :, c] = laplace[:]
-
-    return lf3d
-
-
-def preEpiDerivation(lf3d, scale=0.1, direction='h'):
-    assert isinstance(lf3d, np.ndarray)
-    assert isinstance(scale, float)
-
-    if direction == 'h':
-        for y in xrange(lf3d.shape[1]):
-            for c in xrange(lf3d.shape[3]):
-                grad = vigra.filters.gaussianGradient(lf3d[:, y, :, c], scale)
-                try:
-                    tmp = vigra.colors.linearRangeMapping(grad[:, :, 0], newRange=(0.0, 1.0))
-                except:
-                    tmp = grad[:, :, 0]
-                lf3d[:, y, :, c] = tmp[:]
-
-    elif direction == 'v':
-        for x in xrange(lf3d.shape[2]):
-            for c in xrange(lf3d.shape[3]):
-                grad = vigra.filters.gaussianGradient(lf3d[:, :, x, c], scale)
-                try:
-                    tmp = vigra.colors.linearRangeMapping(grad[:, :, 0], newRange=(0.0, 1.0))
-                except:
-                    tmp = grad[:, :, 0]
-                lf3d[:, :, x, c] = tmp[:]
-    else:
-        assert False, "unknown lightfield direction!"
-
-    return lf3d
-
-
-def preEpiLaplace(lf3d, scale=0.1, direction='h'):
-    assert isinstance(lf3d, np.ndarray)
-    assert isinstance(scale, float)
-
-    if direction == 'h':
-        for y in xrange(lf3d.shape[1]):
-            for c in xrange(lf3d.shape[3]):
-                laplace = vigra.filters.laplacianOfGaussian(lf3d[:, y, :, c], scale)
-                lf3d[:, y, :, c] = laplace[:]
-
-    elif direction == 'v':
-        for x in xrange(lf3d.shape[2]):
-            for c in xrange(lf3d.shape[3]):
-                laplace = vigra.filters.laplacianOfGaussian(lf3d[:, :, x, c], scale)
-                lf3d[:, :, x, c] = laplace[:]
-    else:
-        assert False, "unknown lightfield direction!"
-
-    return lf3d
 
 
 # def mergeOrientations_wta(orientation1, coherence1, orientation2, coherence2):

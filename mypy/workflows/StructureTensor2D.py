@@ -8,15 +8,12 @@ from scipy.ndimage.filters import median_filter
 
 
 from mypy.lightfield import io as lfio
-from mypy.lightfield.helpers import enum
 import mypy.pointclouds.depthToCloud as dtc
 from mypy.lightfield import helpers as lfhelpers
 from mypy.lightfield.depth import structureTensor2D as st2d
-import mypy.visualization.imshow as myshow
-
-
-COLORSPACE = enum(RGB=0, LAB=1, LUV=2)
-PREFILTER = enum(NO=0, IMGD=1, EPID=2, IMGD2=3, EPID2=4)
+from mypy.lightfield.depth.prefilter import COLORSPACE
+from mypy.lightfield.depth.prefilter import PREFILTER
+import mypy.lightfield.depth.prefilter as prefilter
 
 
 
@@ -126,17 +123,19 @@ def compute_horizontal(lf3dh, shift, config):
     lf3d = lfhelpers.refocus_3d(lf3dh, shift, 'h')
 
     if config.color_space:
-        lf3d = st2d.changeColorSpace(lf3d, config.color_space)
+        lf3d = prefilter.changeColorSpace(lf3d, config.color_space)
 
     if config.prefilter > 0:
         if config.prefilter == PREFILTER.IMGD:
-            lf3d = st2d.preImgDerivation(lf3d, scale=config.prefilter_scale, direction='h')
+            lf3d = prefilter.preImgDerivation(lf3d, scale=config.prefilter_scale, direction='h')
         if config.prefilter == PREFILTER.EPID:
-            lf3d = st2d.preEpiDerivation(lf3d, scale=config.prefilter_scale, direction='h')
+            lf3d = prefilter.preEpiDerivation(lf3d, scale=config.prefilter_scale, direction='h')
         if config.prefilter == PREFILTER.IMGD2:
-            lf3d = st2d.preImgLaplace(lf3d, scale=config.prefilter_scale)
+            lf3d = prefilter.preImgLaplace(lf3d, scale=config.prefilter_scale)
         if config.prefilter == PREFILTER.EPID2:
-            lf3d = st2d.preEpiLaplace(lf3d, scale=config.prefilter_scale, direction='h')
+            lf3d = prefilter.preEpiLaplace(lf3d, scale=config.prefilter_scale, direction='h')
+        if config.prefilter == PREFILTER.SCHARR:
+            lf3d = prefilter.preImgScharr(lf3d, direction='h')
 
     structureTensor = None
     if config.structure_tensor_type == "classic":
@@ -174,17 +173,19 @@ def compute_vertical(lf3dv, shift, config):
     lf3d = lfhelpers.refocus_3d(lf3dv, shift, 'v')
 
     if config.color_space:
-        lf3d = st2d.changeColorSpace(lf3d, config.color_space)
+        lf3d = prefilter.changeColorSpace(lf3d, config.color_space)
 
     if config.prefilter > 0:
         if config.prefilter == PREFILTER.IMGD:
-            lf3d = st2d.preImgDerivation(lf3d, scale=config.prefilter_scale, direction='v')
+            lf3d = prefilter.preImgDerivation(lf3d, scale=config.prefilter_scale, direction='v')
         if config.prefilter == PREFILTER.EPID:
-            lf3d = st2d.preEpiDerivation(lf3d, scale=config.prefilter_scale, direction='v')
+            lf3d = prefilter.preEpiDerivation(lf3d, scale=config.prefilter_scale, direction='v')
         if config.prefilter == PREFILTER.IMGD2:
-            lf3d = st2d.preImgLaplace(lf3d, scale=config.prefilter_scale)
+            lf3d = prefilter.preImgLaplace(lf3d, scale=config.prefilter_scale)
         if config.prefilter == PREFILTER.EPID2:
-            lf3d = st2d.preEpiLaplace(lf3d, scale=config.prefilter_scale, direction='v')
+            lf3d = prefilter.preEpiLaplace(lf3d, scale=config.prefilter_scale, direction='v')
+        if config.prefilter == PREFILTER.SCHARR:
+            lf3d = prefilter.preImgScharr(lf3d, direction='v')
 
     structureTensor = None
     if config.structure_tensor_type == "classic":
@@ -355,12 +356,12 @@ def structureTensor2D(config):
                 eposy = config.roi["pos"][1] + config.roi["size"][1]
                 color = color[sposx:eposx, sposy:eposy, 0:3]
 
-        # tmp = np.zeros((lf_shape[1], lf_shape[2], 4), dtype=np.float32)
-        # tmp[:, :, 0] = orientation[lf_shape[0]/2, :, :]
-        # tmp[:, :, 1] = coherence[lf_shape[0]/2, :, :]
-        # tmp[:, :, 2] = depth[:]
-        # vim = vigra.RGBImage(tmp)
-        # vim.writeImage(config.result_path+config.result_label+"final.exr")
+        tmp = np.zeros((lf_shape[1], lf_shape[2], 4), dtype=np.float32)
+        tmp[:, :, 0] = orientation[lf_shape[0]/2, :, :]
+        tmp[:, :, 1] = coherence[lf_shape[0]/2, :, :]
+        tmp[:, :, 2] = depth[:]
+        vim = vigra.RGBImage(tmp)
+        vim.writeImage(config.result_path+config.result_label+"final.exr")
         # myshow.finalsViewer(config.result_path+config.result_label+"final.exr", save_at=config.result_path+config.result_label)
 
         print "make pointcloud..."
