@@ -140,6 +140,29 @@ class StructureTensorClassic(StructureTensor):
         return vigra.filters.structureTensor(epi, params["inner_scale"], params["outer_scale"])
 
 
+# class StructureTensorScharr(StructureTensor):
+#
+#     def __init__(self):
+#         StructureTensor.__init__(self)
+#
+#     def derivations(self, epi, params):
+#         assert isinstance(epi, np.ndarray)
+#         assert params.has_key("inner_scale")
+#         assert params.has_key("outer_scale")
+#
+#         tmp = vigra.filters.gaussianSmoothing(epi, params["inner_scale"])
+#         d = np.zeros((tmp.shape[0], tmp.shape[1], 2), dtype=np.float32)
+#
+#         tmp = convolve(tmp, VSCHARR_WEIGHTS)
+#         d[:, :, 0] = convolve(tmp, HSCHARR_WEIGHTS)
+#         d[:, :, 1] = convolve(tmp, VSCHARR_WEIGHTS)
+#         st = vigra.filters.vectorToTensor(d)
+#         for c in range(3):
+#             st[:, :, c] = vigra.gaussianSmoothing(st[:, :, c], params["outer_scale"])
+#         return st
+
+
+
 class StructureTensorScharr(StructureTensor):
 
     def __init__(self):
@@ -150,15 +173,32 @@ class StructureTensorScharr(StructureTensor):
         assert params.has_key("inner_scale")
         assert params.has_key("outer_scale")
 
-        tmp = vigra.filters.gaussianSmoothing(epi, params["inner_scale"])
-        d = np.zeros((tmp.shape[0], tmp.shape[1], 2), dtype=np.float32)
+        KernelV = np.array([[ 3,  10,  3],
+                            [ 0,   0,  0],
+                            [-3, -10, -3]]) / 32.0
+        KernelH = KernelV.T
 
-        d[:, :, 0] = convolve(tmp, HSCHARR_WEIGHTS)
-        d[:, :, 1] = convolve(tmp, VSCHARR_WEIGHTS)
-        st = vigra.filters.vectorToTensor(d)
-        for c in range(3):
-            st[:, :, c] = vigra.gaussianSmoothing(st[:, :, c], params["outer_scale"])
-        return st
+        scharrh = vigra.filters.Kernel2D()
+        scharrh.initExplicitly((-1, -1), (1, 1), KernelH)
+
+        scharrv = vigra.filters.Kernel2D()
+        scharrv.initExplicitly((-1, -1), (1, 1), KernelV)
+
+        grad = np.zeros((epi.shape[0], epi.shape[1], 2), dtype=np.float32)
+
+        epi = vigra.filters.gaussianSmoothing(epi, params["inner_scale"])
+
+        epi = vigra.filters.convolve(epi, scharrh)
+        grad[:, :, 1] = vigra.filters.convolve(epi, scharrh)
+        grad[:, :, 0] = vigra.filters.convolve(epi, scharrv)
+
+        tensor = vigra.filters.vectorToTensor(grad)
+
+        tensor[:, :, 0] = vigra.filters.gaussianSmoothing(tensor[:, :, 0], params["outer_scale"])
+        tensor[:, :, 1] = vigra.filters.gaussianSmoothing(tensor[:, :, 1], params["outer_scale"])
+        tensor[:, :, 2] = vigra.filters.gaussianSmoothing(tensor[:, :, 2], params["outer_scale"])
+
+        return tensor
 
 
 
