@@ -236,9 +236,9 @@ def mergeOrientations_wta(orientation1, coherence1, orientation2, coherence2):
     orientation1[winner] = orientation2[winner]
     coherence1[winner] = coherence2[winner]
     ### apply memory of coherence
-    winner = np.where(0.99 < coherence1)
-    coherence1[winner] =  coherence1[winner] * 1.01
-    winner = np.where(0.9995 < coherence1)
-    coherence1[winner] =  coherence1[winner] * 1.05
+    # winner = np.where(0.99 < coherence1)
+    # coherence1[winner] =  coherence1[winner] * 1.01
+    # winner = np.where(0.9995 < coherence1)
+    # coherence1[winner] =  coherence1[winner] * 1.05
 
     return orientation1, coherence1
