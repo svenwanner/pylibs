@@ -216,13 +216,6 @@ def structureTensor2D(config):
                 plt.imsave(config.result_path+config.result_label+"coherence_merged_shift_{0}.png".format(shift), coherence[lf_shape[0]/2, :, :], cmap=plt.cm.jet)
 
 
-# <<<<<<< HEAD
-# =======
-#     invalids = np.where(coherence < config.coherence_threshold)
-#     orientation[invalids] = -10
-#     coherence[invalids] = 0
-#
-# >>>>>>> 92e67af7707454cf933ba7e975279e0334367f5f
     mask = coherence[lf_shape[0]/2, :, :]
 
     if config.output_level >= 2:

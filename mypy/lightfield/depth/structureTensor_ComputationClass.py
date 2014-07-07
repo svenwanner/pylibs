@@ -155,13 +155,13 @@ def compute_vertical(lf3dv, shift, config):
 
     if config.prefilter > 0:
         if config.prefilter == PREFILTER.IMGD:
-            lf3d = st2d.preImgDerivation(lf3d, scale=config.prefilter_scale, direction='v')
+            lf3d = prefilter.preImgDerivation(lf3d, scale=config.prefilter_scale, direction='v')
         if config.prefilter == PREFILTER.EPID:
-            lf3d = st2d.preEpiDerivation(lf3d, scale=config.prefilter_scale, direction='v')
+            lf3d = prefilter.preEpiDerivation(lf3d, scale=config.prefilter_scale, direction='v')
         if config.prefilter == PREFILTER.IMGD2:
-            lf3d = st2d.preImgLaplace(lf3d, scale=config.prefilter_scale)
+            lf3d = prefilter.preImgLaplace(lf3d, scale=config.prefilter_scale)
         if config.prefilter == PREFILTER.EPID2:
-            lf3d = st2d.preEpiLaplace(lf3d, scale=config.prefilter_scale, direction='v')
+            lf3d = prefilter.preEpiLaplace(lf3d, scale=config.prefilter_scale, direction='v')
         if config.prefilter == PREFILTER.SCHARR:
             lf3d = prefilter.preImgScharr(lf3d, config, direction='v')
 

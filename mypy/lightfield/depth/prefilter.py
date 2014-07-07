@@ -40,9 +40,9 @@ def preImgDerivation(lf3d, scale=0.1, direction='h'):
         for c in xrange(lf3d.shape[3]):
             grad = vigra.filters.gaussianGradient(lf3d[i, :, :, c], scale)
             if direction == 'h':
-                tmp = grad[:, :, 0]
-            if direction == 'v':
                 tmp = grad[:, :, 1]
+            if direction == 'v':
+                tmp = grad[:, :, 0]
             lf3d[i, :, :, c] = tmp
 
     return lf3d
@@ -73,7 +73,7 @@ def preEpiDerivation(lf3d, scale=0.1, direction='h'):
                 # try:
                 #     tmp = vigra.colors.linearRangeMapping(grad[:, :, 0], newRange=(0.0, 1.0))
                 # except:
-                tmp = grad[:, :, 0]
+                tmp = grad[:, :, 1]
                 lf3d[:, y, :, c] = tmp[:]
 
     elif direction == 'v':
@@ -83,7 +83,7 @@ def preEpiDerivation(lf3d, scale=0.1, direction='h'):
                 # try:
                 #     tmp = vigra.colors.linearRangeMapping(grad[:, :, 0], newRange=(0.0, 1.0))
                 # except:
-                tmp = grad[:, :, 0]
+                tmp = grad[:, :, 1]
                 lf3d[:, :, x, c] = tmp[:]
     else:
         assert False, "unknown lightfield direction!"
@@ -121,7 +121,7 @@ def preImgScharr(lf3d, config = None, direction='h'):
     if direction == 'h':
         Kernel = np.array([[-3, 0, 3], [-10, 0, 10], [-3, 0, 3]]) / 32.0
         scharr = vigra.filters.Kernel2D()
-        scharr.initExplicitly((0,0), (2,2), Kernel)
+        scharr.initExplicitly((-1,-1), (1,1), Kernel)
         for t in xrange(lf3d.shape[0]):
             for c in xrange(lf3d.shape[3]):
                 lf3d[t, :, :, c] = vigra.filters.convolve(lf3d[t, :, :, c], scharr)
@@ -131,7 +131,7 @@ def preImgScharr(lf3d, config = None, direction='h'):
     elif direction == 'v':
         Kernel = np.array([[-3, -10, -3], [0, 0, 0], [3, 10, 3]]) / 32.0
         scharr = vigra.filters.Kernel2D()
-        scharr.initExplicitly((0,0), (2,2), Kernel)
+        scharr.initExplicitly((-1,-1), (1,1), Kernel)
         for t in xrange(lf3d.shape[0]):
             for c in xrange(lf3d.shape[3]):
                 lf3d[t, :, :, c] = vigra.filters.convolve(lf3d[t, :, :, c], scharr)
