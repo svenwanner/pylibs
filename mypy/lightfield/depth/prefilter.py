@@ -2,6 +2,8 @@ import numpy as np
 import vigra
 from mypy.lightfield.helpers import enum
 import logging
+import pylab as plt
+
 #============================================================================================================
 #==========================                     prefiltering methods (color space)              ===========================
 #============================================================================================================
@@ -27,13 +29,13 @@ def changeColorSpace(lf3d, cspace=0):
 #============================================================================================================
 #==========================                     prefiltering methods (derivatives)             ===========================
 #============================================================================================================
-PREFILTER = enum(NO=0, IMGD=1, EPID=2, IMGD2=3, EPID2=4)
+PREFILTER = enum(NO=0, IMGD=1, EPID=2, IMGD2=3, EPID2=4, SCHARR=5)
 
 def preImgDerivation(lf3d, scale=0.1, direction='h'):
     assert isinstance(lf3d, np.ndarray)
     assert isinstance(scale, float)
 
-    logging.debug("apply image derivative prefilter")
+    print("apply image derivative prefilter")
     for i in xrange(lf3d.shape[0]):
         for c in xrange(lf3d.shape[3]):
             grad = vigra.filters.gaussianGradient(lf3d[i, :, :, c], scale)
@@ -50,7 +52,7 @@ def preImgLaplace(lf3d, scale=0.1, direction='h'):
     assert isinstance(lf3d, np.ndarray)
     assert isinstance(scale, float)
 
-    logging.debug("apply image laplace prefilter")
+    print("apply image laplace prefilter")
     for i in xrange(lf3d.shape[0]):
         for c in xrange(lf3d.shape[3]):
             laplace = vigra.filters.laplacianOfGaussian(lf3d[i, :, :, c], scale)
@@ -63,7 +65,7 @@ def preEpiDerivation(lf3d, scale=0.1, direction='h'):
     assert isinstance(lf3d, np.ndarray)
     assert isinstance(scale, float)
 
-    logging.debug("apply epi derivative prefilter")
+    print("apply epi derivative prefilter")
     if direction == 'h':
         for y in xrange(lf3d.shape[1]):
             for c in xrange(lf3d.shape[3]):
@@ -93,7 +95,7 @@ def preEpiLaplace(lf3d, scale=0.1, direction='h'):
     assert isinstance(lf3d, np.ndarray)
     assert isinstance(scale, float)
 
-    logging.debug("apply epi laplace prefilter")
+    print("apply epi laplace prefilter")
     if direction == 'h':
         for y in xrange(lf3d.shape[1]):
             for c in xrange(lf3d.shape[3]):
@@ -105,6 +107,36 @@ def preEpiLaplace(lf3d, scale=0.1, direction='h'):
             for c in xrange(lf3d.shape[3]):
                 laplace = vigra.filters.laplacianOfGaussian(lf3d[:, :, x, c], scale)
                 lf3d[:, :, x, c] = laplace[:]
+    else:
+        assert False, "unknown lightfield direction!"
+
+    return lf3d
+
+
+def preImgScharr(lf3d, config = None, direction='h'):
+
+    assert isinstance(lf3d, np.ndarray)
+
+    print("apply image scharr prefilter")
+    if direction == 'h':
+        Kernel = np.array([[-3, 0, 3], [-10, 0, 10], [-3, 0, 3]]) / 32.0
+        scharr = vigra.filters.Kernel2D()
+        scharr.initExplicitly((0,0), (2,2), Kernel)
+        for t in xrange(lf3d.shape[0]):
+            for c in xrange(lf3d.shape[3]):
+                lf3d[t, :, :, c] = vigra.filters.convolve(lf3d[t, :, :, c], scharr)
+            if config.output_level >3:
+                    plt.imsave(config.result_path+config.result_label+"Horizontal_Scharr_Image_{0}.png".format(t), np.abs(lf3d[t, :, :, :]))
+
+    elif direction == 'v':
+        Kernel = np.array([[-3, -10, -3], [0, 0, 0], [3, 10, 3]]) / 32.0
+        scharr = vigra.filters.Kernel2D()
+        scharr.initExplicitly((0,0), (2,2), Kernel)
+        for t in xrange(lf3d.shape[0]):
+            for c in xrange(lf3d.shape[3]):
+                lf3d[t, :, :, c] = vigra.filters.convolve(lf3d[t, :, :, c], scharr)
+            if config.output_level >3:
+                    plt.imsave(config.result_path+config.result_label+"Vertical_Scharr_Image_{0}.png".format(t), np.abs(lf3d[t, :, :, :]))
     else:
         assert False, "unknown lightfield direction!"
 

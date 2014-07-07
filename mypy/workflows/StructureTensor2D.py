@@ -2,22 +2,18 @@ import os
 import vigra
 import numpy as np
 import pylab as plt
-import scipy.misc as misc
-import threading
-from scipy.ndimage.filters import median_filter
 
+import scipy.misc as misc
+from scipy.ndimage import median_filter
+
+from mypy.lightfield.depth import structureTensor2D as st2d
+
+import mypy.pointclouds.depthToCloud as dtc
+from mypy.lightfield.depth.prefilter import COLORSPACE
+from mypy.lightfield.depth.prefilter import PREFILTER
 
 from mypy.lightfield import io as lfio
-from mypy.lightfield.helpers import enum
-import mypy.pointclouds.depthToCloud as dtc
-from mypy.lightfield import helpers as lfhelpers
-from mypy.lightfield.depth import structureTensor2D as st2d
-import mypy.visualization.imshow as myshow
-
-
-COLORSPACE = enum(RGB=0, LAB=1, LUV=2)
-PREFILTER = enum(NO=0, IMGD=1, EPID=2, IMGD2=3, EPID2=4)
-
+from mypy.lightfield.depth.structureTensor_ComputationClass import Compute
 
 
 #============================================================================================================
@@ -93,144 +89,25 @@ class Config:
 #============================================================================================================
 
 
-class Compute(threading.Thread):
-    lock = threading.Lock()
-
-    def __init__(self, lf3d, shift, config, direction):
-        """
-
-        :param lf3d: 
-        :param shift: 
-        :param config: 
-        :param direction: 
-        """
-        threading.Thread.__init__(self)
-        self.lf3d = lf3d
-        self.shift = shift
-        self.config = config
-        self.direction = direction
-        self.orientation = None
-        self.coherence = None
-
-    def run(self):
-        if self.direction == 'h':
-            self.orientation, self.coherence = compute_horizontal(self.lf3d, self.shift, self.config)
-        if self.direction == 'v':
-            self.orientation, self.coherence = compute_vertical(self.lf3d, self.shift, self.config)
-
-    def get_results(self):
-        return self.orientation, self.coherence
-
-def compute_horizontal(lf3dh, shift, config):
-    print "compute horizontal shift {0}".format(shift), "..."
-    lf3d = lfhelpers.refocus_3d(lf3dh, shift, 'h')
-
-    if config.color_space:
-        lf3d = st2d.changeColorSpace(lf3d, config.color_space)
-
-    if config.prefilter > 0:
-        if config.prefilter == PREFILTER.IMGD:
-            lf3d = st2d.preImgDerivation(lf3d, scale=config.prefilter_scale, direction='h')
-        if config.prefilter == PREFILTER.EPID:
-            lf3d = st2d.preEpiDerivation(lf3d, scale=config.prefilter_scale, direction='h')
-        if config.prefilter == PREFILTER.IMGD2:
-            lf3d = st2d.preImgLaplace(lf3d, scale=config.prefilter_scale)
-        if config.prefilter == PREFILTER.EPID2:
-            lf3d = st2d.preEpiLaplace(lf3d, scale=config.prefilter_scale, direction='h')
-
-    structureTensor = None
-    if config.structure_tensor_type == "classic":
-        print "use vigra structure tensor..."
-        structureTensor = st2d.StructureTensorClassic()
-    if config.structure_tensor_type == "scharr":
-        print "use scharr structure tensor..."
-        structureTensor = st2d.StructureTensorScharr()
-    if config.structure_tensor_type == "hour-glass":
-        print "use scharr hour-glass tensor..."
-        structureTensor = st2d.StructureTensorHourGlass()
-
-    params = {"direction": 'h', "inner_scale": config.inner_scale, "outer_scale": config.outer_scale, "hour-glass": config.hourglass_scale}
-    structureTensor.compute(lf3d, params)
-    st3d = structureTensor.get_result()
-
-    orientation_h, coherence_h = st2d.evaluateStructureTensor(st3d)
-    orientation_h[:] += shift
-
-    if config.coherence_threshold > 0.0:
-        invalids = np.where(coherence_h < config.coherence_threshold)
-        coherence_h[invalids] = 0.0
-
-    if config.output_level == 3:
-        misc.imsave(config.result_path+config.result_label+"orientation_h_shift_{0}.png".format(shift), orientation_h[orientation_h[0]/2, :, :])
-    if config.output_level == 3:
-        misc.imsave(config.result_path+config.result_label+"coherence_h_{0}.png".format(shift), coherence_h[coherence_h[0]/2, :, :])
-
-    return orientation_h, coherence_h
-
-
-
-def compute_vertical(lf3dv, shift, config):
-    print "compute vertical shift {0}".format(shift), "..."
-    lf3d = lfhelpers.refocus_3d(lf3dv, shift, 'v')
-
-    if config.color_space:
-        lf3d = st2d.changeColorSpace(lf3d, config.color_space)
-
-    if config.prefilter > 0:
-        if config.prefilter == PREFILTER.IMGD:
-            lf3d = st2d.preImgDerivation(lf3d, scale=config.prefilter_scale, direction='v')
-        if config.prefilter == PREFILTER.EPID:
-            lf3d = st2d.preEpiDerivation(lf3d, scale=config.prefilter_scale, direction='v')
-        if config.prefilter == PREFILTER.IMGD2:
-            lf3d = st2d.preImgLaplace(lf3d, scale=config.prefilter_scale)
-        if config.prefilter == PREFILTER.EPID2:
-            lf3d = st2d.preEpiLaplace(lf3d, scale=config.prefilter_scale, direction='v')
-
-    structureTensor = None
-    if config.structure_tensor_type == "classic":
-        print "use vigra structure tensor..."
-        structureTensor = st2d.StructureTensorClassic()
-    if config.structure_tensor_type == "scharr":
-        print "use scharr structure tensor..."
-        structureTensor = st2d.StructureTensorScharr()
-    if config.structure_tensor_type == "hour-glass":
-        print "use scharr hour-glass tensor..."
-        structureTensor = st2d.StructureTensorHourGlass()
-
-    params = {"direction": 'v', "inner_scale": config.inner_scale, "outer_scale": config.outer_scale, "hour-glass": config.hourglass_scale}
-    structureTensor.compute(lf3d, params)
-    st3d = structureTensor.get_result()
-
-
-
-    orientation_v, coherence_v = st2d.evaluateStructureTensor(st3d)
-    orientation_v[:] += shift
-
-    if config.coherence_threshold > 0.0:
-        invalids = np.where(coherence_v < config.coherence_threshold)
-        coherence_v[invalids] = 0.0
-
-    if config.output_level == 3:
-        misc.imsave(config.result_path+config.result_label+"orientation_v_shift_{0}.png".format(shift), orientation_v[orientation_v[0]/2, :, :])
-    if config.output_level == 3:
-        misc.imsave(config.result_path+config.result_label+"coherence_v_{0}.png".format(shift), coherence_v[coherence_v[0]/2, :, :])
-
-    return orientation_v, coherence_v
-
-
-
-#============================================================================================================
-#============================================================================================================
-#============================================================================================================
-
-
 def structureTensor2D(config):
+
+
+########################################################################################################################
+##################################   Check the correctness of the parent path
+########################################################################################################################
+
     if not config.result_path.endswith("/"):
         config.result_path += "/"
     if not config.result_label.endswith("/"):
         config.result_label += "/"
     if not os.path.isdir(config.result_path+config.result_label):
         os.makedirs(config.result_path+config.result_label)
+    if config.output_level >3:
+        print('config result path: ' + str(config.result_label))
+
+########################################################################################################################
+##################################   Initialize light field descriptors
+########################################################################################################################
 
     compute_h = False
     compute_v = False
@@ -238,50 +115,76 @@ def structureTensor2D(config):
     lf3dh = None
     lf3dv = None
 
-    print "load data...",
+########################################################################################################################
+##################################   Load Image Data
+########################################################################################################################
+
+    print("load data...")
     try:
         if not config.path_horizontal.endswith("/"):
             config.path_horizontal += "/"
         lf3dh = lfio.load_3d(config.path_horizontal, rgb=config.rgb, roi=config.roi)
         compute_h = True
         lf_shape = lf3dh.shape
+        if config.output_level >3:
+            print('Image shape of horizontal images: ' + str(lf3dh.shape))
+
     except:
         pass
 
     try:
         if not config.path_vertical.endswith("/"):
             config.path_vertical += "/"
-        compute_v = True
         lf3dv = lfio.load_3d(config.path_vertical, rgb=config.rgb, roi=config.roi)
+        compute_v = True
         if lf_shape is None:
             lf_shape = lf3dv.shape
+        if config.output_level >3:
+            print('Image shape of vertical images: ' + str(lf3dv.shape))
+
     except:
         pass
 
-    orientation = np.zeros((lf_shape[0], lf_shape[1], lf_shape[2]), dtype=np.float32)
-    coherence = np.zeros((lf_shape[0], lf_shape[1], lf_shape[2]), dtype=np.float32)
     print "done"
+
+
+########################################################################################################################
+##################################  Initialize memory for disparity and coherence values
+########################################################################################################################
+
+    coherence = np.zeros((lf_shape[0], lf_shape[1], lf_shape[2]), dtype=np.float32)
+    orientation = np.zeros((lf_shape[0], lf_shape[1], lf_shape[2]), dtype=np.float32)
+
+
+########################################################################################################################
+##################################  Thread split computation for horizontal and vertical light field
+########################################################################################################################
 
     for shift in config.global_shifts:
 
         
         threads = []
 
+    
+    ### generate one thread for the horizontal computation ###
         if compute_h:
             thread = Compute(lf3dh, shift, config, direction='h')
             threads += [thread]
             thread.start()
 
         if compute_v:
-            thread = Compute(lf3dv, shift, config, direction='v')
-            threads += [thread]
-            thread.start()
+           thread = Compute(lf3dv, shift, config, direction='v')
+           threads += [thread]
+           thread.start()
+
+    ### Initialize Pointer for Solution Array ###
 
         orientation_h = None
         coherence_h = None
         orientation_v = None
         coherence_v = None
 
+    ### Join threads and get solution of it ###
         for x in threads:
             x.join()
             if x.direction == 'h':
@@ -289,31 +192,37 @@ def structureTensor2D(config):
             if x.direction == 'v':
                 orientation_v, coherence_v = x.get_results()
 
-
         if compute_h and compute_v:
             print "merge vertical/horizontal ..."
             orientation_tmp, coherence_tmp = st2d.mergeOrientations_wta(orientation_h, coherence_h, orientation_v, coherence_v)
             orientation, coherence = st2d.mergeOrientations_wta(orientation, coherence, orientation_tmp, coherence_tmp)
 
             if config.output_level >= 2:
-                plt.imsave(config.result_path+config.result_label+"orientation_merged_shift_{0}.png".format(shift), orientation[lf_shape[0]/2, :, :], cmap=plt.cm.jet)
 
+                plt.imsave(config.result_path+config.result_label+"orientation_merged_shift_{0}.png".format(shift), orientation[lf_shape[0]/2, :, :])
+                plt.imsave(config.result_path+config.result_label+"coherence_merged_shift_{0}.png".format(shift), coherence[lf_shape[0]/2, :, :], cmap=plt.cm.jet)
 
         else:
-            print "merge shifts..."
+            print("merge shifts")
+
             if compute_h:
                 orientation, coherence = st2d.mergeOrientations_wta(orientation, coherence, orientation_h, coherence_h)
+
             if compute_v:
                 orientation, coherence = st2d.mergeOrientations_wta(orientation, coherence, orientation_v, coherence_v)
+
             if config.output_level >= 2:
                 plt.imsave(config.result_path+config.result_label+"orientation_merged_shift_{0}.png".format(shift), orientation[lf_shape[0]/2, :, :], cmap=plt.cm.jet)
                 plt.imsave(config.result_path+config.result_label+"coherence_merged_shift_{0}.png".format(shift), coherence[lf_shape[0]/2, :, :], cmap=plt.cm.jet)
 
 
-    invalids = np.where(coherence < config.coherence_threshold)
-    orientation[invalids] = -10
-    coherence[invalids] = 0
-
+# <<<<<<< HEAD
+# =======
+#     invalids = np.where(coherence < config.coherence_threshold)
+#     orientation[invalids] = -10
+#     coherence[invalids] = 0
+#
+# >>>>>>> 92e67af7707454cf933ba7e975279e0334367f5f
     mask = coherence[lf_shape[0]/2, :, :]
 
     if config.output_level >= 2:
@@ -340,6 +249,7 @@ def structureTensor2D(config):
         drange = config.max_depth-config.min_depth
         depth = vigra.filters.totalVariationFilter(depth.astype(np.float64), mask.astype(np.float64), 0.01*drange*config.tv["alpha"], config.tv["steps"], 0)
 
+
     invalids = np.where(mask == 0)
     depth[invalids] = -1.0
 
@@ -347,6 +257,7 @@ def structureTensor2D(config):
         plt.imsave(config.result_path+config.result_label+"depth_final.png", depth, cmap=plt.cm.jet)
 
     if config.output_level >= 1:
+
         if isinstance(config.centerview_path, str):
             color = misc.imread(config.centerview_path)
             if isinstance(config.roi, type({})):
@@ -356,17 +267,18 @@ def structureTensor2D(config):
                 eposy = config.roi["pos"][1] + config.roi["size"][1]
                 color = color[sposx:eposx, sposy:eposy, 0:3]
 
-        # tmp = np.zeros((lf_shape[1], lf_shape[2], 4), dtype=np.float32)
-        # tmp[:, :, 0] = orientation[lf_shape[0]/2, :, :]
-        # tmp[:, :, 1] = coherence[lf_shape[0]/2, :, :]
-        # tmp[:, :, 2] = depth[:]
-        # vim = vigra.RGBImage(tmp)
-        # vim.writeImage(config.result_path+config.result_label+"final.exr")
-        # myshow.finalsViewer(config.result_path+config.result_label+"final.exr", save_at=config.result_path+config.result_label)
+
+
+        tmp = np.zeros((lf_shape[1], lf_shape[2], 4), dtype=np.float32)
+        tmp[:, :, 0] = orientation[lf_shape[0]/2, :, :]
+        tmp[:, :, 1] = coherence[lf_shape[0]/2, :, :]
+        tmp[:, :, 2] = depth[:]
+        vim = vigra.RGBImage(tmp)
+        vim.writeImage(config.result_path+config.result_label+"final.exr")
+        #myshow.finalsViewer(config.result_path+config.result_label+"final.exr", save_at=config.result_path+config.result_label)
 
         print "make pointcloud..."
         if isinstance(color, np.ndarray):
             dtc.save_pointcloud(config.result_path+config.result_label+"pointcloud.ply", depth_map=depth, color=color, confidence=coherence[lf_shape[0]/2, :, :], focal_length=config.focal_length, min_depth=config.min_depth, max_depth=config.max_depth)
         else:
             dtc.save_pointcloud(config.result_path+config.result_label+"pointcloud.ply", depth_map=depth, confidence=coherence[lf_shape[0]/2, :, :], focal_length=config.focal_length, min_depth=config.min_depth, max_depth=config.max_depth)
-
