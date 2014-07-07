@@ -144,9 +144,9 @@ class StructureTensorScharr(StructureTensor):
         assert params.has_key("inner_scale")
         assert params.has_key("outer_scale")
 
-        KernelV = np.array([[3,  10,  3],
+        KernelV = np.array([[-3,  -10,  -3],
                             [0,   0,  0],
-                            [-3, -10, -3]]) / 32.0
+                            [3, 10, 3]]) / 32.0
         KernelH = KernelV.T
 
         scharrh = vigra.filters.Kernel2D()

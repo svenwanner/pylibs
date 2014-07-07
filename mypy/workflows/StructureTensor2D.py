@@ -246,16 +246,18 @@ def structureTensor2D(config):
         lf3dh = lfio.load_3d(config.path_horizontal, rgb=config.rgb, roi=config.roi)
         compute_h = True
         lf_shape = lf3dh.shape
+        print(lf3dh.shape)
     except:
         pass
 
     try:
         if not config.path_vertical.endswith("/"):
             config.path_vertical += "/"
-        compute_v = True
         lf3dv = lfio.load_3d(config.path_vertical, rgb=config.rgb, roi=config.roi)
+        compute_v = True
         if lf_shape is None:
             lf_shape = lf3dv.shape
+        print(lf3dv.shape)
     except:
         pass
 
@@ -355,14 +357,17 @@ def structureTensor2D(config):
                 sposy = config.roi["pos"][1]
                 eposy = config.roi["pos"][1] + config.roi["size"][1]
                 color = color[sposx:eposx, sposy:eposy, 0:3]
+        try:
+            tmp = np.zeros((lf_shape[1], lf_shape[2], 4), dtype=np.float32)
+            tmp[:, :, 0] = orientation[lf_shape[0]/2, :, :]
+            tmp[:, :, 1] = coherence[lf_shape[0]/2, :, :]
+            tmp[:, :, 2] = depth[:]
+            vim = vigra.RGBImage(tmp)
+            vim.writeImage(config.result_path+config.result_label+"final.exr")
+            #myshow.finalsViewer(config.result_path+config.result_label+"final.exr", save_at=config.result_path+config.result_label)
+        except:
+            pass
 
-        tmp = np.zeros((lf_shape[1], lf_shape[2], 4), dtype=np.float32)
-        tmp[:, :, 0] = orientation[lf_shape[0]/2, :, :]
-        tmp[:, :, 1] = coherence[lf_shape[0]/2, :, :]
-        tmp[:, :, 2] = depth[:]
-        vim = vigra.RGBImage(tmp)
-        vim.writeImage(config.result_path+config.result_label+"final.exr")
-        # myshow.finalsViewer(config.result_path+config.result_label+"final.exr", save_at=config.result_path+config.result_label)
 
         print "make pointcloud..."
         if isinstance(color, np.ndarray):
