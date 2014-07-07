@@ -3,7 +3,7 @@ import vigra
 from mypy.lightfield.helpers import enum
 import logging
 import pylab as plt
-
+from scipy.misc import imsave
 #============================================================================================================
 #==========================                     prefiltering methods (color space)              ===========================
 #============================================================================================================
@@ -29,7 +29,7 @@ def changeColorSpace(lf3d, cspace=0):
 #============================================================================================================
 #==========================                     prefiltering methods (derivatives)             ===========================
 #============================================================================================================
-PREFILTER = enum(NO=0, IMGD=1, EPID=2, IMGD2=3, EPID2=4, SCHARR=5)
+PREFILTER = enum(NO=0, IMGD=1, EPID=2, IMGD2=3, EPID2=4, SCHARR=5, DOG=6)
 
 def preImgDerivation(lf3d, scale=0.1, direction='h'):
     assert isinstance(lf3d, np.ndarray)
@@ -113,7 +113,7 @@ def preEpiLaplace(lf3d, scale=0.1, direction='h'):
     return lf3d
 
 
-def preImgScharr(lf3d, config = None, direction='h'):
+def preImgScharr(lf3d, config=None, direction='h'):
 
     assert isinstance(lf3d, np.ndarray)
 
@@ -121,23 +121,52 @@ def preImgScharr(lf3d, config = None, direction='h'):
     if direction == 'h':
         Kernel = np.array([[-3, 0, 3], [-10, 0, 10], [-3, 0, 3]]) / 32.0
         scharr = vigra.filters.Kernel2D()
-        scharr.initExplicitly((-1,-1), (1,1), Kernel)
+        scharr.initExplicitly((-1, -1), (1, 1), Kernel)
         for t in xrange(lf3d.shape[0]):
             for c in xrange(lf3d.shape[3]):
                 lf3d[t, :, :, c] = vigra.filters.convolve(lf3d[t, :, :, c], scharr)
-            if config.output_level >3:
+            if config.output_level > 3:
                     plt.imsave(config.result_path+config.result_label+"Horizontal_Scharr_Image_{0}.png".format(t), np.abs(lf3d[t, :, :, :]))
 
     elif direction == 'v':
         Kernel = np.array([[-3, -10, -3], [0, 0, 0], [3, 10, 3]]) / 32.0
         scharr = vigra.filters.Kernel2D()
-        scharr.initExplicitly((-1,-1), (1,1), Kernel)
+        scharr.initExplicitly((-1, -1), (1, 1), Kernel)
         for t in xrange(lf3d.shape[0]):
             for c in xrange(lf3d.shape[3]):
                 lf3d[t, :, :, c] = vigra.filters.convolve(lf3d[t, :, :, c], scharr)
-            if config.output_level >3:
+            if config.output_level > 3:
                     plt.imsave(config.result_path+config.result_label+"Vertical_Scharr_Image_{0}.png".format(t), np.abs(lf3d[t, :, :, :]))
     else:
         assert False, "unknown lightfield direction!"
+
+    return lf3d
+
+
+def preDoG(lf3d, config=None):
+
+    assert isinstance(lf3d, np.ndarray)
+
+    if lf3d.shape[3] == 3:
+        tmp = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], 1), dtype=np.float32)
+        tmp[:, :, :, 0] = 0.3*lf3d[:, :, :, 0]+0.59*lf3d[:, :, :, 1]+0.11*lf3d[:, :, :, 2]
+        lf3d = tmp
+
+    print("apply image DoG prefilter")
+
+    sigmas = [0.4, 0.9, 1.5, 2.0, 2.8, 4.0]
+    if config.prefilter_scale > 0.0:
+        for i in range(6):
+            sigmas[i] = config.prefilter_scale*np.exp(i/2.0)
+    for view in range(lf3d.shape[0]):
+        for c in range(lf3d.shape[3]):
+            tmp = np.copy(lf3d[view, :, :, c])
+            lf3d[view, :, :, c] = 0
+            for s in sigmas:
+                level = vigra.filters.gaussianSmoothing(tmp, s)
+                lf3d[view, :, :, c] += tmp - level
+                tmp = level
+            lf3d[view, :, :, c] /= np.amax(lf3d[view, :, :, c])
+
 
     return lf3d
