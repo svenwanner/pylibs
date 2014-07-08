@@ -4,6 +4,7 @@ import vigra
 import numpy as np
 import pylab as plt
 import scipy.misc as misc
+from scipy.ndimage import median_filter
 import mypy.lightfield.depth.prefilter as prefilter
 from mypy.lightfield import io as lfio
 
@@ -277,16 +278,79 @@ def structureTensor2D_forwardBackward(config):
     orientation[invalids] = 0
     coherence[invalids] = 0
 
-    if config.output_level >= 2:
-        plt.imsave(config.result_path+config.result_label+"orientation_final.png", orientation[lf_shape[0]/2, :, :], cmap=plt.cm.gray)
-        plt.imsave(config.result_path+config.result_label+"coherence_final.png", coherence[lf_shape[0]/2, :, :], cmap=plt.cm.gray)
+    # if config.output_level >= 2:
+    #     plt.imsave(config.result_path+config.result_label+"orientation_final.png", orientation[lf_shape[0]/2, :, :], cmap=plt.cm.gray)
+    #     plt.imsave(config.result_path+config.result_label+"coherence_final.png", coherence[lf_shape[0]/2, :, :], cmap=plt.cm.gray)
 
     logging.info("Computed final disparity map!")
 
 ## Light field computation has to be changed just to compute the core of the disparity and just transfer it here to the disparity map
 
-    depth = dtc.disparity_to_depth(orientation[lf_shape[0]/2, :, :], config.base_line, config.focal_length, config.min_depth, config.max_depth)
-    mask = coherence[lf_shape[0]/2, :, :]
+    orientation = orientation[lf_shape[0]/2, :, :]
+    depth = dtc.disparity_to_depth(orientation, config.base_line, config.focal_length, config.min_depth, config.max_depth)
+    mask = np.copy(coherence[lf_shape[0]/2, :, :])
+
+    if isinstance(config.median, int) and config.median > 0:
+        print "apply median filter ..."
+        depth = median_filter(depth, config.median)
+        orientation = median_filter(orientation, config.median)
+    if isinstance(config.nonlinear_diffusion, type([])):
+        print "apply nonlinear diffusion"
+        vigra.filters.nonlinearDiffusion(depth, config.nonlinear_diffusion[0], config.nonlinear_diffusion[1])
+        vigra.filters.nonlinearDiffusion(orientation, config.nonlinear_diffusion[0], config.nonlinear_diffusion[1])
+    if isinstance(config.tv, type({})):
+        print "apply total variation..."
+        mask = coherence[lf_shape[0]/2, :, :]
+        cv = None
+        if lf3dh is not None:
+            if lf_shape[3] == 3:
+                cv = 0.3*lf3dh[lf_shape[0]/2, :, :, 0]+0.59*lf3dh[lf_shape[0]/2, :, :, 1]+0.11*lf3dh[lf_shape[0]/2, :, :, 2]
+            else:
+                cv = lf3dh[lf_shape[0]/2, :, :, 0]
+        elif lf3dv is not None:
+            if lf_shape[3] == 3:
+                cv = 0.3*lf3dv[lf_shape[0]/2, :, :, 0]+0.59*lf3dv[lf_shape[0]/2, :, :, 1]+0.11*lf3dv[lf_shape[0]/2, :, :, 2]
+            else:
+                cv = lf3dv[lf_shape[0]/2, :, :, 0]
+
+        borders = vigra.filters.gaussianGradientMagnitude(cv, 1.6)
+        borders /= np.amax(borders)
+        mask *= 1.0-borders
+        mask /= np.amax(mask)
+        assert depth.shape == mask.shape
+        drange = config.max_depth-config.min_depth
+        drange2 = np.abs(np.amax(orientation) - np.amin(orientation))
+        depth = vigra.filters.totalVariationFilter(depth.astype(np.float64), mask.astype(np.float64), 0.01*drange*config.tv["alpha"], config.tv["steps"], 0)
+        orientation = vigra.filters.totalVariationFilter(orientation.astype(np.float64), mask.astype(np.float64), 0.01*drange2*config.tv["alpha"], config.tv["steps"], 0)
+    if isinstance(config.selective_gaussian, float) and config.selective_gaussian > 0:
+        print "apply masked gauss..."
+        mask = coherence[lf_shape[0]/2, :, :]
+        cv = None
+        if lf3dh is not None:
+            if lf_shape[3] == 3:
+                cv = 0.3*lf3dh[lf_shape[0]/2, :, :, 0]+0.59*lf3dh[lf_shape[0]/2, :, :, 1]+0.11*lf3dh[lf_shape[0]/2, :, :, 2]
+            else:
+                cv = lf3dh[lf_shape[0]/2, :, :, 0]
+        elif lf3dv is not None:
+            if lf_shape[3] == 3:
+                cv = 0.3*lf3dv[lf_shape[0]/2, :, :, 0]+0.59*lf3dv[lf_shape[0]/2, :, :, 1]+0.11*lf3dv[lf_shape[0]/2, :, :, 2]
+            else:
+                cv = lf3dv[lf_shape[0]/2, :, :, 0]
+
+        borders = vigra.filters.gaussianGradientMagnitude(cv, 1.6)
+        borders /= np.amax(borders)
+        mask *= 1.0-borders
+        mask /= np.amax(mask)
+        gauss = vigra.filters.Kernel2D()
+        vigra.filters.Kernel2D.initGaussian(gauss, config.selective_gaussian)
+        gauss.setBorderTreatment(vigra.filters.BorderTreatmentMode.BORDER_TREATMENT_CLIP)
+        depth = vigra.filters.normalizedConvolveImage(depth, mask, gauss)
+        orientation = vigra.filters.normalizedConvolveImage(orientation, mask, gauss)
+
+
+    if config.output_level >= 2:
+        plt.imsave(config.result_path+config.result_label+"orientation_final.png", orientation, cmap=plt.cm.jet)
+        plt.imsave(config.result_path+config.result_label+"coherence_final.png", mask, cmap=plt.cm.jet)
 
     invalids = np.where(mask == 0)
     depth[invalids] = 0

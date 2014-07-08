@@ -253,6 +253,7 @@ def structureTensor2D(config):
 
     orientation = orientation[lf_shape[0]/2, :, :]
     depth = dtc.disparity_to_depth(orientation, config.base_line, config.focal_length, config.min_depth, config.max_depth)
+    mask = np.copy(coherence[lf_shape[0]/2, :, :])
 
     if isinstance(config.median, int) and config.median > 0:
         print "apply median filter ..."
