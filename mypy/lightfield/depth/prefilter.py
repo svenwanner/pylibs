@@ -124,8 +124,10 @@ def preImgScharr(lf3d, config=None, direction='h'):
         scharr.initExplicitly((-1, -1), (1, 1), Kernel)
         for t in xrange(lf3d.shape[0]):
             for c in xrange(lf3d.shape[3]):
+                lf3d[t, :, :, c] = vigra.filters.gaussianSmoothing(lf3d[t, :, :, c], 0.4)
                 lf3d[t, :, :, c] = vigra.filters.convolve(lf3d[t, :, :, c], scharr)
-            if config.output_level > 3:
+                lf3d[t, :, :, c] = lf3d[t, :, :, c]**2
+            if config.output_level >3:
                     plt.imsave(config.result_path+config.result_label+"Horizontal_Scharr_Image_{0}.png".format(t), np.abs(lf3d[t, :, :, :]))
 
     elif direction == 'v':
@@ -134,8 +136,10 @@ def preImgScharr(lf3d, config=None, direction='h'):
         scharr.initExplicitly((-1, -1), (1, 1), Kernel)
         for t in xrange(lf3d.shape[0]):
             for c in xrange(lf3d.shape[3]):
+                lf3d[t, :, :, c] = vigra.filters.gaussianSmoothing(lf3d[t, :, :, c], 0.4)
                 lf3d[t, :, :, c] = vigra.filters.convolve(lf3d[t, :, :, c], scharr)
-            if config.output_level > 3:
+                lf3d[t, :, :, c] = lf3d[t, :, :, c]**2
+            if config.output_level >3:
                     plt.imsave(config.result_path+config.result_label+"Vertical_Scharr_Image_{0}.png".format(t), np.abs(lf3d[t, :, :, :]))
     else:
         assert False, "unknown lightfield direction!"
