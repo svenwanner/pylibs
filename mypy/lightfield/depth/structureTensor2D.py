@@ -158,11 +158,11 @@ class StructureTensorScharr(StructureTensor):
 
         Kernel_H = np.array([[-3, 0, 3], [-10, 0, 10], [-3, 0, 3]]) / 32.0
         scharrh = vigra.filters.Kernel2D()
-        scharrh.initExplicitly((0, 0), (2, 2), Kernel_H)
+        scharrh.initExplicitly((-1, -1), (1, 1), Kernel_H)
 
         Kernel_V = np.array([[-3, -10, -3], [0, 0, 0], [3, 10, 3]]) / 32.0
         scharrv = vigra.filters.Kernel2D()
-        scharrv.initExplicitly((0, 0), (2, 2), Kernel_V)
+        scharrv.initExplicitly((-1, -1), (1, 1), Kernel_V)
 
         epi = vigra.filters.gaussianSmoothing(epi, sigma=params["inner_scale"])
 
@@ -179,6 +179,9 @@ class StructureTensorScharr(StructureTensor):
         tensor[:, :, 0] = vigra.filters.gaussianSmoothing(tensor[:, :, 0], sigma=params["outer_scale"])
         tensor[:, :, 1] = vigra.filters.gaussianSmoothing(tensor[:, :, 1], sigma=params["outer_scale"])
         tensor[:, :, 2] = vigra.filters.gaussianSmoothing(tensor[:, :, 2], sigma=params["outer_scale"])
+
+        # tensor = vigra.filters.hourGlassFilter2D(tensor, params["outer_scale"], 0.4)
+        # tensor = vigra.filters.hourGlassFilter2D(tensor, params["hour-glass"], 0.4)
 
         return tensor
 
@@ -230,9 +233,9 @@ def mergeOrientations_wta(orientation1, coherence1, orientation2, coherence2):
     coherence1[winner] = coherence2[winner]
 
     ### apply memory of coherence
-    # winner = np.where(0.999 < coherence1)
-    # coherence1[winner] =  coherence1[winner] * 1.01
-    # winner = np.where(0.99995 < coherence1)
-    # coherence1[winner] =  coherence1[winner] * 1.05
+    winner = np.where(0.999 < coherence1)
+    coherence1[winner] =  coherence1[winner] * 1.01
+    winner = np.where(0.99995 < coherence1)
+    coherence1[winner] =  coherence1[winner] * 1.05
 
     return orientation1, coherence1
