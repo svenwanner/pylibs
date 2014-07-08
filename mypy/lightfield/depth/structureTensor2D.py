@@ -166,7 +166,7 @@ class StructureTensorScharr(StructureTensor):
 
         epi = vigra.filters.gaussianSmoothing(epi, sigma=params["inner_scale"])
 
-        epi = vigra.filters.convolve(epi, scharrh)
+        # epi = vigra.filters.convolve(epi, scharrh)
         d_2dim = vigra.filters.convolve(epi, scharrh)
         d_1dim = vigra.filters.convolve(epi, scharrv)
 
@@ -186,8 +186,83 @@ class StructureTensorScharr(StructureTensor):
         return tensor
 
 
+class StructureTensorForward(StructureTensor):
 
+    def __init__(self):
+        StructureTensor.__init__(self)
 
+    def derivations(self, epi, params):
+        assert isinstance(epi, np.ndarray)
+        assert params.has_key("inner_scale")
+        assert params.has_key("outer_scale")
+
+        Kernel_H = np.array([[0, 0, 0], [-1, 1, 0], [0, 0, 0]]) / 2.0
+        scharrh = vigra.filters.Kernel2D()
+        scharrh.initExplicitly((-1, -1), (1, 1), Kernel_H)
+
+        Kernel_V = np.array([[0, -1, 0], [0, 1, 0], [0, 0, 0]]) / 2.0
+        scharrv = vigra.filters.Kernel2D()
+        scharrv.initExplicitly((-1, -1), (1, 1), Kernel_V)
+
+        epi = vigra.filters.gaussianSmoothing(epi, sigma=params["inner_scale"])
+
+        # epi = vigra.filters.convolve(epi, scharrh)
+        d_2dim = vigra.filters.convolve(epi, scharrh)
+        d_1dim = vigra.filters.convolve(epi, scharrv)
+
+        grad = np.zeros((d_1dim.shape[0], d_1dim.shape[1], 2), dtype = np.float32)
+        grad[:, :, 0] = d_1dim[:,:]
+        grad[:, :, 1] = d_2dim[:,:]
+
+        tensor = vigra.filters.vectorToTensor(grad)
+
+        tensor[:, :, 0] = vigra.filters.gaussianSmoothing(tensor[:, :, 0], sigma=params["outer_scale"])
+        tensor[:, :, 1] = vigra.filters.gaussianSmoothing(tensor[:, :, 1], sigma=params["outer_scale"])
+        tensor[:, :, 2] = vigra.filters.gaussianSmoothing(tensor[:, :, 2], sigma=params["outer_scale"])
+
+        # tensor = vigra.filters.hourGlassFilter2D(tensor, params["outer_scale"], 0.4)
+        # tensor = vigra.filters.hourGlassFilter2D(tensor, params["hour-glass"], 0.4)
+
+        return tensor
+
+class StructureTensorBackward(StructureTensor):
+
+    def __init__(self):
+        StructureTensor.__init__(self)
+
+    def derivations(self, epi, params):
+        assert isinstance(epi, np.ndarray)
+        assert params.has_key("inner_scale")
+        assert params.has_key("outer_scale")
+
+        Kernel_H = np.array([[0, 0, 0], [0, -1, 1], [0, 0, 0]]) / 2.0
+        scharrh = vigra.filters.Kernel2D()
+        scharrh.initExplicitly((-1, -1), (1, 1), Kernel_H)
+
+        Kernel_V = np.array([[0, 0, 0], [0, -1, 0], [0, 1, 0]]) / 2.0
+        scharrv = vigra.filters.Kernel2D()
+        scharrv.initExplicitly((-1, -1), (1, 1), Kernel_V)
+
+        epi = vigra.filters.gaussianSmoothing(epi, sigma=params["inner_scale"])
+
+        # epi = vigra.filters.convolve(epi, scharrh)
+        d_2dim = vigra.filters.convolve(epi, scharrh)
+        d_1dim = vigra.filters.convolve(epi, scharrv)
+
+        grad = np.zeros((d_1dim.shape[0], d_1dim.shape[1], 2), dtype = np.float32)
+        grad[:, :, 0] = d_1dim[:,:]
+        grad[:, :, 1] = d_2dim[:,:]
+
+        tensor = vigra.filters.vectorToTensor(grad)
+
+        tensor[:, :, 0] = vigra.filters.gaussianSmoothing(tensor[:, :, 0], sigma=params["outer_scale"])
+        tensor[:, :, 1] = vigra.filters.gaussianSmoothing(tensor[:, :, 1], sigma=params["outer_scale"])
+        tensor[:, :, 2] = vigra.filters.gaussianSmoothing(tensor[:, :, 2], sigma=params["outer_scale"])
+
+        # tensor = vigra.filters.hourGlassFilter2D(tensor, params["outer_scale"], 0.4)
+        # tensor = vigra.filters.hourGlassFilter2D(tensor, params["hour-glass"], 0.4)
+
+        return tensor
 
 #############################################################################################################
 ############# Computation of disparity and coherence map and merge to global solution
