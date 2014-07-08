@@ -248,7 +248,7 @@ def structureTensor2D(config):
                 plt.imsave(config.result_path+config.result_label+"coherence_merged_shift_{0}.png".format(shift), coherence[lf_shape[0]/2, :, :], cmap=plt.cm.jet)
 
 
-    mask = coherence[lf_shape[0]/2, :, :]
+
 
 
     orientation = orientation[lf_shape[0]/2, :, :]
@@ -264,6 +264,23 @@ def structureTensor2D(config):
         vigra.filters.nonlinearDiffusion(orientation, config.nonlinear_diffusion[0], config.nonlinear_diffusion[1])
     if isinstance(config.tv, type({})):
         print "apply total variation..."
+        mask = coherence[lf_shape[0]/2, :, :]
+        cv = None
+        if lf3dh is not None:
+            if lf_shape[3] == 3:
+                cv = 0.3*lf3dh[lf_shape[0]/2, :, :, 0]+0.59*lf3dh[lf_shape[0]/2, :, :, 1]+0.11*lf3dh[lf_shape[0]/2, :, :, 2]
+            else:
+                cv = lf3dh[lf_shape[0]/2, :, :, 0]
+        elif lf3dv is not None:
+            if lf_shape[3] == 3:
+                cv = 0.3*lf3dv[lf_shape[0]/2, :, :, 0]+0.59*lf3dv[lf_shape[0]/2, :, :, 1]+0.11*lf3dv[lf_shape[0]/2, :, :, 2]
+            else:
+                cv = lf3dv[lf_shape[0]/2, :, :, 0]
+
+        borders = vigra.filters.gaussianGradientMagnitude(cv, 1.6)
+        borders /= np.amax(borders)
+        mask *= 1.0-borders
+        mask /= np.amax(mask)
         assert depth.shape == mask.shape
         drange = config.max_depth-config.min_depth
         drange2 = np.abs(np.amax(orientation) - np.amin(orientation))
@@ -271,6 +288,23 @@ def structureTensor2D(config):
         orientation = vigra.filters.totalVariationFilter(orientation.astype(np.float64), mask.astype(np.float64), 0.01*drange2*config.tv["alpha"], config.tv["steps"], 0)
     if isinstance(config.selective_gaussian, float) and config.selective_gaussian > 0:
         print "apply masked gauss..."
+        mask = coherence[lf_shape[0]/2, :, :]
+        cv = None
+        if lf3dh is not None:
+            if lf_shape[3] == 3:
+                cv = 0.3*lf3dh[lf_shape[0]/2, :, :, 0]+0.59*lf3dh[lf_shape[0]/2, :, :, 1]+0.11*lf3dh[lf_shape[0]/2, :, :, 2]
+            else:
+                cv = lf3dh[lf_shape[0]/2, :, :, 0]
+        elif lf3dv is not None:
+            if lf_shape[3] == 3:
+                cv = 0.3*lf3dv[lf_shape[0]/2, :, :, 0]+0.59*lf3dv[lf_shape[0]/2, :, :, 1]+0.11*lf3dv[lf_shape[0]/2, :, :, 2]
+            else:
+                cv = lf3dv[lf_shape[0]/2, :, :, 0]
+
+        borders = vigra.filters.gaussianGradientMagnitude(cv, 1.6)
+        borders /= np.amax(borders)
+        mask *= 1.0-borders
+        mask /= np.amax(mask)
         gauss = vigra.filters.Kernel2D()
         vigra.filters.Kernel2D.initGaussian(gauss, config.selective_gaussian)
         gauss.setBorderTreatment(vigra.filters.BorderTreatmentMode.BORDER_TREATMENT_CLIP)
