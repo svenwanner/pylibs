@@ -11,6 +11,7 @@ from mypy.lightfield.depth import structureTensor2D as st2d
 import mypy.pointclouds.depthToCloud as dtc
 from mypy.lightfield.depth.prefilter import COLORSPACE
 from mypy.lightfield.depth.prefilter import PREFILTER
+import mypy.lightfield.depth.prefilter as prefilter
 
 from mypy.lightfield import io as lfio
 from mypy.lightfield.depth.structureTensor_ComputationClass import Compute
@@ -44,7 +45,7 @@ class Config:
 
         self.color_space = COLORSPACE.RGB       # colorscape to convert the images into [RGB,LAB,LUV]
         self.prefilter_scale = 0.4              # scale of the prefilter
-        self.prefilter = PREFILTER.IMGD2        # type of the prefilter [NO,IMGD, EPID, IMGD2, EPID2]
+        self.prefilter = PREFILTER.IMGD2        # type of the prefilter [NO,IMGD, EPID, IMGD2, EPID2, DoG]
 
         self.median = 5                         # apply median filter on disparity map
         self.nonlinear_diffusion = [0.5, 5]     # apply nonlinear diffusion [0] edge threshold, [1] scale
@@ -119,33 +120,64 @@ def structureTensor2D(config):
 ##################################   Load Image Data
 ########################################################################################################################
 
-    print("load data...")
+    print "try to load horizontal data ...",
     try:
         if not config.path_horizontal.endswith("/"):
             config.path_horizontal += "/"
         lf3dh = lfio.load_3d(config.path_horizontal, rgb=config.rgb, roi=config.roi)
+        print "ok"
         compute_h = True
         lf_shape = lf3dh.shape
-        if config.output_level >3:
+        if config.output_level > 3:
             print('Image shape of horizontal images: ' + str(lf3dh.shape))
 
-    except:
-        pass
+        if config.color_space:
+            lf3dh = prefilter.changeColorSpace(lf3dh, config.color_space)
 
+        if config.prefilter > 0:
+            if config.prefilter == PREFILTER.IMGD:
+                lf3dh = prefilter.preImgDerivation(lf3dh, scale=config.prefilter_scale, direction='v')
+            if config.prefilter == PREFILTER.IMGD2:
+                lf3dh = prefilter.preImgLaplace(lf3dh, scale=config.prefilter_scale)
+            if config.prefilter == PREFILTER.SCHARR:
+                lf3dh = prefilter.preImgScharr(lf3dh, config, direction='v')
+            if config.prefilter == PREFILTER.DOG:
+                lf3dh = prefilter.preDoG(lf3dh, config)
+
+    except:
+        print "failed"
+
+    print "try to load vertical data ..."
     try:
         if not config.path_vertical.endswith("/"):
             config.path_vertical += "/"
         lf3dv = lfio.load_3d(config.path_vertical, rgb=config.rgb, roi=config.roi)
+        print "ok"
         compute_v = True
         if lf_shape is None:
             lf_shape = lf3dv.shape
-        if config.output_level >3:
+        if config.output_level > 3:
             print('Image shape of vertical images: ' + str(lf3dv.shape))
 
+        if config.color_space:
+            lf3dv = prefilter.changeColorSpace(lf3dv, config.color_space)
+
+        if config.prefilter > 0:
+            if config.prefilter == PREFILTER.IMGD:
+                lf3dv = prefilter.preImgDerivation(lf3dv, scale=config.prefilter_scale, direction='v')
+            if config.prefilter == PREFILTER.IMGD2:
+                lf3dv = prefilter.preImgLaplace(lf3dv, scale=config.prefilter_scale)
+            if config.prefilter == PREFILTER.SCHARR:
+                lf3dv = prefilter.preImgScharr(lf3dv, config, direction='v')
+            if config.prefilter == PREFILTER.DOG:
+                lf3dv = prefilter.preDoG(lf3dv, config)
+
     except:
-        pass
+        print "failed"
 
     print "done"
+
+
 
 
 ########################################################################################################################

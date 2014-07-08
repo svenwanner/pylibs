@@ -96,6 +96,11 @@ def compute_horizontal(lf3dh, shift, config):
     #         print(S)
 
 
+    ### Prefilter of imput images (optional) ###
+    if config.prefilter == PREFILTER.EPID:
+        lf3d = prefilter.preEpiDerivation(lf3d, scale=config.prefilter_scale, direction='h')
+    if config.prefilter == PREFILTER.EPID2:
+        lf3d = prefilter.preEpiLaplace(lf3d, scale=config.prefilter_scale, direction='h')
 
     ### compute structure tensor ###
     structureTensor = None
@@ -135,6 +140,12 @@ def compute_vertical(lf3dv, shift, config):
     print "compute vertical shift {0}".format(shift), "...",
     lf3d = lfhelpers.refocus_3d(lf3dv, shift, 'v')
 
+
+    if config.prefilter > 0:
+        if config.prefilter == PREFILTER.EPID:
+            lf3d = prefilter.preEpiDerivation(lf3d, scale=config.prefilter_scale, direction='v')
+        if config.prefilter == PREFILTER.EPID2:
+            lf3d = prefilter.preEpiLaplace(lf3d, scale=config.prefilter_scale, direction='v')
 
     structureTensor = None
     if config.structure_tensor_type == "classic":
