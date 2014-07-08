@@ -250,30 +250,37 @@ def structureTensor2D(config):
 
     mask = coherence[lf_shape[0]/2, :, :]
 
-    if config.output_level >= 2:
-        plt.imsave(config.result_path+config.result_label+"orientation_final.png", orientation[lf_shape[0]/2, :, :], cmap=plt.cm.jet)
-        plt.imsave(config.result_path+config.result_label+"coherence_final.png", mask, cmap=plt.cm.jet)
 
-    depth = dtc.disparity_to_depth(orientation[lf_shape[0]/2, :, :], config.base_line, config.focal_length, config.min_depth, config.max_depth)
+    orientation = orientation[lf_shape[0]/2, :, :]
+    depth = dtc.disparity_to_depth(orientation, config.base_line, config.focal_length, config.min_depth, config.max_depth)
 
+    if isinstance(config.median, int) and config.median > 0:
+        print "apply median filter ..."
+        depth = median_filter(depth, config.median)
+        orientation = median_filter(orientation, config.median)
     if isinstance(config.nonlinear_diffusion, type([])):
         print "apply nonlinear diffusion"
         vigra.filters.nonlinearDiffusion(depth, config.nonlinear_diffusion[0], config.nonlinear_diffusion[1])
+        vigra.filters.nonlinearDiffusion(orientation, config.nonlinear_diffusion[0], config.nonlinear_diffusion[1])
+    if isinstance(config.tv, type({})):
+        print "apply total variation..."
+        assert depth.shape == mask.shape
+        drange = config.max_depth-config.min_depth
+        drange2 = np.abs(np.amax(orientation) - np.amin(orientation))
+        depth = vigra.filters.totalVariationFilter(depth.astype(np.float64), mask.astype(np.float64), 0.01*drange*config.tv["alpha"], config.tv["steps"], 0)
+        orientation = vigra.filters.totalVariationFilter(orientation.astype(np.float64), mask.astype(np.float64), 0.01*drange2*config.tv["alpha"], config.tv["steps"], 0)
     if isinstance(config.selective_gaussian, float) and config.selective_gaussian > 0:
         print "apply masked gauss..."
         gauss = vigra.filters.Kernel2D()
         vigra.filters.Kernel2D.initGaussian(gauss, config.selective_gaussian)
         gauss.setBorderTreatment(vigra.filters.BorderTreatmentMode.BORDER_TREATMENT_CLIP)
         depth = vigra.filters.normalizedConvolveImage(depth, mask, gauss)
-    if isinstance(config.median, int) and config.median > 0:
-        print "apply median filter ..."
-        depth = median_filter(depth, config.median)
-    if isinstance(config.tv, type({})):
-        print "apply total variation..."
-        assert depth.shape == mask.shape
-        drange = config.max_depth-config.min_depth
-        depth = vigra.filters.totalVariationFilter(depth.astype(np.float64), mask.astype(np.float64), 0.01*drange*config.tv["alpha"], config.tv["steps"], 0)
+        orientation = vigra.filters.normalizedConvolveImage(orientation, mask, gauss)
 
+
+    if config.output_level >= 2:
+        plt.imsave(config.result_path+config.result_label+"orientation_final.png", orientation, cmap=plt.cm.jet)
+        plt.imsave(config.result_path+config.result_label+"coherence_final.png", mask, cmap=plt.cm.jet)
 
     invalids = np.where(mask == 0)
     depth[invalids] = -1.0
@@ -295,7 +302,7 @@ def structureTensor2D(config):
 
 
         tmp = np.zeros((lf_shape[1], lf_shape[2], 4), dtype=np.float32)
-        tmp[:, :, 0] = orientation[lf_shape[0]/2, :, :]
+        tmp[:, :, 0] = orientation[:]
         tmp[:, :, 1] = coherence[lf_shape[0]/2, :, :]
         tmp[:, :, 2] = depth[:]
         vim = vigra.RGBImage(tmp)
