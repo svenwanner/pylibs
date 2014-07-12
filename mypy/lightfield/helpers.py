@@ -62,12 +62,12 @@ def getFilenames(fpath, index=0, amount=-1, ftype="png"):
     if amount == -1 or index + amount >= len(fnames):
         last_index = len(fnames)
 
-    print "load filenames from path:", fpath
-    print "will keep images from index:", index, "to", index+amount-1
+    print "load filenames from path:", fpath, "..."
+    print "will keep images from index:", index, "to", index+amount-1, "..."
 
     fnames = fnames[index:last_index]
 
-    print "return list of", len(fnames), "images"
+    print "return list of", len(fnames), "images", "..."
     print "done -->"
     return fnames
 
@@ -110,8 +110,8 @@ def loadSequence(fnames, dtype=np.float32):
         if np.amax(sequence > 1.0):
             sequence[:] /= 255.0
 
-    print "load sequene of shape:", sequence.shape
-    print "range:", np.amin(sequence), np.amax(sequence)
+    print "load sequene of shape:", sequence.shape, "..."
+    print "range:", np.amin(sequence), np.amax(sequence), "..."
     print "done -->"
     return sequence
 

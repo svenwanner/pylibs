@@ -7,7 +7,7 @@ import mypy.visualization.imshow as ims
 
 from mypy.lightfield.io import load_lf3d_fromFiles
 from mypy.lightfield.helpers import changeColorspace
-from mypy.pointclouds.depthToCloud import disparity_to_depth, cloud_from_depth, PlyWriter
+from mypy.pointclouds.depthToCloud import disparity_to_depth, cloud_from_depth, PlyWriter, transformCloud
 
 
 class SubLFProcessor(object):
@@ -16,7 +16,7 @@ class SubLFProcessor(object):
 
         self.fpath = parameter["filepath"]
         self.focus = parameter["focus"]
-        self.numOfCams = parameter["subLF_size"]
+        self.numOfCams = parameter["num_of_cams"]
         self.colorpace = parameter["colorspace"]
         self.results = None
 
@@ -32,7 +32,11 @@ class SubLFProcessor(object):
             self.lf = load_lf3d_fromFiles(self.fpath, camIndex, self.numOfCams, self.focus, dtype=np.float32)
             self.shape = self.lf.shape
             self.results = np.zeros((self.shape[1], self.shape[2], 2), dtype=np.float32)
-            self.cv = self.lf[self.shape[0]/2, :, :, 0:self.shape[3]]
+            self.cv = np.copy(self.lf[self.shape[0]/2, :, :, 0:self.shape[3]])
+            if self.cv.dtype != np.uint8:
+                self.cv *= 255.0
+                self.cv = self.cv.astype(np.uint8)
+
             self.lf = changeColorspace(self.lf, self.colorpace)
             return True
         except Exception as e:
@@ -106,26 +110,54 @@ class DenseLightFieldProcessor(object):
         assert isinstance(parameter, type({}))
         assert isinstance(processor, SubLFProcessor)
         assert isinstance(parameter["total_frames"], int)
-        assert isinstance(parameter["subLF_size"], int)
+        assert isinstance(parameter["num_of_cams"], int)
 
         self.parameter = parameter
         self.processor = processor
 
-        self.iterations = self.parameter["total_frames"]/self.parameter["subLF_size"]
+        self.iterations = self.parameter["total_frames"]/self.parameter["num_of_cams"]
 
 
     def run(self):
         cam_index = 0
+        target_cam_shift = self.parameter["baseline"]*self.parameter["total_frames"]/2
+
         for i in range(self.iterations):
+            print "\n<-- compute iteration step", i, "..."
             if self.processor.load(cam_index):
+                cloudshift = self.parameter["cam_initial_pos"][0] + i*self.parameter["baseline"]*self.parameter["num_of_cams"]+self.parameter["baseline"]*self.parameter["num_of_cams"]/2
+                translate = [cloudshift, 0.0, self.parameter["cam_initial_pos"][2]]
+
+                print "transform cloud..."
+                print "translation:", translate, "..."
+                print "rotate:", self.parameter["cam_rotation"], "..."
+
                 processor.compute()
                 results = processor.getResults()
-                depth = disparity_to_depth(results[:, :, 0], parameter["baseline"], parameter["focal_length"], parameter["min_depth"], parameter["max_depth"])
-                cloud = cloud_from_depth(depth, parameter["focal_length"])
-                pcWriter = PlyWriter(name=self.parameter["resultpath"]+"_%4.4i" % i,
-                                    cloud=cloud, colors=processor.cv, confidence=results[:, :, 1])
 
-            cam_index += self.parameter["subLF_size"]
+                depth = disparity_to_depth(results[:, :, 0],
+                                           self.parameter["baseline"],
+                                           self.parameter["focal_length"],
+                                           self.parameter["min_depth"],
+                                           self.parameter["max_depth"])
+
+                cloud = cloud_from_depth(depth, self.parameter["focal_length"])
+                cloud = transformCloud(cloud,
+                                       rotate_x=self.parameter["cam_rotation"][0],
+                                       rotate_y=self.parameter["cam_rotation"][1],
+                                       rotate_z=self.parameter["cam_rotation"][2],
+                                       translate=translate)
+
+                PlyWriter(name=self.parameter["resultpath"]+"_%4.4i" % i,
+                          cloud=cloud, colors=processor.cv,
+                          confidence=results[:, :, 1], format="EN")
+
+                print "done -->"
+            else:
+                print "\nFinished...!"
+                sys.exit()
+
+            cam_index += self.parameter["num_of_cams"]
 
 
 
@@ -133,17 +165,19 @@ if __name__ == "__main__":
 
     parameter = {"filepath": "/home/swanner/Desktop/highSampledTestScene/rendered/imgs",
                  "resultpath": "/home/swanner/Desktop/highSampledTestScene/results/cloud",
-                 "subLF_size": 7,
+                 "num_of_cams": 7,
                  "total_frames": 21,
                  "focus": 2,
+                 "cam_rotation": [180.0, 0.0, 0.0],
+                 "cam_initial_pos": [-1.0, 0.0, 2.6],
                  "colorspace": "hsv",
                  "inner_scale": 0.6,
-                 "outer_scale": 1.3,
+                 "outer_scale": 1.0,
                  "min_coherence": 0.98,
                  "focal_length": 480,
                  "baseline": 0.01,
-                 "min_depth": 1.7,
-                 "max_depth": 2.7}
+                 "min_depth": 1.4,
+                 "max_depth": 2.8}
 
     processor = StructureTensorProcessor(parameter)
 
