@@ -112,6 +112,9 @@ class PlyWriter(object):
         assert isinstance(self.cloud, np.ndarray)
         assert isinstance(self.name, str)
 
+        if not self.name.endswith(".ply"):
+            self.name += ".ply"
+
         points = []
         colors = None
         intensity = None

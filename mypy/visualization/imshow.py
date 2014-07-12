@@ -134,7 +134,7 @@ def imshow(im, cmap="gray", show=True):
     amax = np.amax(im)
     amin = np.amin(im)
 
-    plt.imshow(im, cmap=cmap)
+    plt.imshow(im, cmap=cmap, interpolation='nearest')
     plt.title("range: ("+str(amin)+","+str(amax)+")")
     if show:
         plt.show()

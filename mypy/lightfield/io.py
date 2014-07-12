@@ -6,6 +6,9 @@ import scipy.misc as misc
 from mypy.image.io import loadEXR
 from mypy.visualization.imshow import imshow
 
+from mypy.lightfield.helpers import refocus_3d
+from mypy.lightfield.helpers import getFilenames, loadSequence
+
 def finalResultViewer(final_exr, save_to=None):
 
     try:
@@ -18,6 +21,29 @@ def finalResultViewer(final_exr, save_to=None):
                 misc.imsave(save_to, final_res[:, :, i])
     except:
         print "Error reading final.exr!"
+
+
+def load_lf3d_fromFiles(fpath, index=0, amount=-1, focus=0, dtype=np.float32, ftype="png"):
+    """
+    Load a filename list from path, start index and amount of filenames to load
+    as well as the filetype can be specified. By default a list of all filenames
+    of file type png are read. If focus is set the returned 3d light field is refocused.
+
+    :rtype : object
+    :param fpath: str location of image files
+    :param index: int list index of filenames
+    :param amount: int number of filenames to load
+    :param focus: int or float refocus step in pixel
+    :param dtype: numpy.dtype
+    :param ftype: str "png","tif","ppm","bmp","jpg"
+    :return: ndarray of range [numOfImgs, sy, sx, channels]
+    """
+    fnames = getFilenames(fpath, index, amount, ftype)
+    lf = loadSequence(fnames, dtype)
+    if focus == 0:
+        return lf
+    else:
+        return refocus_3d(lf, focus)
 
 
 
