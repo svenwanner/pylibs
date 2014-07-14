@@ -147,23 +147,23 @@ def transformCloud(cloud, rotate_x=None, rotate_y=None, rotate_z=None, translate
 
 
 class PlyWriter(object):
-    def __init__(self, name=None, cloud=None, colors=None, intensity=None, confidence=None, format="DE"):
-        self.name = name
+    def __init__(self, filename=None, cloud=None, colors=None, intensity=None, confidence=None, format="DE"):
+        self.filename = filename
         self.cloud = cloud
         self.colors = colors
         self.intensity = intensity
         self.confidence = confidence
         self.format = format
 
-        if name is not None and cloud is not None:
+        if filename is not None and cloud is not None:
             self.save()
 
-    def save(self):
+    def save(self, append=False):
         assert isinstance(self.cloud, np.ndarray)
-        assert isinstance(self.name, str)
+        assert isinstance(self.filename, str)
 
-        if not self.name.endswith(".ply"):
-            self.name += ".ply"
+        if not self.filename.endswith(".ply"):
+            self.filename += ".ply"
 
         points = []
         colors = None
@@ -207,9 +207,12 @@ class PlyWriter(object):
         print "from", self.cloud.shape[0]*self.cloud.shape[1], "points was", debug_count[0], "vaild and ", debug_count[1], "invalid. Checksum:", debug_count[0]+debug_count[1]
 
 
-        f = open(self.name, 'w')
+        if append:
+            f = open(self.filename, 'a')
+        else:
+            f = open(self.filename, 'w')
+            self.write_header(f, points)
 
-        self.write_header(f, points)
         self.write_points(f, points, colors, confidence, intensity)
 
         f.close()

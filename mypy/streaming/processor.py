@@ -118,12 +118,31 @@ class DenseLightFieldProcessor(object):
         self.iterations = self.parameter["total_frames"]/self.parameter["num_of_cams"]
 
 
+    def mergeResults(final_result, results, final_cloud, cloud):
+        pass
+
+
+    def createGrid(self):
+
+
+
+
     def run(self):
         cam_index = 0
+        append_points = False
         target_cam_shift = self.parameter["baseline"]*self.parameter["total_frames"]/2
+
+        plyWriter = PlyWriter(self.parameter["resultpath"], format="EN")
+
+        final_cloud = None
+        final_result = None
 
         for i in range(self.iterations):
             print "\n<-- compute iteration step", i, "..."
+
+            if i > 0:
+                append_points = True
+
             if self.processor.load(cam_index):
                 cloudshift = self.parameter["cam_initial_pos"][0] + i*self.parameter["baseline"]*self.parameter["num_of_cams"]+self.parameter["baseline"]*self.parameter["num_of_cams"]/2
                 translate = [cloudshift, 0.0, self.parameter["cam_initial_pos"][2]]
@@ -134,6 +153,9 @@ class DenseLightFieldProcessor(object):
 
                 processor.compute()
                 results = processor.getResults()
+
+                if i==0:
+                    final_result = np.zeros_like(results)
 
                 depth = disparity_to_depth(results[:, :, 0],
                                            self.parameter["baseline"],
@@ -148,9 +170,14 @@ class DenseLightFieldProcessor(object):
                                        rotate_z=self.parameter["cam_rotation"][2],
                                        translate=translate)
 
-                PlyWriter(name=self.parameter["resultpath"]+"_%4.4i" % i,
-                          cloud=cloud, colors=processor.cv,
-                          confidence=results[:, :, 1], format="EN")
+                if i==0:
+                    final_cloud = np.zeros_like(cloud)
+
+                self.mergeResults(final_result, results, final_cloud, cloud)
+
+
+                imsave(self.parameter["resultpath"]+"_depth_%4.4i.png" % i, processor.results[:, :, 0])
+                imsave(self.parameter["resultpath"]+"_coherence_%4.4i.png" % i, processor.results[:, :, 1])
 
                 print "done -->"
             else:
@@ -159,6 +186,14 @@ class DenseLightFieldProcessor(object):
 
             cam_index += self.parameter["num_of_cams"]
 
+        plyWriter.cloud = cloud
+        plyWriter.colors = processor.cv
+        plyWriter.confidence = results[:, :, 1]
+
+        plyWriter.save(append=append_points)
+        imsave(self.parameter["resultpath"]+"_depth_final.png", processor.results[:, :, 0])
+        imsave(self.parameter["resultpath"]+"_coherence_final.png", processor.results[:, :, 1])
+
 
 
 if __name__ == "__main__":
@@ -166,7 +201,7 @@ if __name__ == "__main__":
     parameter = {"filepath": "/home/swanner/Desktop/highSampledTestScene/rendered/imgs",
                  "resultpath": "/home/swanner/Desktop/highSampledTestScene/results/cloud",
                  "num_of_cams": 7,
-                 "total_frames": 21,
+                 "total_frames": 200,
                  "focus": 2,
                  "cam_rotation": [180.0, 0.0, 0.0],
                  "cam_initial_pos": [-1.0, 0.0, 2.6],
