@@ -6,7 +6,6 @@ import pylab as plt
 import scipy.misc as misc
 import mypy.lightfield.depth.prefilter as prefilter
 from mypy.lightfield import io as lfio
-from mypy.utils import tiff
 
 import mypy.pointclouds.depthToCloud as dtc
 from mypy.lightfield import helpers as lfhelpers
@@ -220,13 +219,6 @@ def compute_horizontal(lf3dh, shift, config):
 
         misc.imsave(config.result_path+config.result_label+"coherence_h_{0}.png".format(shift), coherence[orientation.shape[0]/2, :, :])
 
-        tiff.imsave(config.result_path+config.result_label+"C1_h_{0}.tif".format(shift), c1[orientation.shape[0]/2, :, :])
-        tiff.imsave(config.result_path+config.result_label+"C2_h_{0}.tif".format(shift), c2[orientation.shape[0]/2, :, :])
-
-        tiff.imsave(config.result_path+config.result_label+"largest_h_{0}.tif".format(shift), eigwert_map_largest[orientation.shape[0]/2, :, :])
-        tiff.imsave(config.result_path+config.result_label+"second_h_{0}.tif".format(shift), eigwert_map_second[orientation.shape[0]/2, :, :])
-        tiff.imsave(config.result_path+config.result_label+"smallest_h_{0}.tif".format(shift), eigwert_map_smallest[orientation.shape[0]/2, :, :])
-
     orientation[:] += shift
 
     logging.info('done!')
@@ -406,13 +398,6 @@ def compute_vertical(lf3dv, shift, config):
         misc.imsave(config.result_path+config.result_label+"orientation_v_shift_{0}.png".format(shift), orientation[orientation.shape[0]/2, :, :])
 
         misc.imsave(config.result_path+config.result_label+"coherence_v_{0}.png".format(shift), coherence[orientation.shape[0]/2, :, :])
-
-        tiff.imsave(config.result_path+config.result_label+"C1_v_{0}.tif".format(shift), c1[orientation.shape[0]/2, :, :])
-        tiff.imsave(config.result_path+config.result_label+"C2_v_{0}.tif".format(shift), c2[orientation.shape[0]/2, :, :])
-
-        tiff.imsave(config.result_path+config.result_label+"largest_v_{0}.tif".format(shift), eigwert_map_largest[orientation.shape[0]/2, :, :])
-        tiff.imsave(config.result_path+config.result_label+"second_v_{0}.tif".format(shift), eigwert_map_second[orientation.shape[0]/2, :, :])
-        tiff.imsave(config.result_path+config.result_label+"smallest_v_{0}.tif".format(shift), eigwert_map_smallest[orientation.shape[0]/2, :, :])
 
     orientation[:] += shift
 
