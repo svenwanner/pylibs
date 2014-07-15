@@ -120,6 +120,10 @@ class DenseLightFieldProcessor(object):
         parameter["min_depth"] = float(parameter["min_depth"])
         parameter["max_depth"] = float(parameter["max_depth"])
 
+        fov = np.arctan2(float(self.parameter["sensor_size"]), 2.0*self.parameter["focal_length_mm"])
+        optimal_accuracy = self.parameter["cam_initial_pos"][2]*np.tan(2*fov/parameter["resolution"][1])
+        print "optimal accuracy would be", optimal_accuracy
+
         print "\n<-- set up DenseLightFieldProcessor..."
 
         self.parameter = parameter
@@ -147,15 +151,15 @@ class DenseLightFieldProcessor(object):
     def computeVisibleSceneArea(self):
 
         # compute field of view angles
-        alpha = np.arctan2(float(self.parameter["sensor_size"]), 2.0*self.parameter["focal_length_mm"])
-        alpha2 = np.arctan2(self.parameter["sensor_size"]/(float(self.parameter["resolution"][0])/self.parameter["resolution"][1]), 2.0*parameter["focal_length_mm"])
+        fov_w = np.arctan2(float(self.parameter["sensor_size"]), 2.0*self.parameter["focal_length_mm"])
+        fov_h = np.arctan2(self.parameter["sensor_size"]/(float(self.parameter["resolution"][0])/self.parameter["resolution"][1]), 2.0*parameter["focal_length_mm"])
 
         # compute distance between cameras
         d_tot = np.abs(float(self.parameter["cam_initial_pos"][0])-float(self.parameter["cam_final_pos"][0]))
 
         # compute real visible scene width and height
-        vsw = 2*self.parameter["cam_initial_pos"][2]*np.tan(alpha)+d_tot
-        vsh = 2*self.parameter["cam_initial_pos"][2]*np.tan(alpha2)
+        vsw = 2*self.parameter["cam_initial_pos"][2]*np.tan(fov_w)+d_tot
+        vsh = 2*self.parameter["cam_initial_pos"][2]*np.tan(fov_h)
         return vsw, vsh
 
 
@@ -198,6 +202,16 @@ class DenseLightFieldProcessor(object):
                                        rotate_z=self.parameter["cam_rotation"][2],
                                        translate=translate)
 
+                plyWriter = PlyWriter(self.parameter["resultpath"]+"_iteration_%4.4i"%i, format="EN")
+                plyWriter.cloud = cloud
+                plyWriter.colors = processor.cv
+                plyWriter.save()
+
+                plyWriter.cloud = cloud
+                plyWriter.colors = processor.cv
+                plyWriter.confidence = results[:, :, 1]
+                plyWriter.save(append=append_points)
+
                 # push all points from the cloud into the worldGrid instance into current iteration layer
                 for n in range(cloud.shape[0]):
                     for m in range(cloud.shape[1]):
@@ -217,7 +231,13 @@ class DenseLightFieldProcessor(object):
 
 
 
+        plyWriter = PlyWriter(self.parameter["resultpath"]+"_final", format="EN")
         cloud = self.worldGrid.getResult()
+        cloud = transformCloud(cloud,
+                                       rotate_x=self.parameter["cam_rotation"][0],
+                                       rotate_y=self.parameter["cam_rotation"][1],
+                                       rotate_z=self.parameter["cam_rotation"][2],
+                                       translate=[0,0,0])
         imsave(self.parameter["resultpath"]+"_finalDepth.png", cloud[:, :, 2])
         imsave(self.parameter["resultpath"]+"_finalCoherence.png", cloud[:, :, 3])
         plyWriter.cloud = cloud
@@ -237,13 +257,13 @@ if __name__ == "__main__":
 
     parameter = {"filepath": "/home/swanner/Desktop/denseSampledTestScene/rendered/fullRes",
                  "resultpath": "/home/swanner/Desktop/denseSampledTestScene/results_FR/cloud",
-                 "num_of_cams": 25,
+                 "num_of_cams": 11,
                  "total_frames": 200,
                  "focus": 2,
                  "cam_rotation": [180.0, 0.0, 0.0],
                  "cam_initial_pos": [-1.0, 0.0, 2.6],
                  "cam_final_pos": [1.0, 0.0, 2.6],
-                 "world_accuracy_m": 0.005,
+                 "world_accuracy_m": 0.0054,
                  "resolution": [960, 540],
                  "sensor_size": 32,
                  "colorspace": "hsv",

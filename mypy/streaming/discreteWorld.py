@@ -35,7 +35,6 @@ class discreteWorldSpace(object):
 
         index = self.world2grid(y, x)
         if index is not None:
-            print "world2grid index", index[0], index[1]
             self.grid[index[0], index[1], layer] = value[:]
         else:
             pass
@@ -80,9 +79,9 @@ class discreteWorldSpace(object):
     def grid2world(self, n, m):
         if 0 <= n <= self.N:
             if 0 <= m <= self.M:
-                print "grid2world project m :", m, ", n :", n, " to x :", int((m-self.M/2)/self.M*self.world_size[1]), " to y :", int((self.N/2-n)/self.N*self.world_size[0])
-                return [int((self.N/2-n)/self.N*self.world_size[0]),
-                        int((m-self.M/2)/self.M*self.world_size[1])]
+                #print "grid2world project m :", m, ", n :", n, " to x :", int((m-self.M/2)/self.M*self.world_size[1]), " to y :", int((self.N/2-n)/self.N*self.world_size[0])
+                return [(float(self.N)/2.0-float(n))/float(self.N)*self.world_size[0],
+                        (float(m)-float(self.M)/2.0)/float(self.M)*self.world_size[1]]
             else:
                 return None
         else:

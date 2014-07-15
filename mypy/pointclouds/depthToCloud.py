@@ -1,5 +1,4 @@
 import numpy as np
-import pylab as plt
 
 def save_pointcloud(filename, depth_map=None, disparity_map=None, color=None, intensity=None, confidence=None, focal_length=None, base_line=None, min_depth=0.01, max_depth=10.0):
     """
@@ -207,7 +206,15 @@ class PlyWriter(object):
 
 
         if append:
-            f = open(self.filename, 'a')
+            f = open(self.filename, 'r')
+            lines = f.readlines()
+            vertices = int(lines[2][15:-1])
+            f.close()
+            f = open(self.filename, 'w')
+            self.write_header(f, points, vertices)
+            for n, line in enumerate(lines):
+                if n > 10:
+                    f.write(line)
         else:
             f = open(self.filename, 'w')
             self.write_header(f, points)
@@ -216,10 +223,10 @@ class PlyWriter(object):
 
         f.close()
 
-    def write_header(self, f, points):
+    def write_header(self, f, points, additional_points=0):
         f.write('ply\n')
         f.write('format ascii 1.0\n')
-        f.write('element vertex %d\n' % len(points))
+        f.write('element vertex %d\n' % (len(points)+additional_points))
         f.write('property float x\n')
         f.write('property float y\n')
         f.write('property float z\n')
