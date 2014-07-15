@@ -7,6 +7,7 @@ import mypy.visualization.imshow as ims
 
 from mypy.lightfield.io import load_lf3d_fromFiles
 from mypy.lightfield.helpers import changeColorspace
+from mypy.streaming.discreteWorld import discreteWorldSpace
 from mypy.pointclouds.depthToCloud import disparity_to_depth, cloud_from_depth, PlyWriter, transformCloud
 
 
@@ -137,11 +138,9 @@ class DenseLightFieldProcessor(object):
         #compute real world scene grid
         self.visibleSceneWidth, self.visibleSceneHeight = self.computeVisibleSceneArea()
         print "computed visible scene size h =", self.visibleSceneHeight, "m w =", self.visibleSceneWidth, "m"
-        self.worldGrid = np.zeros((self.visibleSceneHeight/parameter["world_accuracy_m"], self.visibleSceneWidth/parameter["world_accuracy_m"], 2), dtype=np.float32)
+        # create disceteWorldSpace instance storing all reconstructed points and generating a point cloud when finished
+        self.worldGrid = discreteWorldSpace([self.visibleSceneHeight,self.visibleSceneWidth], parameter["world_accuracy_m"], self.iterations)
         print "created world grid of size (h,w):", self.worldGrid.shape[0], self.worldGrid.shape[1]
-
-        self.parameter["center_of_scene_px"] = [self.worldGrid.shape[0]/2, self.worldGrid.shape[1]/2]
-
 
         print "done -->"
 
@@ -160,22 +159,12 @@ class DenseLightFieldProcessor(object):
         return vsw, vsh
 
 
-    def getWorldCoordFromIndex(self, h, w):
-        pass
-
-
-    def getIndexFromWorldCoord(self, x, y):
-        pass
-
     def run(self):
         cam_index = 0
         append_points = False
-        target_cam_shift = self.parameter["baseline"]*self.parameter["total_frames"]/2
+    #target_cam_shift = self.parameter["baseline"]*self.parameter["total_frames"]/2
 
         plyWriter = PlyWriter(self.parameter["resultpath"], format="EN")
-
-        final_cloud = None
-        final_result = None
 
         for i in range(self.iterations):
             print "\n<-- compute iteration step", i, "..."
@@ -194,15 +183,14 @@ class DenseLightFieldProcessor(object):
                 processor.compute()
                 results = processor.getResults()
 
-                if i==0:
-                    final_result = np.zeros_like(results)
-
+                # compute depth from disparity
                 depth = disparity_to_depth(results[:, :, 0],
                                            self.parameter["baseline"],
                                            self.parameter["focal_length_px"],
                                            self.parameter["min_depth"],
                                            self.parameter["max_depth"])
 
+                # compute cloud and transform it to center camera
                 cloud = cloud_from_depth(depth, self.parameter["focal_length_px"])
                 cloud = transformCloud(cloud,
                                        rotate_x=self.parameter["cam_rotation"][0],
@@ -210,15 +198,13 @@ class DenseLightFieldProcessor(object):
                                        rotate_z=self.parameter["cam_rotation"][2],
                                        translate=translate)
 
-                if i==0:
-                    final_cloud = np.zeros_like(cloud)
+                # push all points from the cloud into the worldGrid instance into current iteration layer
+                for n in range(cloud.shape[0]):
+                    for m in range(cloud.shape[1]):
+                        self.worldGrid.setWorldValue(float(cloud[n, m, 1]), float(cloud[n, m, 0]), i, np.array([cloud[n, m, 2], results[n, m, 1]]))
 
-                plyWriter.cloud = cloud
-                plyWriter.colors = processor.cv
-                plyWriter.confidence = results[:, :, 1]
-
-                plyWriter.save(append=append_points)
-
+                # save all disparity steps as image
+                imsave(self.parameter["resultpath"]+"_layer_%4.4i.png" % i, self.worldGrid.grid[:, :, i, 0])
                 imsave(self.parameter["resultpath"]+"_depth_%4.4i.png" % i, processor.results[:, :, 0])
                 imsave(self.parameter["resultpath"]+"_coherence_%4.4i.png" % i, processor.results[:, :, 1])
 
@@ -231,21 +217,33 @@ class DenseLightFieldProcessor(object):
 
 
 
+        cloud = self.worldGrid.getResult()
+        imsave(self.parameter["resultpath"]+"_finalDepth.png", cloud[:, :, 2])
+        imsave(self.parameter["resultpath"]+"_finalCoherence.png", cloud[:, :, 3])
+        plyWriter.cloud = cloud
+        #color = np.zeros((cloud.shape[0], cloud.shape[1], 3))
+        #b = color.shape[0]-processor.cv.shape[1]
+        #color[:, b/2:b/2+processor.cv.shape[0]]
+        #plyWriter.colors = processor.cv
+        #plyWriter.confidence = results[:, :, 1]
+
+        plyWriter.save()
+
 
 
 
 
 if __name__ == "__main__":
 
-    parameter = {"filepath": "/home/swanner/Desktop/denseSampledTestScene/rendered/imgs",
-                 "resultpath": "/home/swanner/Desktop/denseSampledTestScene/results/cloud",
-                 "num_of_cams": 9,
+    parameter = {"filepath": "/home/swanner/Desktop/denseSampledTestScene/rendered/fullRes",
+                 "resultpath": "/home/swanner/Desktop/denseSampledTestScene/results_FR/cloud",
+                 "num_of_cams": 25,
                  "total_frames": 200,
                  "focus": 2,
                  "cam_rotation": [180.0, 0.0, 0.0],
                  "cam_initial_pos": [-1.0, 0.0, 2.6],
                  "cam_final_pos": [1.0, 0.0, 2.6],
-                 "world_accuracy_m": 0.01,
+                 "world_accuracy_m": 0.005,
                  "resolution": [960, 540],
                  "sensor_size": 32,
                  "colorspace": "hsv",
@@ -256,6 +254,28 @@ if __name__ == "__main__":
                  "baseline": 0.01,
                  "min_depth": 1.4,
                  "max_depth": 2.8}
+
+
+    parameter2 = {"filepath": "/home/swanner/Desktop/denseSampledTestScene/rendered/lowRes",
+             "resultpath": "/home/swanner/Desktop/denseSampledTestScene/results_LR/cloud",
+             "num_of_cams": 25,
+             "total_frames": 200,
+             "focus": 0,
+             "cam_rotation": [180.0, 0.0, 0.0],
+             "cam_initial_pos": [-1.0, 0.0, 2.6],
+             "cam_final_pos": [1.0, 0.0, 2.6],
+             "world_accuracy_m": 0.005,
+             "resolution": [192, 108],
+             "sensor_size": 32,
+             "colorspace": "hsv",
+             "inner_scale": 0.6,
+             "outer_scale": 1.0,
+             "min_coherence": 0.98,
+             "focal_length_mm": 16,
+             "baseline": 0.1,
+             "min_depth": 1.4,
+             "max_depth": 2.8}
+
 
     processor = StructureTensorProcessor(parameter)
 

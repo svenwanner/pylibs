@@ -89,10 +89,9 @@ def cloud_from_depth(depth_map, focal_length):
     for y in xrange(cloud.shape[0]):
         for x in xrange(cloud.shape[1]):
             if cloud[y, x, 2] > 0.0:
-                cloud[y, x, 0] = (x-depth_map.shape[1]/2.0)*depth_map[y, x]/focal_length
-                cloud[y, x, 1] = (y-depth_map.shape[0]/2.0)*depth_map[y, x]/focal_length
+                cloud[y, x, 0] = float((float(x)-depth_map.shape[1]/2.0)*depth_map[y, x]/float(focal_length))
+                cloud[y, x, 1] = float((float(y)-depth_map.shape[0]/2.0)*depth_map[y, x]/float(focal_length))
                 cloud[y, x, 3] = 1
-
 
     return cloud
 
