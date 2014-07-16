@@ -21,12 +21,12 @@ class discreteWorldSpace(object):
         self.result_layer = result_layer
         self.shape = (self.N+1, self.M+1, result_layer, 2)
 
-
         self.grid = np.zeros(self.shape, dtype=np.float32)
+        print "created world grid of size (w,h):", self.shape[1], self.shape[0]
 
     def setWorldValue(self, y, x, layer, value):
-        assert isinstance(y, float)
-        assert isinstance(x, float)
+        assert isinstance(y, np.float32)
+        assert isinstance(x, np.float32)
         assert isinstance(layer, int)
         assert 0 <= layer < self.result_layer
         assert isinstance(value, np.ndarray)
@@ -41,7 +41,7 @@ class discreteWorldSpace(object):
             #print "Warning, projected position (",y,",",x,") out of grid!"
 
 
-    def getResult(self):
+    def getResultMeaan(self):
         cloud = np.zeros((self.N+1, self.M+1, 4))
         #confidence = np.zeros((self.N+1, self.M+1))
 
@@ -55,13 +55,41 @@ class discreteWorldSpace(object):
                     confidences /= csum
                     depth = np.sum(confidences*depths)
                     wpos = self.grid2world(n, m)
-                    cloud[n, m, 0] = wpos[0]
-                    cloud[n, m, 1] = wpos[1]
+                    cloud[n, m, 0] = wpos[1]
+                    cloud[n, m, 1] = wpos[0]
                     cloud[n, m, 2] = depth
                     cloud[n, m, 3] = np.mean(confidences)
                 else:
                     cloud[n, m, 3] = 0
                     cloud[n, m, 2] = -1
+
+        return cloud
+
+    def getResult(self):
+        cloud = np.zeros((self.N+1, self.M+1, 4))
+        #confidence = np.zeros((self.N+1, self.M+1))
+
+        for n in range(self.N+1):
+            for m in range(self.M+1):
+                confidences = self.grid[n, m, :, 1]
+                depths = self.grid[n, m, :, 0]
+                csum = np.sum(confidences)
+                if csum > 0:
+                    #confidence[n, m] = np.mean(confidences)
+                    #confidences /= csum
+                    #depth = np.median(depths)
+                    wpos = self.grid2world(n, m)
+                    cloud[n, m, 0] = wpos[1]
+                    cloud[n, m, 1] = wpos[0]
+                    cloud[n, m, 2] = np.median(depths)
+                    cloud[n, m, 3] = np.median(confidences)
+                else:
+                    cloud[n, m, 3] = 0
+                    cloud[n, m, 2] = -1
+
+        ### Todo: check why z and y dim is flipped
+        cloud[:, :, 2] *= -1
+        cloud[:, :, 1] *= -1
 
         return cloud
 
