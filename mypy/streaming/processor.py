@@ -6,7 +6,7 @@ from scipy.misc import imread, imsave, imshow
 import mypy.visualization.imshow as ims
 
 from mypy.lightfield.io import load_lf3d_fromFiles
-from mypy.lightfield.helpers import changeColorspace
+from mypy.lightfield.helpers import changeColorspace, refocus_epi
 from mypy.streaming.discreteWorld import discreteWorldSpace
 from mypy.pointclouds.depthToCloud import disparity_to_depth, cloud_from_depth, PlyWriter, transformCloud
 
@@ -30,7 +30,7 @@ class SubLFProcessor(object):
         assert isinstance(camIndex, int)
 
         try:
-            self.lf = load_lf3d_fromFiles(self.fpath, camIndex, self.numOfCams, self.focus, dtype=np.float32)
+            self.lf = load_lf3d_fromFiles(self.fpath, camIndex, self.numOfCams, dtype=np.float32)
             self.shape = self.lf.shape
             self.results = np.zeros((self.shape[1], self.shape[2], 2), dtype=np.float32)
             self.cv = np.copy(self.lf[self.shape[0]/2, :, :, 0:self.shape[3]])
@@ -63,44 +63,56 @@ class StructureTensorProcessor(SubLFProcessor):
 
         for y in xrange(self.shape[1]):
 
-            ### compute tensor for each y coordinate and each color channel ###
-            tensor = np.zeros((self.shape[3], self.shape[0], self.shape[2], 3), dtype=np.float32)
-            for c in range(self.shape[3]):
-                tensor[c, :, :, :] = vigra.filters.structureTensor(self.lf[:, y, :, c],
-                                                                   self.parameter["inner_scale"],
-                                                                   self.parameter["outer_scale"])
+            epi = np.copy(self.lf[:, y, :, c])
+            tmp_results = np.zeros((len(self.parameter["focus"]), epi.shape[1], 2), np.float32)
 
-            ### mean over color channels ###
-            tensor = np.mean(tensor, axis=0)
+            for n, focus in enumerate(self.parameter["focus"]):
 
-            ### compute coherence value ###
-            up = np.sqrt((tensor[:, :, 2]-tensor[:, :, 0])**2 + 4*tensor[:, :, 1]**2)
-            down = (tensor[:, :, 2]+tensor[:, :, 0] + 1e-25)
-            coherence = up / down
+                ### compute tensor for each y coordinate and each color channel ###
+                tensor = np.zeros((self.shape[3], self.shape[0], self.shape[2], 3), dtype=np.float32)
 
-            ### compute disparity value ###
-            orientation = vigra.numpy.arctan2(2*tensor[:, :, 1], tensor[:, :, 2]-tensor[:, :, 0]) / 2.0
-            orientation = vigra.numpy.tan(orientation[:])
+                repi = refocus_epi(epi, focus)
+                for c in range(self.shape[3]):
+                    tensor[c, :, :, :] = vigra.filters.structureTensor(repi,
+                                                                       self.parameter["inner_scale"],
+                                                                       self.parameter["outer_scale"])
 
-            ### mark out of boundary orientation estimation ###
-            invalid_ubounds = np.where(orientation > 1.1)
-            invalid_lbounds = np.where(orientation < -1.1)
-            invalid = np.where(coherence < self.parameter["min_coherence"])
+                ### mean over color channels ###
+                tensor = np.mean(tensor, axis=0)
 
-            orientation += self.focus
+                ### compute coherence value ###
+                up = np.sqrt((tensor[self.shape[0]/2, :, 2]-tensor[self.shape[0]/2, :, 0])**2 + 4*tensor[self.shape[0]/2, :, 1]**2)
+                down = (tensor[self.shape[0]/2, :, 2]+tensor[self.shape[0]/2, :, 0] + 1e-25)
+                coherence = up / down
 
-            ### set coherence of invalid values to zero ###
-            coherence[invalid_ubounds] = 0
-            coherence[invalid_lbounds] = 0
-            coherence[invalid] = 0
+                ### compute disparity value ###
+                orientation = vigra.numpy.arctan2(2*tensor[self.shape[0]/2, :, 1], tensor[self.shape[0]/2, :, 2]-tensor[self.shape[0]/2, :, 0]) / 2.0
+                orientation = vigra.numpy.tan(orientation[:])
 
-            ### set orientation of invalid values to related maximum/minimum value
-            orientation[invalid_ubounds] = -1
-            orientation[invalid_lbounds] = -1
-            orientation[invalid] = -1
+                ### mark out of boundary orientation estimation ###
+                invalid_ubounds = np.where(orientation > 1.1)
+                invalid_lbounds = np.where(orientation < -1.1)
+                invalid = np.where(coherence < self.parameter["min_coherence"])
 
-            self.results[y, :, 0] = orientation[self.shape[0]/2, :]
-            self.results[y, :, 1] = coherence[self.shape[0]/2, :]
+                orientation += focus
+
+                ### set coherence of invalid values to zero ###
+                coherence[invalid_ubounds] = 0
+                coherence[invalid_lbounds] = 0
+                coherence[invalid] = 0
+
+                ### set orientation of invalid values to related maximum/minimum value
+                orientation[invalid_ubounds] = -1
+                orientation[invalid_lbounds] = -1
+                orientation[invalid] = -1
+
+                tmp_results[n, :, 0] = orientation[:]
+                tmp_results[n, :, 1] = coherence[:]
+
+
+
+            self.results[y, :, 0] =
+            self.results[y, :, 1] =
 
         print "done -->"
 
@@ -164,7 +176,6 @@ class DenseLightFieldEngine(object):
         d_tot = self.cam_max_baseline
 
         # compute real visible scene width and height
-        ### Todo: first tomorrow: start here to check
         vsw = 2*self.parameter["cam_initial_pos"][2]*np.tan(fov_w)+d_tot
         vsh = 2*self.parameter["cam_initial_pos"][2]*np.tan(fov_h)
 
@@ -174,18 +185,20 @@ class DenseLightFieldEngine(object):
 
     def run(self):
         cam_index = 0
-        append_points = False
+        # append_points = False
 
-        plyWriter = PlyWriter(self.parameter["resultpath"], format="EN")
+        # plyWriter = PlyWriter(self.parameter["resultpath"], format="EN")
 
         for i in range(self.iterations):
             print "\n<-- compute iteration step", i, "..."
 
-            if i > 0:
-                append_points = True
+            # if i > 0:
+            #     append_points = True
 
             if self.processor.load(cam_index):
-                cloudshift = self.parameter["cam_initial_pos"][0] + i*self.parameter["baseline"]*self.parameter["num_of_cams"]+self.parameter["baseline"]*self.parameter["num_of_cams"]/2
+                current_cam_pos = self.parameter["cam_initial_pos"][0] + i*self.parameter["baseline"]*self.parameter["num_of_cams"]+self.parameter["baseline"]*self.parameter["num_of_cams"]/2
+                cloud_destination = self.parameter["cam_initial_pos"][0]+(self.parameter["total_frames"]-1)*self.parameter["baseline"]/2.0
+                cloudshift = cloud_destination-current_cam_pos
                 translate = [cloudshift, 0.0, self.parameter["cam_initial_pos"][2]]
 
                 print "transform cloud..."
@@ -210,21 +223,21 @@ class DenseLightFieldEngine(object):
                                        rotate_z=self.parameter["cam_rotation"][2],
                                        translate=translate)
 
-                plyWriter_dbg = PlyWriter(self.parameter["resultpath"]+"_iteration_%4.4i"%i, format="EN")
-                plyWriter_dbg.cloud = cloud
-                plyWriter_dbg.colors = processor.cv
-                plyWriter_dbg.save()
+                # plyWriter_dbg = PlyWriter(self.parameter["resultpath"]+"_iteration_%4.4i"%i, format="EN")
+                # plyWriter_dbg.cloud = cloud
+                # plyWriter_dbg.colors = processor.cv
+                # plyWriter_dbg.save()
 
-                plyWriter.cloud = cloud
-                plyWriter.colors = processor.cv
-                plyWriter.confidence = results[:, :, 1]
-                plyWriter.save(append=append_points)
+                # plyWriter.cloud = cloud
+                # plyWriter.colors = processor.cv
+                # plyWriter.confidence = results[:, :, 1]
+                # plyWriter.save(append=append_points)
 
                 # push all points from the cloud into the current iteration layer of the worldGrid instance
                 ### TODO: check y,x dimension of cloud is equal to results?
                 for n in range(cloud.shape[0]):
                     for m in range(cloud.shape[1]):
-                        self.worldGrid.setWorldValue(cloud[n, m, 1], cloud[n, m, 0], i, np.array([cloud[n, m, 2], results[n, m, 1]]))
+                        self.worldGrid.setWorldValue(cloud[n, m, 0], cloud[n, m, 1], i, np.array([cloud[n, m, 2], results[n, m, 1]]))
 
                 # save all disparity steps as image
                 imsave(self.parameter["resultpath"]+"_layer_%4.4i.png" % i, self.worldGrid.grid[:, :, i, 0])
@@ -240,6 +253,8 @@ class DenseLightFieldEngine(object):
 
 
 
+        self.worldGrid.save(self.parameter["resultpath"]+"_worldGrid")
+
         plyWriter = PlyWriter(self.parameter["resultpath"]+"_final", format="EN")
         cloud = self.worldGrid.getResult()
         cloud = transformCloud(cloud,
@@ -247,6 +262,7 @@ class DenseLightFieldEngine(object):
                                        rotate_y=self.parameter["cam_rotation"][1],
                                        rotate_z=self.parameter["cam_rotation"][2],
                                        translate=[0,0,0])
+
         imsave(self.parameter["resultpath"]+"_finalDepth.png", cloud[:, :, 2])
         imsave(self.parameter["resultpath"]+"_finalCoherence.png", cloud[:, :, 3])
         plyWriter.cloud = cloud
@@ -268,7 +284,7 @@ if __name__ == "__main__":
                  "resultpath": "/home/swanner/Desktop/denseSampledTestScene/results_FR/cloud",
                  "num_of_cams": 11,
                  "total_frames": 200,
-                 "focus": 2,
+                 "focus": [2],
                  "cam_rotation": [180.0, 0.0, 0.0],
                  "cam_initial_pos": [-1.0, 0.0, 2.6],
                  "cam_final_pos": [1.0, 0.0, 2.6],
@@ -289,7 +305,7 @@ if __name__ == "__main__":
              "resultpath": "/home/swanner/Desktop/denseSampledTestScene/results2_FR/cloud",
              "num_of_cams": 11,
              "total_frames": 231,
-             "focus": 2,
+             "focus": [3],
              "cam_rotation": [180.0, 0.0, 0.0],
              "cam_initial_pos": [0.0, 0.0, 2.0],
              #"cam_final_pos": [2.31, 0.0, 2.0],

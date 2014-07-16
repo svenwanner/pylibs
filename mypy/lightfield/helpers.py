@@ -178,3 +178,26 @@ def refocus_3d(lf, focus, lf_type='h'):
         print "refocus undefined"
 
     return tmp
+
+
+
+def refocus_epi(epi, focus):
+    """
+    refocus a 3D light field by an integer pixel shift
+
+    :param epi: numpy array of structure [num_of_cams,width,channels]
+    :param focus: integer pixel value to refocus
+    :return repi: numpy array of structure [num_of_cams,width,channels]
+    """
+    assert isinstance(epi, np.ndarray)
+    assert isinstance(focus, int) or isinstance(focus, float)
+
+    tmp = np.copy(epi)
+    for h in range(tmp.shape[0]):
+        for c in range(tmp.shape[2]):
+            if isinstance(focus, float):
+                tmp[h, :, c] = shift(epi[h, :, c], shift=[0, (h - epi.shape[0] / 2) * focus])
+            elif isinstance(focus, int):
+                tmp[h, :, c] = np.roll(epi[h, :, c], shift=(h - epi.shape[0] / 2) * focus)
+
+    return tmp

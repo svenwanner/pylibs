@@ -24,16 +24,17 @@ class discreteWorldSpace(object):
         self.grid = np.zeros(self.shape, dtype=np.float32)
         print "created world grid of size (w,h):", self.shape[1], self.shape[0]
 
-    def setWorldValue(self, y, x, layer, value):
-        assert isinstance(y, np.float32)
+
+    def setWorldValue(self, x, y, layer, value):
         assert isinstance(x, np.float32)
+        assert isinstance(y, np.float32)
         assert isinstance(layer, int)
         assert 0 <= layer < self.result_layer
         assert isinstance(value, np.ndarray)
         assert len(value.shape) == 1
         assert value.shape[0] == 2
 
-        index = self.world2grid(y, x)
+        index = self.world2grid(x, y)
         if index is not None:
             self.grid[index[0], index[1], layer] = value[:]
         else:
@@ -41,7 +42,14 @@ class discreteWorldSpace(object):
             #print "Warning, projected position (",y,",",x,") out of grid!"
 
 
-    def getResultMeaan(self):
+    def getResult(self, rtype="median"):
+        if rtype == "mean":
+            return self.getResultMean()
+        if rtype == "median":
+            return self.getResultMedian()
+
+
+    def getResultMean(self):
         cloud = np.zeros((self.N+1, self.M+1, 4))
         #confidence = np.zeros((self.N+1, self.M+1))
 
@@ -65,7 +73,8 @@ class discreteWorldSpace(object):
 
         return cloud
 
-    def getResult(self):
+
+    def getResultMedian(self):
         cloud = np.zeros((self.N+1, self.M+1, 4))
         #confidence = np.zeros((self.N+1, self.M+1))
 
@@ -93,7 +102,8 @@ class discreteWorldSpace(object):
 
         return cloud
 
-    def world2grid(self, y, x):
+
+    def world2grid(self, x, y):
         if -self.world_size[0]/2.0 <= y <= self.world_size[0]/2.0:
             if -self.world_size[1]/2.0 <= x <= self.world_size[0]/2.0:
                 return [int((self.world_size[0]/2.0-y)/self.world_size[0]*self.N),

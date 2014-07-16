@@ -127,25 +127,25 @@ def transformCloud(cloud, rotate_x=None, rotate_y=None, rotate_z=None, translate
                    [0.0, 0.0, 1.0, 0.0],
                    [0.0, 0.0, 0.0, 1.0]])
 
-    for y in xrange(cloud.shape[0]):
-        for x in xrange(cloud.shape[1]):
-            if cloud[y, x, 3] > 0.0:
-                p = np.mat([cloud[y, x, 0], cloud[y, x, 1], cloud[y, x, 2], 1.0])
+    for x in xrange(cloud.shape[0]):
+        for y in xrange(cloud.shape[1]):
+            if cloud[x, y, 3] > 0.0:
+                p = np.mat([cloud[x, y, 0], cloud[x, y, 1], cloud[x, y, 2], 1.0])
                 p_trans = p*RX
                 p_trans = p_trans*RY
                 p_trans = p_trans*RZ
                 p_trans = p_trans*T
 
-                p_trans[0,0] /= p_trans[0,3]
-                p_trans[0,1] /= p_trans[0,3]
-                cloud[y, x, 0:3] = p_trans[0,0:3]
+                p_trans[0, 0] /= p_trans[0, 3]
+                p_trans[0, 1] /= p_trans[0, 3]
+                cloud[x, y, 0:3] = p_trans[0, 0:3]
 
     print "done -->"
     return cloud
 
 
 class PlyWriter(object):
-    def __init__(self, filename=None, cloud=None, colors=None, intensity=None, confidence=None, format="DE"):
+    def __init__(self, filename=None, cloud=None, colors=None, intensity=None, confidence=None, format="EN"):
         self.filename = filename
         self.cloud = cloud
         self.colors = colors

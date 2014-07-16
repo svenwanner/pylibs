@@ -23,7 +23,7 @@ def finalResultViewer(final_exr, save_to=None):
         print "Error reading final.exr!"
 
 
-def load_lf3d_fromFiles(fpath, index=0, amount=-1, focus=0, dtype=np.float32, ftype="png"):
+def load_lf3d_fromFiles(fpath, index=0, amount=-1, dtype=np.float32, ftype="png"):
     """
     Load a filename list from path, start index and amount of filenames to load
     as well as the filetype can be specified. By default a list of all filenames
@@ -39,11 +39,8 @@ def load_lf3d_fromFiles(fpath, index=0, amount=-1, focus=0, dtype=np.float32, ft
     :return: ndarray of range [numOfImgs, sy, sx, channels]
     """
     fnames = getFilenames(fpath, index, amount, ftype)
-    lf = loadSequence(fnames, dtype)
-    if focus == 0:
-        return lf
-    else:
-        return refocus_3d(lf, focus)
+    return loadSequence(fnames, dtype)
+
 
 
 
