@@ -92,6 +92,8 @@ def orientationClassic(strTensorh, strTensorv, config, shift):
 
         orientation, coherence = mergeOrientations_wta(orientationH,coherenceH,orientationV,coherenceV)
 
+        # orientation =  (orientationH[:] * coherenceH[:] + orientationV[:] * coherenceV[:]) / (coherenceH[:] *coherenceV[:] + 1e-16)
+
         if config.output_level >= 2:
             plt.imsave(config.result_path+config.result_label+"orientation_merged_{0}.png".format(shift), orientation, cmap=plt.cm.jet)
             plt.imsave(config.result_path+config.result_label+"coherence_merged_{0}.png".format(shift), coherence, cmap=plt.cm.jet)
@@ -157,10 +159,15 @@ def compute_horizontal(lf3dh, shift, config):
         gradient[:, :, :, 0] +=  grad[:, :, :, c, 0]
         gradient[:, :, :, 1] +=  grad[:, :, :, c, 1]
 
+    # gradient[:, :, :, 0] = vigra.filters.convolveOneDimension(gradient[:, :, :, 0], 2, gaussianOuter)
+    # gradient[:, :, :, 1] = vigra.filters.convolveOneDimension(gradient[:, :, :, 1], 2, gaussianOuter)
+    # gradient[:, :, :, 0] = vigra.filters.convolveOneDimension(gradient[:, :, :, 0], 0, gaussianOuter)
+    # gradient[:, :, :, 1] = vigra.filters.convolveOneDimension(gradient[:, :, :, 1], 0, gaussianOuter)
+
     tensor = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], 3), dtype=np.float32)
-    tensor[:,:,:,0] = gradient[:, :, :, 0]**2
-    tensor[:,:,:,1] = gradient[:, :, :, 1]*gradient[:, :, :, 0]
-    tensor[:,:,:,2] = gradient[:, :, :, 1]**2
+    tensor[:, :, :, 0] = gradient[:, :, :, 0]**2
+    tensor[:, :, :, 1] = gradient[:, :, :, 1]*gradient[:, :, :, 0]
+    tensor[:, :, :, 2] = gradient[:, :, :, 1]**2
 
     print("apply gaussian filter along 3rd dimension")
     tensor = vigra.filters.convolveOneDimension(tensor, 2, gaussianOuter)
@@ -236,7 +243,7 @@ def compute_vertical(lf3dv, shift, config):
     grad[:, :, :, :, 0] = vigra.filters.convolveOneDimension(grad[:, :, :, :, 0], 1, scharr2dim)
 
     print("apply scharr filter along 1rd dimension")
-    grad[:, :, :, :, 1] = vigra.filters.convolveOneDimension(lf3d,1,scharr1dim)
+    grad[:, :, :, :, 1] = vigra.filters.convolveOneDimension(lf3d, 1, scharr1dim)
     grad[:, :, :, :, 1] = vigra.filters.convolveOneDimension(grad[:, :, :, :, 1], 0, scharr2dim)
 
     gradient = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], 2), dtype=np.float32)
@@ -244,10 +251,15 @@ def compute_vertical(lf3dv, shift, config):
         gradient[:, :, :, 0] +=  grad[:, :, :, c, 0]
         gradient[:, :, :, 1] +=  grad[:, :, :, c, 1]
 
+    # gradient[:, :, :, 0] = vigra.filters.convolveOneDimension(gradient[:, :, :, 0], 1, gaussianOuter)
+    # gradient[:, :, :, 1] = vigra.filters.convolveOneDimension(gradient[:, :, :, 1], 1, gaussianOuter)
+    # gradient[:, :, :, 0] = vigra.filters.convolveOneDimension(gradient[:, :, :, 0], 0, gaussianOuter)
+    # gradient[:, :, :, 1] = vigra.filters.convolveOneDimension(gradient[:, :, :, 1], 0, gaussianOuter)
+
     tensor = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], 3), dtype=np.float32)
-    tensor[:, :, :,0] = gradient[:, :, :, 0]**2
-    tensor[:, :, :,1] = gradient[:, :, :, 1]*gradient[:, :, :, 0]
-    tensor[:, :, :,2] = gradient[:, :, :, 1]**2
+    tensor[:, :, :, 0] = gradient[:, :, :, 0]**2
+    tensor[:, :, :, 1] = gradient[:, :, :, 1]*gradient[:, :, :, 0]
+    tensor[:, :, :, 2] = gradient[:, :, :, 1]**2
 
     print("apply gaussian filter along 2rd dimension")
     tensor = vigra.filters.convolveOneDimension(tensor, 1, gaussianOuter)
@@ -331,26 +343,27 @@ def structureTensor4D(config):
 
         orientationClassic(strTensorh, strTensorv, config,shift)
 
+        # print(gradh.shape)
+        # print(gradv.shape)
 
-        print(gradh.shape)
-        print(gradv.shape)
+        print("4D structure tensor")
 
-        Ix_plus_Iy_square = (gradh[:, :, :, 0] - gradv[:, :, :, 0])**2
-        Iu_plus_Iv_square = (gradh[:, :, :, 1] - gradv[:, :, :, 1])**2
-        Ix_plus_Iy_mul_Iu_plus_Iv = (gradh[:, :, :, 0] - gradv[:, :, :, 0])*(gradh[:, :, :, 1] - gradv[:, :, :, 1])
+        Ix_plus_Iy_square = (gradh[gradh.shape[0]/2, :, :, 0] + gradv[gradh.shape[0]/2, :, :, 0])**2
+        Iu_plus_Iv_square = (gradh[gradh.shape[0]/2, :, :, 1] + gradv[gradh.shape[0]/2, :, :, 1])**2
+        Ix_plus_Iy_mul_Iu_plus_Iv = (gradh[gradh.shape[0]/2, :, :, 0] + gradv[gradh.shape[0]/2, :, :, 0])*(gradh[gradh.shape[0]/2, :, :, 1] + gradv[gradh.shape[0]/2, :, :, 1])
 
-        # Ix_plus_Iy_square = vigra.filters.gaussianSmoothing(Ix_plus_Iy_square, config.outer_scale)
-        # Iu_plus_Iv_square = vigra.filters.gaussianSmoothing(Iu_plus_Iv_square, config.outer_scale)
-        # Ix_plus_Iy_mul_Iu_plus_Iv = vigra.filters.gaussianSmoothing(Ix_plus_Iy_mul_Iu_plus_Iv, config.outer_scale)
+        Ix_plus_Iy_square = vigra.filters.gaussianSmoothing(Ix_plus_Iy_square, config.outer_scale)
+        Iu_plus_Iv_square = vigra.filters.gaussianSmoothing(Iu_plus_Iv_square, config.outer_scale)
+        Ix_plus_Iy_mul_Iu_plus_Iv = vigra.filters.gaussianSmoothing(Ix_plus_Iy_mul_Iu_plus_Iv, config.outer_scale)
 
 
         ### compute coherence value ###
-        up = np.sqrt((Iu_plus_Iv_square[Iu_plus_Iv_square.shape[0]/2, :, :]-Ix_plus_Iy_square[Ix_plus_Iy_square.shape[0]/2, :, :])**2 + 4*Ix_plus_Iy_mul_Iu_plus_Iv[Ix_plus_Iy_mul_Iu_plus_Iv.shape[0]/2, :, :]**2)
-        down = (Iu_plus_Iv_square[Iu_plus_Iv_square.shape[0]/2, :, :]+Ix_plus_Iy_square[Ix_plus_Iy_square.shape[0]/2, :, :] + 1e-25)
+        up = np.sqrt((Iu_plus_Iv_square[ :, :]-Ix_plus_Iy_square[ :, :])**2 + 4*Ix_plus_Iy_mul_Iu_plus_Iv[ :, :]**2)
+        down = (Iu_plus_Iv_square[ :, :]+Ix_plus_Iy_square[ :, :] + 1e-25)
         coherence = up / down
 
         ### compute disparity value ###
-        orientation = vigra.numpy.arctan2(2*Ix_plus_Iy_mul_Iu_plus_Iv[Ix_plus_Iy_mul_Iu_plus_Iv.shape[0]/2, :, :], Iu_plus_Iv_square[Iu_plus_Iv_square.shape[0]/2, :, :]-Ix_plus_Iy_square[Ix_plus_Iy_square.shape[0]/2, :, :]) / 2.0
+        orientation = vigra.numpy.arctan2(2*Ix_plus_Iy_mul_Iu_plus_Iv[ :, :], Iu_plus_Iv_square[ :, :]-Ix_plus_Iy_square[ :, :]) / 2.0
         orientation = vigra.numpy.tan(orientation[:])
 
         ### mark out of boundary orientation estimation ###
