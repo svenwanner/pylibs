@@ -92,7 +92,7 @@ def plot(figure_no, data, min, max, title, bartitle, save=False):
     if (max < np.max(data) ):
          d[10] = "> " + str(max)
     if (np.min(data) < min ):
-         d[0] = "< " + str(max)
+         d[0] = "< " + str(min)
 
     b = plt.colorbar(cax=cax)
     b.ax.set_yticklabels(d)
@@ -145,22 +145,22 @@ if __name__ == "__main__":
         ### compute the MAE, MSE, MRE ###
 
 
-        #mae, mae_no = compute_MAE(depth, GT_img)
-        #mse, mse_no = compute_MSE(depth, GT_img)
-        #[mre, mre_no, mre_pc] = compute_MRE(depth, GT_img)
+        mae, mae_no = compute_MAE(depth, GT_img)
+        mse, mse_no = compute_MSE(depth, GT_img)
+        [mre, mre_no, mre_pc] = compute_MRE(depth, GT_img)
 
-        #print('\033[91mMAE [m]: '+ str(mae_no))
-        #print('MSE [m]: '+ str(mse_no))
-        #print('MRE [ ]: '+ str(mre_no))
-        #print('MRE [%]: '+ str(mre_pc))
-        #print("\033[92m")
+        print('\033[91mMAE [m]: '+ str(mae_no))
+        print('MSE [m]: '+ str(mse_no))
+        print('MRE [ ]: '+ str(mre_no))
+        print('MRE [%]: '+ str(mre_pc))
+        print("\033[92m")
 
         #### Display MAE,MSE MRE ###
         save = False
 
-        #plot(3, mae, minError, maxError, "Mean Absolute Error", "MAE [px]",save)
-        #plot(4, mse, minError, maxError, "Mean Squared Error", "MSE [px]",save)
-        #plot(5, mre, minError, maxError, "Mean Relative Error", "MRE [px]",save)
+        plot(3, mae, minError, maxError, "Mean Absolute Error: "+ "{0:.5f}".format(mae_no), "MAE [px]",save)
+        plot(4, mse, minError, maxError, "Mean Squared Error: "+ "{0:.5f}".format(mse_no), "MSE [px]",save)
+        plot(5, mre, minError, maxError, "Mean Relative Error: "+ "{0:.2f}".format(mre_pc) + "%", "MRE [px]",save)
 
         print("\033[0m")
         plot(1, depth, minDepth, maxDepth, "Depth Estimation", "Depth [m]", save)
