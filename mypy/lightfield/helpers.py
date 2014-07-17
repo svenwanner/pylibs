@@ -87,7 +87,7 @@ def loadSequence(fnames, dtype=np.float32):
     assert isinstance(fnames[0], str)
     assert isinstance(dtype, type(np.float32))
 
-    print "\n<-- loadSequence..."
+    print "\n<-- loadSequence...",
 
     im = imread(fnames[0])
     channels = 1
@@ -110,9 +110,14 @@ def loadSequence(fnames, dtype=np.float32):
         if np.amax(sequence > 1.0):
             sequence[:] /= 255.0
 
-    print "load sequene of shape:", sequence.shape, "..."
-    print "range:", np.amin(sequence), np.amax(sequence), "..."
-    print "done -->"
+    if len(fnames) == 0:
+        print "failed!"
+        sys.exit()
+    else:
+        print "ok"
+        print "load sequene of shape:", sequence.shape, "..."
+        print "range:", np.amin(sequence), np.amax(sequence), "..."
+        print "done -->"
     return sequence
 
 

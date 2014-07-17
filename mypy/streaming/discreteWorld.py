@@ -19,13 +19,13 @@ class discreteWorldSpace(object):
         self.N = int(world_size[0]/precision)
         self.M = int(world_size[1]/precision)
         self.result_layer = result_layer
-        self.shape = (self.N+1, self.M+1, result_layer, 2)
+        self.shape = (self.N+1, self.M+1, result_layer, 5)
 
         self.grid = np.zeros(self.shape, dtype=np.float32)
         print "created world grid of size (w,h):", self.shape[1], self.shape[0]
 
 
-    def setWorldValue(self, x, y, layer, value):
+    def setWorldValue(self, x, y, layer, value, color=None):
         assert isinstance(x, np.float32)
         assert isinstance(y, np.float32)
         assert isinstance(layer, int)
@@ -36,7 +36,9 @@ class discreteWorldSpace(object):
 
         index = self.world2grid(x, y)
         if index is not None:
-            self.grid[index[0], index[1], layer] = value[:]
+            self.grid[index[0], index[1], layer, 0:2] = value[:]
+            if color is not None:
+                self.grid[index[0], index[1], layer, 2:self.grid.shape[3]] = color[:]
         else:
             pass
             #print "Warning, projected position (",y,",",x,") out of grid!"
@@ -51,7 +53,7 @@ class discreteWorldSpace(object):
 
     def getResultMean(self):
         cloud = np.zeros((self.N+1, self.M+1, 4))
-        #confidence = np.zeros((self.N+1, self.M+1))
+        color = np.zeros((self.N+1, self.M+1, 3))
 
         for n in range(self.N+1):
             for m in range(self.M+1):
@@ -59,7 +61,6 @@ class discreteWorldSpace(object):
                 depths = self.grid[n, m, :, 0]
                 csum = np.sum(confidences)
                 if csum > 0:
-                    #confidence[n, m] = np.mean(confidences)
                     confidences /= csum
                     depth = np.sum(confidences*depths)
                     wpos = self.grid2world(n, m)
@@ -67,31 +68,9 @@ class discreteWorldSpace(object):
                     cloud[n, m, 1] = wpos[0]
                     cloud[n, m, 2] = depth
                     cloud[n, m, 3] = np.mean(confidences)
-                else:
-                    cloud[n, m, 3] = 0
-                    cloud[n, m, 2] = -1
 
-        return cloud
-
-
-    def getResultMedian(self):
-        cloud = np.zeros((self.N+1, self.M+1, 4))
-        #confidence = np.zeros((self.N+1, self.M+1))
-
-        for n in range(self.N+1):
-            for m in range(self.M+1):
-                confidences = self.grid[n, m, :, 1]
-                depths = self.grid[n, m, :, 0]
-                csum = np.sum(confidences)
-                if csum > 0:
-                    #confidence[n, m] = np.mean(confidences)
-                    #confidences /= csum
-                    #depth = np.median(depths)
-                    wpos = self.grid2world(n, m)
-                    cloud[n, m, 0] = wpos[1]
-                    cloud[n, m, 1] = wpos[0]
-                    cloud[n, m, 2] = np.median(depths)
-                    cloud[n, m, 3] = np.median(confidences)
+                    for c in range(3):
+                        color[n, m, c] = self.grid[n, m, c+2]
                 else:
                     cloud[n, m, 3] = 0
                     cloud[n, m, 2] = -1
@@ -100,7 +79,36 @@ class discreteWorldSpace(object):
         # cloud[:, :, 2] *= -1
         # cloud[:, :, 1] *= -1
 
-        return cloud
+        return cloud, color
+
+
+    def getResultMedian(self):
+        cloud = np.zeros((self.N+1, self.M+1, 4))
+        color = np.zeros((self.N+1, self.M+1, 3))
+
+        for n in range(self.N+1):
+            for m in range(self.M+1):
+                confidences = self.grid[n, m, :, 1]
+                depths = self.grid[n, m, :, 0]
+                csum = np.sum(confidences)
+                if csum > 0:
+                    wpos = self.grid2world(n, m)
+                    cloud[n, m, 0] = wpos[1]
+                    cloud[n, m, 1] = wpos[0]
+                    cloud[n, m, 2] = np.median(depths)
+                    cloud[n, m, 3] = np.median(confidences)
+
+                    for c in range(3):
+                        color[n, m, c] = np.mean(self.grid[n, m, :, c+2])
+                else:
+                    cloud[n, m, 3] = 0
+                    cloud[n, m, 2] = -1
+
+        ### Todo: check why z and y dim is flipped
+        # cloud[:, :, 2] *= -1
+        # cloud[:, :, 1] *= -1
+
+        return cloud, color
 
 
     def world2grid(self, x, y):

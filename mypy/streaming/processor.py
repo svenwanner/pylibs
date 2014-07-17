@@ -31,8 +31,9 @@ class SubLFProcessor(object):
 
         try:
             self.lf = load_lf3d_fromFiles(self.fpath, camIndex, self.numOfCams, dtype=np.float32)
+
             self.shape = self.lf.shape
-            self.results = np.zeros((self.shape[1], self.shape[2], 2), dtype=np.float32)
+            self.results = np.zeros((self.shape[1], self.shape[2], 5), dtype=np.float32)
             self.cv = np.copy(self.lf[self.shape[0]/2, :, :, 0:self.shape[3]])
             if self.cv.dtype != np.uint8:
                 self.cv *= 255.0
@@ -64,7 +65,7 @@ class StructureTensorProcessor(SubLFProcessor):
         for y in xrange(self.shape[1]):
 
             epi = np.copy(self.lf[:, y, :, :])
-            tmp_results = np.zeros((len(self.parameter["focus"]), epi.shape[1], 5), np.float32)
+            tmp_results = np.zeros((len(self.parameter["focus"]), epi.shape[1], 2+self.shape[3]), np.float32)
 
             for n, focus in enumerate(self.parameter["focus"]):
 
@@ -118,7 +119,11 @@ class StructureTensorProcessor(SubLFProcessor):
 
             self.results[y, :, 0] = best_orientations[:]
             self.results[y, :, 1] = max_c[:]
-            #self.results[y, :, 0:self.shape[3]] = epi[self.shape[0]/2, :, 0:self.shape[3]]
+            if self.shape[3] == 3:
+                self.results[y, :, 2:] = epi[self.shape[0]/2, :, :]
+            elif self.shape[3] == 1:
+                for c in range(3):
+                    self.results[y, :, 2+c] = epi[self.shape[0]/2, :, 0]
 
         print "done -->"
 
@@ -209,8 +214,8 @@ class DenseLightFieldEngine(object):
                 print "translation:", translate, "..."
                 print "rotate:", self.parameter["cam_rotation"], "..."
 
-                processor.compute()
-                results = processor.getResults()
+                self.processor.compute()
+                results = self.processor.getResults()
 
 
 
@@ -235,12 +240,12 @@ class DenseLightFieldEngine(object):
                 ### TODO: check y,x dimension of cloud is equal to results?
                 for n in range(cloud.shape[0]):
                     for m in range(cloud.shape[1]):
-                        self.worldGrid.setWorldValue(cloud[n, m, 0], cloud[n, m, 1], i, np.array([cloud[n, m, 2], results[n, m, 1]]))
+                        self.worldGrid.setWorldValue(cloud[n, m, 0], cloud[n, m, 1], i, np.array([cloud[n, m, 2], results[n, m, 1]]), results[n, m, 2:])
 
                 # save all disparity steps as image
                 imsave(self.parameter["resultpath"]+"_layer_%4.4i.png" % i, self.worldGrid.grid[:, :, i, 0])
-                imsave(self.parameter["resultpath"]+"_depth_%4.4i.png" % i, processor.results[:, :, 0])
-                imsave(self.parameter["resultpath"]+"_coherence_%4.4i.png" % i, processor.results[:, :, 1])
+                imsave(self.parameter["resultpath"]+"_depth_%4.4i.png" % i, self.processor.results[:, :, 0])
+                imsave(self.parameter["resultpath"]+"_coherence_%4.4i.png" % i, self.processor.results[:, :, 1])
 
                 print "done -->"
             else:
@@ -254,17 +259,17 @@ class DenseLightFieldEngine(object):
         self.worldGrid.save(self.parameter["resultpath"]+"_worldGrid")
 
         plyWriter = PlyWriter(self.parameter["resultpath"]+"_final", format="EN")
-        cloud = self.worldGrid.getResult()
-        cloud = transformCloud(cloud,
-                                       rotate_x=self.parameter["cam_rotation"][0],
-                                       rotate_y=self.parameter["cam_rotation"][1],
-                                       rotate_z=self.parameter["cam_rotation"][2],
-                                       translate=[0, 0, 0])
+        cloud, color = self.worldGrid.getResult()
+        # cloud = transformCloud(cloud,
+        #                                rotate_x=self.parameter["cam_rotation"][0],
+        #                                rotate_y=self.parameter["cam_rotation"][1],
+        #                                rotate_z=self.parameter["cam_rotation"][2],
+        #                                translate=[0, 0, 0])
 
         imsave(self.parameter["resultpath"]+"_finalDepth.png", cloud[:, :, 2])
         imsave(self.parameter["resultpath"]+"_finalCoherence.png", cloud[:, :, 3])
         plyWriter.cloud = cloud
-
+        plyWriter.color = color
         plyWriter.save()
 
 
