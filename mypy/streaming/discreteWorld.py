@@ -97,8 +97,8 @@ class discreteWorldSpace(object):
                     cloud[n, m, 2] = -1
 
         ### Todo: check why z and y dim is flipped
-        cloud[:, :, 2] *= -1
-        cloud[:, :, 1] *= -1
+        # cloud[:, :, 2] *= -1
+        # cloud[:, :, 1] *= -1
 
         return cloud
 
@@ -133,6 +133,5 @@ class discreteWorldSpace(object):
             filename += ".h5"
 
         f = h5.File(filename, "w")
-        dset = f.create_dataset("cloud")
-        dset = np.copy(self.grid)
+        dset = f.create_dataset("grid", data=np.copy(self.grid), dtype=np.float32)
         f.close()
