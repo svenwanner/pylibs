@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-def compute_MSE(depth, gt, upperBorderError, lowerBorderError):
+def compute_MSE(depth, gt):
     """
 
     :param depth: Computed depth map
@@ -35,7 +35,7 @@ def compute_MAE(depth, gt):
 
     return mae, mae_no
 
-def compute_MRE(depth, gt, upperBorderError, lowerBorderError):
+def compute_MRE(depth, gt):
     """
 
     :param depth: Computed depth map
@@ -92,7 +92,7 @@ def plot(figure_no, data, min, max, title, bartitle, save=False):
     if (max < np.max(data) ):
          d[10] = "> " + str(max)
     if (np.min(data) < min ):
-         d[0] = "< " + str(max)
+         d[0] = "< " + str(min)
 
     b = plt.colorbar(cax=cax)
     b.ax.set_yticklabels(d)
@@ -105,23 +105,39 @@ def plot(figure_no, data, min, max, title, bartitle, save=False):
 
 if __name__ == "__main__":
 
-    if 6 <= len(sys.argv) <= 7:
+    if 5 <= len(sys.argv) <= 7:
 
         #### Load depth estimation and ground truth data ###
 
         depth_img = vigra.readImage(sys.argv[1])
-        GT = vigra.readImage(sys.argv[2])
+        print(depth_img.shape)
+        name = sys.argv[2]
+        if name.endswith('exr'):
+            data = vigra.readImage(sys.argv[2])
+            print(data.shape)
+            GT = np.copy(data[:, :, 0])
+            minDepth = float(sys.argv[3])
+            maxDepth = float(sys.argv[4])
+            minError = float(sys.argv[5])
+            maxError = float(sys.argv[6])
+        else:
+            GT = np.copy(depth_img[:, :, 3])
+            minDepth = float(sys.argv[2])
+            maxDepth = float(sys.argv[3])
+            minError = float(sys.argv[4])
+            maxError = float(sys.argv[5])
+
 
         ### Exr files are 4dimensional extract layer with depth information ###
 
         depth = np.copy(depth_img[:, :, 2])
-        GT = np.copy(GT[:, :, 2])
 
         ### check if size of both arrays is the same, if not reduce the ground truth ###
 
-        if (GT.shape != depth_img.shape):
-            diff0 = abs(GT.shape[0]-depth_img.shape[0])/2
-            diff1 = abs(GT.shape[1]-depth_img.shape[1])/2
+        if (GT.shape != depth.shape):
+            print('enter')
+            diff0 = abs(GT.shape[0]-depth.shape[0])/2
+            diff1 = abs(GT.shape[1]-depth.shape[1])/2
             GT_img = GT[diff0:GT.shape[0]-diff0, diff1:GT.shape[1]-diff1]
         else:
             GT_img = GT
@@ -130,8 +146,8 @@ if __name__ == "__main__":
 
 
         mae, mae_no = compute_MAE(depth, GT_img)
-        mse, mse_no = compute_MSE(depth, GT_img, sys.argv[5], sys.argv[6])
-        [mre, mre_no, mre_pc] = compute_MRE(depth, GT_img, sys.argv[5], sys.argv[6])
+        mse, mse_no = compute_MSE(depth, GT_img)
+        [mre, mre_no, mre_pc] = compute_MRE(depth, GT_img)
 
         print('\033[91mMAE [m]: '+ str(mae_no))
         print('MSE [m]: '+ str(mse_no))
@@ -140,28 +156,27 @@ if __name__ == "__main__":
         print("\033[92m")
 
         #### Display MAE,MSE MRE ###
-        save = True
+        save = False
 
-        plot(3, mae,float(sys.argv[5]),float(sys.argv[6]), "Mean Absolute Error"+ str(mae_no), "MAE [px]",save)
-        plot(4, mse,float(sys.argv[5]),float(sys.argv[6]), "Mean Squared Error"+ str(mse_no), "MSE [px]",save)
-        plot(5, mre,float(sys.argv[5]),float(sys.argv[6]), "Mean Relative Error"+ str(mre_pc), "MRE [px]",save)
+        plot(3, mae, minError, maxError, "Mean Absolute Error: "+ "{0:.5f}".format(mae_no), "MAE [px]",save)
+        plot(4, mse, minError, maxError, "Mean Squared Error: "+ "{0:.5f}".format(mse_no), "MSE [px]",save)
+        plot(5, mre, minError, maxError, "Mean Relative Error: "+ "{0:.2f}".format(mre_pc) + "%", "MRE [px]",save)
 
         print("\033[0m")
-        plot(1, depth, float(sys.argv[3]),float(sys.argv[4]), "Depth Estimation", "Depth [m]",save)
-        plot(2, GT_img, float(sys.argv[3]),float(sys.argv[4]), "Ground Truth", "Depth [m]",save)
-
+        plot(1, depth, minDepth, maxDepth, "Depth Estimation", "Depth [m]", save)
+        plot(2, GT_img, minDepth, maxDepth, "Ground Truth", "Depth [m]", save)
 
         plt.show()
 
 
     else:
         print("\033[93m Computes the Mean Absolute Error, Mean Square Error and the Mean Relative Error of a given Depth map with the GT image \033[0m")
-        print("arg1: depthimage file")
-        print("arg2: GT file (optional if in different file safed)")
-        print("arg3: Upper Border Depth")
-        print("arg4: Lower Border Depth")
-        print("arg5: Upper Border Comparison")
-        print("arg6: Lower Border Comparison")
+        print("arg1: depth_image file")
+        print("arg2: GT file (optional)")
+        print("arg3: min Border Depth")
+        print("arg4: max Border Depth")
+        print("arg5: min Border Comparison")
+        print("arg6: max Border Comparison")
 
 
 

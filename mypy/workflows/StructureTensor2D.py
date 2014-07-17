@@ -255,6 +255,19 @@ def structureTensor2D(config):
     depth = dtc.disparity_to_depth(orientation, config.base_line, config.focal_length, config.min_depth, config.max_depth)
     mask = np.copy(coherence[lf_shape[0]/2, :, :])
 
+    regionFillMask = np.copy(mask)
+    lower = np.where(regionFillMask < config.coherence_threshold)
+    upper = np.where(regionFillMask > config.coherence_threshold)
+    regionFillMask[lower] = 0.0
+    regionFillMask[upper] = 1.0
+
+    plt.imsave(config.result_path+config.result_label+"Mask.png", regionFillMask, cmap=plt.cm.jet)
+
+    print("fill regions with no ")
+
+
+
+
     if isinstance(config.median, int) and config.median > 0:
         print "apply median filter ..."
         depth = median_filter(depth, config.median)
@@ -344,8 +357,8 @@ def structureTensor2D(config):
         vim.writeImage(config.result_path+config.result_label+"final.exr")
         #myshow.finalsViewer(config.result_path+config.result_label+"final.exr", save_at=config.result_path+config.result_label)
 
-        print "make pointcloud..."
-        if isinstance(color, np.ndarray):
-            dtc.save_pointcloud(config.result_path+config.result_label+"pointcloud.ply", depth_map=depth, color=color, confidence=coherence[lf_shape[0]/2, :, :], focal_length=config.focal_length, min_depth=config.min_depth, max_depth=config.max_depth)
-        else:
-            dtc.save_pointcloud(config.result_path+config.result_label+"pointcloud.ply", depth_map=depth, confidence=coherence[lf_shape[0]/2, :, :], focal_length=config.focal_length, min_depth=config.min_depth, max_depth=config.max_depth)
+        # print "make pointcloud..."
+        # if isinstance(color, np.ndarray):
+        #     dtc.save_pointcloud(config.result_path+config.result_label+"pointcloud.ply", depth_map=depth, color=color, confidence=coherence[lf_shape[0]/2, :, :], focal_length=config.focal_length, min_depth=config.min_depth, max_depth=config.max_depth)
+        # else:
+        #     dtc.save_pointcloud(config.result_path+config.result_label+"pointcloud.ply", depth_map=depth, confidence=coherence[lf_shape[0]/2, :, :], focal_length=config.focal_length, min_depth=config.min_depth, max_depth=config.max_depth)
