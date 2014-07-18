@@ -166,13 +166,13 @@ class StructureTensorScharr(StructureTensor):
 
         epi = vigra.filters.gaussianSmoothing(epi, sigma=params["inner_scale"])
 
-        # epi = vigra.filters.convolve(epi, scharrh)
+        epi = vigra.filters.convolve(epi, scharrh)
         d_2dim = vigra.filters.convolve(epi, scharrh)
         d_1dim = vigra.filters.convolve(epi, scharrv)
 
         grad = np.zeros((d_1dim.shape[0], d_1dim.shape[1], 2), dtype = np.float32)
-        grad[:, :, 0] = d_1dim[:,:]
-        grad[:, :, 1] = d_2dim[:,:]
+        grad[:, :, 0] = d_1dim[:, :]
+        grad[:, :, 1] = d_2dim[:, :]
 
         tensor = vigra.filters.vectorToTensor(grad)
 
@@ -308,9 +308,9 @@ def mergeOrientations_wta(orientation1, coherence1, orientation2, coherence2):
     coherence1[winner] = coherence2[winner]
 
     ### apply memory of coherence
-    winner = np.where(0.999 < coherence1)
-    coherence1[winner] =  coherence1[winner] * 1.01
-    winner = np.where(0.99995 < coherence1)
-    coherence1[winner] =  coherence1[winner] * 1.05
+    # winner = np.where(0.999 < coherence1)
+    # coherence1[winner] =  coherence1[winner] * 1.01
+    # winner = np.where(0.99995 < coherence1)
+    # coherence1[winner] =  coherence1[winner] * 1.05
 
     return orientation1, coherence1

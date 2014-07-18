@@ -140,7 +140,6 @@ def compute_vertical(lf3dv, shift, config):
     print "compute vertical shift {0}".format(shift), "...",
     lf3d = lfhelpers.refocus_3d(lf3dv, shift, 'v')
 
-
     if config.prefilter > 0:
         if config.prefilter == PREFILTER.EPID:
             lf3d = prefilter.preEpiDerivation(lf3d, scale=config.prefilter_scale, direction='v')

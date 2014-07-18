@@ -357,8 +357,8 @@ def structureTensor2D(config):
         vim.writeImage(config.result_path+config.result_label+"final.exr")
         #myshow.finalsViewer(config.result_path+config.result_label+"final.exr", save_at=config.result_path+config.result_label)
 
-        # print "make pointcloud..."
-        # if isinstance(color, np.ndarray):
-        #     dtc.save_pointcloud(config.result_path+config.result_label+"pointcloud.ply", depth_map=depth, color=color, confidence=coherence[lf_shape[0]/2, :, :], focal_length=config.focal_length, min_depth=config.min_depth, max_depth=config.max_depth)
-        # else:
-        #     dtc.save_pointcloud(config.result_path+config.result_label+"pointcloud.ply", depth_map=depth, confidence=coherence[lf_shape[0]/2, :, :], focal_length=config.focal_length, min_depth=config.min_depth, max_depth=config.max_depth)
+        print "make pointcloud..."
+        if isinstance(color, np.ndarray):
+            dtc.save_pointcloud(config.result_path+config.result_label+"pointcloud.ply", depth_map=depth, color=color, confidence=coherence[lf_shape[0]/2, :, :], focal_length=config.focal_length, min_depth=config.min_depth, max_depth=config.max_depth)
+        else:
+            dtc.save_pointcloud(config.result_path+config.result_label+"pointcloud.ply", depth_map=depth, confidence=coherence[lf_shape[0]/2, :, :], focal_length=config.focal_length, min_depth=config.min_depth, max_depth=config.max_depth)

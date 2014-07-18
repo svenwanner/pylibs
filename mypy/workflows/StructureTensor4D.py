@@ -18,7 +18,38 @@ from mypy.lightfield import helpers as lfhelpers
 #============================================================================================================
 #=========                                       LF processing                                   ===========
 #============================================================================================================
+def preImgScharr(lf3d, config=None, direction='h'):
 
+    assert isinstance(lf3d, np.ndarray)
+
+    print("apply image scharr prefilter")
+    if direction == 'h':
+        Kernel = np.array([[-3, 0, 3], [-10, 0, 10], [-3, 0, 3]]) / 32.0
+        scharr = vigra.filters.Kernel2D()
+        scharr.initExplicitly((-1, -1), (1, 1), Kernel)
+        for t in xrange(lf3d.shape[0]):
+            for c in xrange(lf3d.shape[3]):
+                lf3d[t, :, :, c] = vigra.filters.gaussianSmoothing(lf3d[t, :, :, c], 0.4)
+                lf3d[t, :, :, c] = vigra.filters.convolve(lf3d[t, :, :, c], scharr)
+                lf3d[t, :, :, c] = lf3d[t, :, :, c]**2
+            if config.output_level >3:
+                    plt.imsave(config.result_path+config.result_label+"Horizontal_Scharr_Image_{0}.png".format(t), np.abs(lf3d[t, :, :, :]))
+
+    elif direction == 'v':
+        Kernel = np.array([[-3, -10, -3], [0, 0, 0], [3, 10, 3]]) / 32.0
+        scharr = vigra.filters.Kernel2D()
+        scharr.initExplicitly((-1, -1), (1, 1), Kernel)
+        for t in xrange(lf3d.shape[0]):
+            for c in xrange(lf3d.shape[3]):
+                lf3d[t, :, :, c] = vigra.filters.gaussianSmoothing(lf3d[t, :, :, c], 0.4)
+                lf3d[t, :, :, c] = vigra.filters.convolve(lf3d[t, :, :, c], scharr)
+                lf3d[t, :, :, c] = lf3d[t, :, :, c]**2
+            if config.output_level >3:
+                    plt.imsave(config.result_path+config.result_label+"Vertical_Scharr_Image_{0}.png".format(t), np.abs(lf3d[t, :, :, :]))
+    else:
+        assert False, "unknown lightfield direction!"
+
+    return lf3d
 
 def Compute(lf3d, shift, config, direction):
 
@@ -36,67 +67,58 @@ def mergeOrientations_wta(orientation1, coherence1, orientation2, coherence2):
 
     return orientation1, coherence1
 
+def evaluateStructureTensor(tensor):
+
+    assert isinstance(tensor, np.ndarray)
+
+    ### compute coherence value ###
+    up = np.sqrt((tensor[:, :, 2]-tensor[:, :, 0])**2 + 4*tensor[:, :, 1]**2)
+    down = (tensor[:, :, 2]+tensor[:, :, 0] + 1e-25)
+    coherence = up / down
+
+    ### compute disparity value ###
+    orientation = vigra.numpy.arctan2(2*tensor[:, :, 1], tensor[:, :, 2]-tensor[:, :, 0]) / 2.0
+    orientation = vigra.numpy.tan(orientation[:])
+
+    ### mark out of boundary orientation estimation ###
+    invalid_ubounds = np.where(orientation > 1.1)
+    invalid_lbounds = np.where(orientation < -1.1)
+
+    ### set coherence of invalid values to zero ###
+    coherence[invalid_ubounds] = 0
+    coherence[invalid_lbounds] = 0
+
+
+    ### set orientation of invalid values to related maximum/minimum value
+    orientation[invalid_ubounds] = 1.1
+    orientation[invalid_lbounds] = -1.1
+
+    return orientation, coherence
+
 def orientationClassic(strTensorh, strTensorv, config, shift):
 
-        ### compute coherence value ###
-        up = np.sqrt((strTensorh[strTensorh.shape[0]/2, :, :, 2]-strTensorh[strTensorh.shape[0]/2, :, :, 0])**2 + 4*strTensorh[strTensorh.shape[0]/2, :, :, 1]**2)
-        down = (strTensorh[strTensorh.shape[0]/2, :, :, 2]+strTensorh[strTensorh.shape[0]/2, :, :, 0] + 1e-25)
-        coherenceH = up / down
+        orientationH, coherenceH = evaluateStructureTensor(strTensorh[strTensorh.shape[0]/2,:,:])
 
-        ### compute disparity value ###
-        orientationH = vigra.numpy.arctan2(2*strTensorh[strTensorh.shape[0]/2, :, :, 1], strTensorh[strTensorh.shape[0]/2, :, :, 2]-strTensorh[strTensorh.shape[0]/2, :, :, 0]) / 2.0
-        orientationH = vigra.numpy.tan(orientationH[:])
-
-        ### mark out of boundary orientation estimation ###
-        invalid_ubounds = np.where(orientationH > 1.1)
-        invalid_lbounds = np.where(orientationH < -1.1)
-
-        ### set coherence of invalid values to zero ###
-        coherenceH[invalid_ubounds] = 0
-        coherenceH[invalid_lbounds] = 0
-
-        ### set orientation of invalid values to related maximum/minimum value
-        orientationH[invalid_ubounds] = 1.1
-        orientationH[invalid_lbounds] = -1.1
-
-        if config.output_level >= 2:
+        if config.output_level >= 4:
             plt.imsave(config.result_path+config.result_label+"orientation_Horizontal_{0}.png".format(shift), orientationH, cmap=plt.cm.jet)
             plt.imsave(config.result_path+config.result_label+"coherence_Horizontal_{0}.png".format(shift), coherenceH, cmap=plt.cm.jet)
 
+        orientationV, coherenceV = evaluateStructureTensor(strTensorv[strTensorv.shape[0]/2,:,:])
 
-        ### compute coherence value ###
-        up = np.sqrt((strTensorv[strTensorh.shape[0]/2, :, :, 2]-strTensorv[strTensorh.shape[0]/2, :, :, 0])**2 + 4*strTensorv[strTensorh.shape[0]/2, :, :, 1]**2)
-        down = (strTensorv[strTensorh.shape[0]/2, :, :, 2]+strTensorv[strTensorh.shape[0]/2, :, :, 0] + 1e-25)
-        coherenceV = up / down
-
-        ### compute disparity value ###
-        orientationV = vigra.numpy.arctan2(2*strTensorv[strTensorh.shape[0]/2, :, :, 1], strTensorv[strTensorh.shape[0]/2, :, :, 2]-strTensorv[strTensorh.shape[0]/2, :, :, 0]) / 2.0
-        orientationV = vigra.numpy.tan(orientationV[:])
-
-        ### mark out of boundary orientation estimation ###
-        invalid_ubounds = np.where(orientationV > 1.1)
-        invalid_lbounds = np.where(orientationV < -1.1)
-
-        ### set coherence of invalid values to zero ###
-        coherenceV[invalid_ubounds] = 0
-        coherenceV[invalid_lbounds] = 0
-
-        ### set orientation of invalid values to related maximum/minimum value
-        orientationV[invalid_ubounds] = 1.1
-        orientationV[invalid_lbounds] = -1.1
-
-        if config.output_level >= 2:
+        if config.output_level >= 4:
             plt.imsave(config.result_path+config.result_label+"orientation_Vertical_{0}.png".format(shift), orientationV, cmap=plt.cm.jet)
             plt.imsave(config.result_path+config.result_label+"coherence_Vertical_{0}.png".format(shift), coherenceV, cmap=plt.cm.jet)
 
+        orientation, coherence = mergeOrientations_wta(orientationH, coherenceH, orientationV, coherenceV)
+        orientation[:] += float(shift)
 
-        orientation, coherence = mergeOrientations_wta(orientationH,coherenceH,orientationV,coherenceV)
+        print(orientation.shape)
 
-        # orientation =  (orientationH[:] * coherenceH[:] + orientationV[:] * coherenceV[:]) / (coherenceH[:] *coherenceV[:] + 1e-16)
+        if config.output_level >= 3:
+            plt.imsave(config.result_path+config.result_label+"orientation_merged_local_{0}.png".format(shift), orientation, cmap=plt.cm.jet)
+            plt.imsave(config.result_path+config.result_label+"coherence_merged_local_{0}.png".format(shift), coherence, cmap=plt.cm.jet)
 
-        if config.output_level >= 2:
-            plt.imsave(config.result_path+config.result_label+"orientation_merged_{0}.png".format(shift), orientation, cmap=plt.cm.jet)
-            plt.imsave(config.result_path+config.result_label+"coherence_merged_{0}.png".format(shift), coherence, cmap=plt.cm.jet)
+        return orientation, coherence
 
 #============================================================================================================
 #=========                              Horizontal LF computation                                ===========
@@ -109,25 +131,10 @@ def compute_horizontal(lf3dh, shift, config):
     lf3d = lfhelpers.refocus_3d(lf3d, shift, 'h')
     print("shape of horizontal light field: " + str(lf3d.shape))
 
-    # if config.output_level == 4:
-    #     print("Save shifted images")
-    #     for i in range(lf3d.shape[0]):
-    #         misc.imsave(config.result_path+config.result_label+"horizontal_Input_shifted_{0}.png".format(i), lf3d[i ,: ,: ,:])
-
     if config.color_space:
         lf3d = prefilter.changeColorSpace(lf3d, config.color_space)
 
-    # print("Prefilter status: " + str(config.prefilter))
-    # if config.prefilter > 0:
-    #     print("Prefilter status: " + str(config.prefilter))
-    #     if config.prefilter == prefilter.PREFILTER.IMGD:
-    #        lf3d = prefilter.preImgDerivation(lf3d, scale=config.prefilter_scale, direction='h')
-    #     if config.prefilter == prefilter.PREFILTER.EPID:
-    #        lf3d = prefilter.preEpiDerivation(lf3d, scale=config.prefilter_scale, direction='h')
-    #     if config.prefilter == prefilter.PREFILTER.IMGD2:
-    #         lf3d = prefilter.preImgLaplace(lf3d, scale=config.prefilter_scale)
-    #     if config.prefilter == prefilter.PREFILTER.EPID2:
-    #         lf3d = prefilter.preEpiLaplace(lf3d, scale=config.prefilter_scale, direction='h')
+    # lf3d = prefilter.preImgScharr(lf3d, config=config, direction='h')
 
     gaussianInner = vigra.filters.gaussianKernel(config.inner_scale)
     gaussianOuter = vigra.filters.gaussianKernel(config.outer_scale)
@@ -140,53 +147,61 @@ def compute_horizontal(lf3dh, shift, config):
     scharr2dim = vigra.filters.Kernel1D()
     scharr2dim.initExplicitly(-1, 1, K)
 
-    print("apply gaussian filter along 3rd dimension")
-    lf3d = vigra.filters.convolveOneDimension(lf3d, 2, gaussianInner)
-    print("apply gaussian filter along 1rd dimension")
-    lf3d = vigra.filters.convolveOneDimension(lf3d, 0, gaussianInner)
-
     grad = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], lf3d.shape[3], 2), dtype=np.float32)
-    print("apply scharr filter along 3rd dimension")
-    grad[:, :, :, :, 0] = vigra.filters.convolveOneDimension(lf3d,0,scharr1dim)
-    grad[:, :, :, :, 0] = vigra.filters.convolveOneDimension(grad[:, :, :, :, 0], 2, scharr2dim)
-
-    print("apply scharr filter along 1rd dimension")
-    grad[:, :, :, :, 1] = vigra.filters.convolveOneDimension(lf3d,2,scharr1dim)
-    grad[:, :, :, :, 1] = vigra.filters.convolveOneDimension(grad[:, :, :, :, 1], 0, scharr2dim)
-
+    tensor = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], lf3d.shape[3], 3), dtype=np.float32)
     gradient = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], 2), dtype=np.float32)
-    for c in range(3):
-        gradient[:, :, :, 0] +=  grad[:, :, :, c, 0]
-        gradient[:, :, :, 1] +=  grad[:, :, :, c, 1]
+    ten = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], 3), dtype=np.float32)
 
-    # gradient[:, :, :, 0] = vigra.filters.convolveOneDimension(gradient[:, :, :, 0], 2, gaussianOuter)
-    # gradient[:, :, :, 1] = vigra.filters.convolveOneDimension(gradient[:, :, :, 1], 2, gaussianOuter)
-    # gradient[:, :, :, 0] = vigra.filters.convolveOneDimension(gradient[:, :, :, 0], 0, gaussianOuter)
-    # gradient[:, :, :, 1] = vigra.filters.convolveOneDimension(gradient[:, :, :, 1], 0, gaussianOuter)
+    for i in range(lf3d.shape[3]):
 
-    tensor = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], 3), dtype=np.float32)
-    tensor[:, :, :, 0] = gradient[:, :, :, 0]**2
-    tensor[:, :, :, 1] = gradient[:, :, :, 1]*gradient[:, :, :, 0]
-    tensor[:, :, :, 2] = gradient[:, :, :, 1]**2
+        ### Inner gaussian filter ###
+        print("apply gaussian filter along 3rd dimension")
+        lf3d[:, :, :, i] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 2, gaussianInner)
+        print("apply gaussian filter along 1rd dimension")
+        lf3d[:, :, :, i] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 0, gaussianInner)
+        # print("apply gaussian filter along 2rd dimension")
+        # lf3d = vigra.filters.convolveOneDimension(lf3d, 1, gaussianInner)
 
-    print("apply gaussian filter along 3rd dimension")
-    tensor = vigra.filters.convolveOneDimension(tensor, 2, gaussianOuter)
-    print("apply gaussian filter along 1rd dimension")
-    tensor = vigra.filters.convolveOneDimension(tensor, 0, gaussianOuter)
+        ### EPI prefilter ###
+        print("apply scharr pre-filter along 3rd dimension")
+        lf3d[:, :, :, i] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 2, scharr1dim)
+        lf3d[:, :, :, i] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 0, scharr2dim)
 
+        ### Derivative computation ###
+        print("apply scharr filter along 1st dimension")
+        grad[:, :, :, i, 0] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 0, scharr1dim)
+        grad[:, :, :, i, 0] = vigra.filters.convolveOneDimension(grad[:, :, :, i, 0], 2, scharr2dim)
+        print("apply scharr filter along 3rd dimension")
+        grad[:, :, :, i, 1] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 2, scharr1dim)
+        grad[:, :, :, i, 1] = vigra.filters.convolveOneDimension(grad[:, :, :, i, 1], 0, scharr2dim)
 
-    # if config.output_level == 4:
-    #     print("Save gradient EPI images")
-    #     for i in range(lf3d.shape[0]):
-    #         misc.imsave(config.result_path+config.result_label+"DerivativeEPI_Images{0}.png".format(i), grad2dim[i ,: ,: ,:])
-    #     print("Save gradient Images images")
-    #     for i in range(lf3d.shape[0]):
-    #         misc.imsave(config.result_path+config.result_label+"DerivativeImage_Images{0}.png".format(i), grad1dim[i ,: ,: ,:])
-    #     print("Save filtered Images images")
-    #     for i in range(lf3d.shape[0]):
-    #         misc.imsave(config.result_path+config.result_label+"Filtered_Images{0}.png".format(i), lf3d[i ,: ,: ,:])
+        tensor[:, :, :, i, 0] = grad[:, :, :, i, 0]**2
+        tensor[:, :, :, i, 1] = grad[:, :, :, i, 1]*grad[:, :, :, i, 0]
+        tensor[:, :, :, i, 2] = grad[:, :, :, i, 1]**2
 
-    return tensor, gradient
+        print("apply gaussian filter along 3rd dimension")
+        tensor[:, :, :, i, 0] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 0], 2, gaussianOuter)
+        tensor[:, :, :, i, 1] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 1], 2, gaussianOuter)
+        tensor[:, :, :, i, 2] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 2], 2, gaussianOuter)
+
+        print("apply gaussian filter along 1rd dimension")
+        tensor[:, :, :, i, 0] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 0], 0, gaussianOuter)
+        tensor[:, :, :, i, 1] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 1], 0, gaussianOuter)
+        tensor[:, :, :, i, 2] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 2], 0, gaussianOuter)
+
+        gradient[:, :, :, 0] += grad[:, :, :, i, 0]
+        gradient[:, :, :, 1] += grad[:, :, :, i, 1]
+        ten[:, :, :, 0] += tensor[:, :, :, i, 0]
+        ten[:, :, :, 1] += tensor[:, :, :, i, 1]
+        ten[:, :, :, 2] += tensor[:, :, :, i, 2]
+
+    gradient[:, :, :, 0] /= 3
+    gradient[:, :, :, 1] /= 3
+    ten[:, :, :, 0] /= 3
+    ten[:, :, :, 1] /= 3
+    ten[:, :, :, 2] /= 3
+
+    return ten, gradient
 
 
 #============================================================================================================
@@ -207,19 +222,7 @@ def compute_vertical(lf3dv, shift, config):
     if config.color_space:
         lf3d = prefilter.changeColorSpace(lf3d, config.color_space)
 
-    # if config.output_level == 4:
-    #    for i in range(lf3d.shape[0]):
-    #         misc.imsave(config.result_path+config.result_label+"vertical_Input_shifted_color_space_changed_{0}.png".format(i), lf3d[i ,: ,: ,:])
-
-    # if config.prefilter > 0:
-    #    if config.prefilter == prefilter.PREFILTER.IMGD:
-    #        lf3d = prefilter.preImgDerivation(lf3d, scale=config.prefilter_scale, direction='v')
-    #    if config.prefilter == prefilter.PREFILTER.EPID:
-    #        lf3d = prefilter.preEpiDerivation(lf3d, scale=config.prefilter_scale, direction='v')
-    #    if config.prefilter == prefilter.PREFILTER.IMGD2:
-    #         lf3d = prefilter.preImgLaplace(lf3d, scale=config.prefilter_scale)
-    #    if config.prefilter == prefilter.PREFILTER.EPID2:
-    #         lf3d = prefilter.preEpiLaplace(lf3d, scale=config.prefilter_scale, direction='v')
+    # lf3d = prefilter.preImgScharr(lf3d, config=config, direction='v')
 
     gaussianInner = vigra.filters.gaussianKernel(config.inner_scale)
     gaussianOuter = vigra.filters.gaussianKernel(config.outer_scale)
@@ -232,44 +235,63 @@ def compute_vertical(lf3dv, shift, config):
     scharr2dim = vigra.filters.Kernel1D()
     scharr2dim.initExplicitly(-1, 1, K)
 
-    print("apply gaussian filter along 2rd dimension")
-    lf3d = vigra.filters.convolveOneDimension(lf3d, 1, gaussianInner)
-    print("apply gaussian filter along 1rd dimension")
-    lf3d = vigra.filters.convolveOneDimension(lf3d, 0, gaussianInner)
-
     grad = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], lf3d.shape[3], 2), dtype=np.float32)
-    print("apply scharr filter along 2rd dimension")
-    grad[:, :, :, :, 0] = vigra.filters.convolveOneDimension(lf3d, 0, scharr1dim)
-    grad[:, :, :, :, 0] = vigra.filters.convolveOneDimension(grad[:, :, :, :, 0], 1, scharr2dim)
-
-    print("apply scharr filter along 1rd dimension")
-    grad[:, :, :, :, 1] = vigra.filters.convolveOneDimension(lf3d, 1, scharr1dim)
-    grad[:, :, :, :, 1] = vigra.filters.convolveOneDimension(grad[:, :, :, :, 1], 0, scharr2dim)
-
+    tensor = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], lf3d.shape[3], 3), dtype=np.float32)
     gradient = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], 2), dtype=np.float32)
-    for c in range(3):
-        gradient[:, :, :, 0] +=  grad[:, :, :, c, 0]
-        gradient[:, :, :, 1] +=  grad[:, :, :, c, 1]
+    ten = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], 3), dtype=np.float32)
 
-    # gradient[:, :, :, 0] = vigra.filters.convolveOneDimension(gradient[:, :, :, 0], 1, gaussianOuter)
-    # gradient[:, :, :, 1] = vigra.filters.convolveOneDimension(gradient[:, :, :, 1], 1, gaussianOuter)
-    # gradient[:, :, :, 0] = vigra.filters.convolveOneDimension(gradient[:, :, :, 0], 0, gaussianOuter)
-    # gradient[:, :, :, 1] = vigra.filters.convolveOneDimension(gradient[:, :, :, 1], 0, gaussianOuter)
+    for i in range(lf3d.shape[3]):
 
-    tensor = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], 3), dtype=np.float32)
-    tensor[:, :, :, 0] = gradient[:, :, :, 0]**2
-    tensor[:, :, :, 1] = gradient[:, :, :, 1]*gradient[:, :, :, 0]
-    tensor[:, :, :, 2] = gradient[:, :, :, 1]**2
+        ### Inner gaussian filter ###
+        print("apply gaussian filter along 3rd dimension")
+        lf3d[:, :, :, i] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 1, gaussianInner)
+        print("apply gaussian filter along 1rd dimension")
+        lf3d[:, :, :, i] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 0, gaussianInner)
+        # print("apply gaussian filter along 2rd dimension")
+        # lf3d = vigra.filters.convolveOneDimension(lf3d, 1, gaussianInner)
 
-    print("apply gaussian filter along 2rd dimension")
-    tensor = vigra.filters.convolveOneDimension(tensor, 1, gaussianOuter)
-    print("apply gaussian filter along 1rd dimension")
-    tensor = vigra.filters.convolveOneDimension(tensor, 0, gaussianOuter)
+        ### EPI prefilter ###
+        print("apply scharr pre-filter along 3rd dimension")
+        lf3d[:, :, :, i] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 1, scharr1dim)
+        lf3d[:, :, :, i] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 0, scharr2dim)
+
+        ### Derivative computation ###
+        print("apply scharr filter along 1st dimension")
+        grad[:, :, :, i, 0] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 0, scharr1dim)
+        grad[:, :, :, i, 0] = vigra.filters.convolveOneDimension(grad[:, :, :, i, 0], 1, scharr2dim)
+        print("apply scharr filter along 3rd dimension")
+        grad[:, :, :, i, 1] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 1, scharr1dim)
+        grad[:, :, :, i, 1] = vigra.filters.convolveOneDimension(grad[:, :, :, i, 1], 0, scharr2dim)
+
+        tensor[:, :, :, i, 0] = grad[:, :, :, i, 0]**2
+        tensor[:, :, :, i, 1] = grad[:, :, :, i, 1]*grad[:, :, :, i, 0]
+        tensor[:, :, :, i, 2] = grad[:, :, :, i, 1]**2
+
+        print("apply gaussian filter along 3rd dimension")
+        tensor[:, :, :, i, 0] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 0], 1, gaussianOuter)
+        tensor[:, :, :, i, 1] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 1], 1, gaussianOuter)
+        tensor[:, :, :, i, 2] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 2], 1, gaussianOuter)
+
+        print("apply gaussian filter along 1rd dimension")
+        tensor[:, :, :, i, 0] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 0], 0, gaussianOuter)
+        tensor[:, :, :, i, 1] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 1], 0, gaussianOuter)
+        tensor[:, :, :, i, 2] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 2], 0, gaussianOuter)
+
+        gradient[:, :, :, 0] += grad[:, :, :, i, 0]
+        gradient[:, :, :, 1] += grad[:, :, :, i, 1]
+        ten[:, :, :, 0] += tensor[:, :, :, i, 0]
+        ten[:, :, :, 1] += tensor[:, :, :, i, 1]
+        ten[:, :, :, 2] += tensor[:, :, :, i, 2]
+
+    gradient[:, :, :, 0] /= 3
+    gradient[:, :, :, 1] /= 3
+    ten[:, :, :, 0] /= 3
+    ten[:, :, :, 1] /= 3
+    ten[:, :, :, 2] /= 3
 
 
 
-
-    return tensor, gradient
+    return ten, gradient
 
 
 
@@ -281,7 +303,6 @@ def compute_vertical(lf3dv, shift, config):
 
 
 def structureTensor4D(config):
-
 
     if not config.result_path.endswith("/"):
         config.result_path += "/"
@@ -341,86 +362,88 @@ def structureTensor4D(config):
             print("compute vertical LightField")
             strTensorv , gradv = Compute(lf3dv, shift, config, direction='v')
 
-        orientationClassic(strTensorh, strTensorv, config,shift)
+        print(strTensorh.shape)
+        print(strTensorh.shape)
+
+        orientationL, coherenceL = orientationClassic(strTensorh, strTensorv, config,shift)
+        orientation, coherence = mergeOrientations_wta(orientation, coherence, orientationL, coherenceL)
+
 
         # print(gradh.shape)
         # print(gradv.shape)
 
-        print("4D structure tensor")
-
-        Ix_plus_Iy_square = (gradh[gradh.shape[0]/2, :, :, 0] + gradv[gradh.shape[0]/2, :, :, 0])**2
-        Iu_plus_Iv_square = (gradh[gradh.shape[0]/2, :, :, 1] + gradv[gradh.shape[0]/2, :, :, 1])**2
-        Ix_plus_Iy_mul_Iu_plus_Iv = (gradh[gradh.shape[0]/2, :, :, 0] + gradv[gradh.shape[0]/2, :, :, 0])*(gradh[gradh.shape[0]/2, :, :, 1] + gradv[gradh.shape[0]/2, :, :, 1])
-
-        Ix_plus_Iy_square = vigra.filters.gaussianSmoothing(Ix_plus_Iy_square, config.outer_scale)
-        Iu_plus_Iv_square = vigra.filters.gaussianSmoothing(Iu_plus_Iv_square, config.outer_scale)
-        Ix_plus_Iy_mul_Iu_plus_Iv = vigra.filters.gaussianSmoothing(Ix_plus_Iy_mul_Iu_plus_Iv, config.outer_scale)
-
-
-        ### compute coherence value ###
-        up = np.sqrt((Iu_plus_Iv_square[ :, :]-Ix_plus_Iy_square[ :, :])**2 + 4*Ix_plus_Iy_mul_Iu_plus_Iv[ :, :]**2)
-        down = (Iu_plus_Iv_square[ :, :]+Ix_plus_Iy_square[ :, :] + 1e-25)
-        coherence = up / down
-
-        ### compute disparity value ###
-        orientation = vigra.numpy.arctan2(2*Ix_plus_Iy_mul_Iu_plus_Iv[ :, :], Iu_plus_Iv_square[ :, :]-Ix_plus_Iy_square[ :, :]) / 2.0
-        orientation = vigra.numpy.tan(orientation[:])
-
-        ### mark out of boundary orientation estimation ###
-        invalid_ubounds = np.where(orientation > 1.1)
-        invalid_lbounds = np.where(orientation < -1.1)
-
-        ### set coherence of invalid values to zero ###
-        coherence[invalid_ubounds] = 0
-        coherence[invalid_lbounds] = 0
-
-        ### set orientation of invalid values to related maximum/minimum value
-        orientation[invalid_ubounds] = 1.1
-        orientation[invalid_lbounds] = -1.1
-
-        if config.output_level >= 2:
-            plt.imsave(config.result_path+config.result_label+"orientation_4D_{0}.png".format(shift), orientation, cmap=plt.cm.jet)
-            plt.imsave(config.result_path+config.result_label+"coherence_4D_{0}.png".format(shift), coherence, cmap=plt.cm.jet)
-
-
+        # print("4D structure tensor")
+        #
+        # Ix_plus_Iy_square = (gradh[gradh.shape[0]/2, :, :, 0] + gradv[gradh.shape[0]/2, :, :, 0])**2
+        # Iu_plus_Iv_square = (gradh[gradh.shape[0]/2, :, :, 1] + gradv[gradh.shape[0]/2, :, :, 1])**2
+        # Ix_plus_Iy_mul_Iu_plus_Iv = (gradh[gradh.shape[0]/2, :, :, 0] + gradv[gradh.shape[0]/2, :, :, 0])*(gradh[gradh.shape[0]/2, :, :, 1] + gradv[gradh.shape[0]/2, :, :, 1])
+        #
+        # Ix_plus_Iy_square = vigra.filters.gaussianSmoothing(Ix_plus_Iy_square, config.outer_scale)
+        # Iu_plus_Iv_square = vigra.filters.gaussianSmoothing(Iu_plus_Iv_square, config.outer_scale)
+        # Ix_plus_Iy_mul_Iu_plus_Iv = vigra.filters.gaussianSmoothing(Ix_plus_Iy_mul_Iu_plus_Iv, config.outer_scale)
+        #
+        #
+        # ### compute coherence value ###
+        # up = np.sqrt((Iu_plus_Iv_square[ :, :]-Ix_plus_Iy_square[ :, :])**2 + 4*Ix_plus_Iy_mul_Iu_plus_Iv[ :, :]**2)
+        # down = (Iu_plus_Iv_square[ :, :]+Ix_plus_Iy_square[ :, :] + 1e-25)
+        # coherence = up / down
+        #
+        # ### compute disparity value ###
+        # orientation = vigra.numpy.arctan2(2*Ix_plus_Iy_mul_Iu_plus_Iv[ :, :], Iu_plus_Iv_square[ :, :]-Ix_plus_Iy_square[ :, :]) / 2.0
+        # orientation = vigra.numpy.tan(orientation[:])
+        #
+        # ### mark out of boundary orientation estimation ###
+        # invalid_ubounds = np.where(orientation > 1.1)
+        # invalid_lbounds = np.where(orientation < -1.1)
+        #
+        # ### set coherence of invalid values to zero ###
+        # coherence[invalid_ubounds] = 0
+        # coherence[invalid_lbounds] = 0
+        #
+        # ### set orientation of invalid values to related maximum/minimum value
+        # orientation[invalid_ubounds] = 1.1
+        # orientation[invalid_lbounds] = -1.1
+        #
+        # if config.output_level >= 2:
+        #     plt.imsave(config.result_path+config.result_label+"orientation_4D_{0}.png".format(shift), orientation, cmap=plt.cm.jet)
+        #     plt.imsave(config.result_path+config.result_label+"coherence_4D_{0}.png".format(shift), coherence, cmap=plt.cm.jet)
 
 
 
-# #
-#     if config.output_level >= 2:
-#         plt.imsave(config.result_path+config.result_label+"orientation_final.png", orientation[lf_shape[0]/2, :, :], cmap=plt.cm.gray)
-#         plt.imsave(config.result_path+config.result_label+"coherence_final.png", coherence[lf_shape[0]/2, :, :], cmap=plt.cm.gray)
+    if config.output_level >= 2:
+        plt.imsave(config.result_path+config.result_label+"orientation_final.png", orientation[:, :], cmap=plt.cm.jet)
+        plt.imsave(config.result_path+config.result_label+"coherence_final.png", coherence[:, :], cmap=plt.cm.jet)
 
-#     logging.info("Computed final disparity map!")
-#
-# ## Light field computation has to be changed just to compute the core of the disparity and just transfer it here to the disparity map
-#
-#     depth = dtc.disparity_to_depth(orientation[lf_shape[0]/2, :, :], config.base_line, config.focal_length, config.min_depth, config.max_depth)
-#     mask = coherence[lf_shape[0]/2, :, :]
-#
-#     invalids = np.where(mask == 0)
-#     depth[invalids] = 0
-#
-#     if config.output_level >= 1:
-#         plt.imsave(config.result_path+config.result_label+"depth_final.png", depth, cmap=plt.cm.jet)
-#
-#     if config.output_level >= 1:
-#         if isinstance(config.centerview_path, str):
-#             color = misc.imread(config.centerview_path)
-#             if isinstance(config.roi, type({})):
-#                 sposx = config.roi["pos"][0]
-#                 eposx = config.roi["pos"][0] + config.roi["size"][0]
-#                 sposy = config.roi["pos"][1]
-#                 eposy = config.roi["pos"][1] + config.roi["size"][1]
-#                 color = color[sposx:eposx, sposy:eposy, 0:3]
-#
-#         print "make pointcloud...",
-#         if isinstance(color, np.ndarray):
-#             dtc.save_pointcloud(config.result_path+config.result_label+"pointcloud.ply", depth_map=depth, color=color, focal_length=config.focal_length)
-#         else:
-#             dtc.save_pointcloud(config.result_path+config.result_label+"pointcloud.ply", depth_map=depth, focal_length=config.focal_length)
-#
-#         print "ok"
+    logging.info("Computed final disparity map!")
+
+## Light field computation has to be changed just to compute the core of the disparity and just transfer it here to the disparity map
+
+    depth = dtc.disparity_to_depth(orientation[:, :], config.base_line, config.focal_length, config.min_depth, config.max_depth)
+    mask = coherence[:, :]
+
+    invalids = np.where(mask == 0)
+    depth[invalids] = 0
+
+    if config.output_level >= 1:
+        plt.imsave(config.result_path+config.result_label+"depth_final.png", depth, cmap=plt.cm.jet)
+
+    if config.output_level >= 1:
+        if isinstance(config.centerview_path, str):
+            color = misc.imread(config.centerview_path)
+            if isinstance(config.roi, type({})):
+                sposx = config.roi["pos"][0]
+                eposx = config.roi["pos"][0] + config.roi["size"][0]
+                sposy = config.roi["pos"][1]
+                eposy = config.roi["pos"][1] + config.roi["size"][1]
+                color = color[sposx:eposx, sposy:eposy, 0:3]
+
+        print "make pointcloud...",
+        if isinstance(color, np.ndarray):
+            dtc.save_pointcloud(config.result_path+config.result_label+"pointcloud.ply", depth_map=depth, color=color, focal_length=config.focal_length)
+        else:
+            dtc.save_pointcloud(config.result_path+config.result_label+"pointcloud.ply", depth_map=depth, focal_length=config.focal_length)
+
+        print "ok"
 
 
 
