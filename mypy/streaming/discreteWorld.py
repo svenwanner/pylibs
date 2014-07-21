@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.stats.mstats import mquantiles
 
 try:
     import h5py as h5
@@ -49,6 +50,8 @@ class discreteWorldSpace(object):
             return self.getResultMean()
         if rtype == "median":
             return self.getResultMedian()
+        if rtype == "median_3x3":
+            return self.getResultsRegionMedian()
 
 
     def getResultMean(self):
@@ -75,16 +78,13 @@ class discreteWorldSpace(object):
                     cloud[n, m, 3] = 0
                     cloud[n, m, 2] = -1
 
-        ### Todo: check why z and y dim is flipped
-        # cloud[:, :, 2] *= -1
-        # cloud[:, :, 1] *= -1
-
-        return cloud, color
+        return cloud, color, None
 
 
     def getResultMedian(self):
         cloud = np.zeros((self.N+1, self.M+1, 4))
         color = np.zeros((self.N+1, self.M+1, 3))
+        doubleDepthProp  = np.zeros((self.N+1, self.M+1))
 
         for n in range(self.N+1):
             for m in range(self.M+1):
@@ -95,20 +95,53 @@ class discreteWorldSpace(object):
                     wpos = self.grid2world(n, m)
                     cloud[n, m, 0] = wpos[1]
                     cloud[n, m, 1] = wpos[0]
-                    cloud[n, m, 2] = np.median(depths)
-                    cloud[n, m, 3] = np.median(confidences)
+                    dq = mquantiles(depths)
+                    cloud[n, m, 2] = dq[1]
+                    cloud[n, m, 3] = mquantiles(confidences)[1]
+                    doubleDepthProp[n, m] = dq[2]-dq[0]
 
                     for c in range(3):
-                        color[n, m, c] = np.mean(self.grid[n, m, :, c+2])
+                        color[n, m, c] = np.median(self.grid[n, m, :, c+2])
                 else:
                     cloud[n, m, 3] = 0
                     cloud[n, m, 2] = -1
 
-        ### Todo: check why z and y dim is flipped
-        # cloud[:, :, 2] *= -1
-        # cloud[:, :, 1] *= -1
+        return cloud, color, doubleDepthProp
 
-        return cloud, color
+
+    def getResultsRegionMedian(self):
+        cloud = np.zeros((self.N+1, self.M+1, 4))
+        color = np.zeros((self.N+1, self.M+1, 3))
+        doubleDepthProp  = np.zeros((self.N+1, self.M+1))
+
+        for n in range(self.N+1):
+            for m in range(self.M+1):
+                confidences = None
+                depths = None
+                if n>0 and n<self.N and m>0 and m<self.M:
+                    confidences = self.grid[n-1:n+2, m-1:m+2, :, 1].flatten()
+                    depths = self.grid[n-1:n+2, m-1:m+2, :, 0].flatten()
+                else:
+                    confidences = self.grid[n, m, :, 1].flatten()
+                    depths = self.grid[n, m, :, 0].flatten()
+                csum = np.sum(confidences)
+                if csum > 0:
+                    wpos = self.grid2world(n, m)
+                    cloud[n, m, 0] = wpos[1]
+                    cloud[n, m, 1] = wpos[0]
+                    dq = mquantiles(depths)
+                    cloud[n, m, 2] = dq[1]
+                    cloud[n, m, 3] = mquantiles(confidences)[1]
+                    doubleDepthProp[n, m] = dq[2]-dq[0]
+
+                    for c in range(3):
+                        color[n, m, c] = np.median(self.grid[n, m, :, c+2])
+                else:
+                    cloud[n, m, 3] = 0
+                    cloud[n, m, 2] = -1
+
+        doubleDepthProp[:] /= np.amax(doubleDepthProp)
+        return cloud, color, doubleDepthProp
 
 
     def world2grid(self, x, y):
@@ -125,7 +158,6 @@ class discreteWorldSpace(object):
     def grid2world(self, n, m):
         if 0 <= n <= self.N:
             if 0 <= m <= self.M:
-                #print "grid2world project m :", m, ", n :", n, " to x :", int((m-self.M/2)/self.M*self.world_size[1]), " to y :", int((self.N/2-n)/self.N*self.world_size[0])
                 return [(float(self.N)/2.0-float(n))/float(self.N)*self.world_size[0],
                         (float(m)-float(self.M)/2.0)/float(self.M)*self.world_size[1]]
             else:

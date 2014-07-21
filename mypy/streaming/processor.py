@@ -259,13 +259,15 @@ class DenseLightFieldEngine(object):
         self.worldGrid.save(self.parameter["resultpath"]+"_worldGrid")
 
         plyWriter = PlyWriter(self.parameter["resultpath"]+"_final", format="EN")
-        cloud, color = self.worldGrid.getResult()
+        cloud, color, doubleDepthProp = self.worldGrid.getResult(rtype='median')
         # cloud = transformCloud(cloud,
         #                                rotate_x=self.parameter["cam_rotation"][0],
         #                                rotate_y=self.parameter["cam_rotation"][1],
         #                                rotate_z=self.parameter["cam_rotation"][2],
         #                                translate=[0, 0, 0])
 
+        if doubleDepthProp is not None:
+            imsave(self.parameter["resultpath"]+"doubleDepthProp.png", doubleDepthProp[:, :])
         imsave(self.parameter["resultpath"]+"_finalDepth.png", cloud[:, :, 2])
         imsave(self.parameter["resultpath"]+"_finalCoherence.png", cloud[:, :, 3])
         plyWriter.cloud = cloud
