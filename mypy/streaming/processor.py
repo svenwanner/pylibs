@@ -2,6 +2,7 @@ import sys, os
 from glob import glob
 import numpy as np
 import vigra
+import pylab as plt
 from scipy.misc import imread, imsave, imshow
 import mypy.visualization.imshow as ims
 
@@ -19,6 +20,7 @@ class SubLFProcessor(object):
         self.focus = parameter["focus"]
         self.numOfCams = parameter["num_of_cams"]
         self.colorpace = parameter["colorspace"]
+        self.parameter = parameter
         self.results = None
 
     def showEpi(self, index):
@@ -30,7 +32,9 @@ class SubLFProcessor(object):
         assert isinstance(camIndex, int)
 
         try:
-            self.lf = load_lf3d_fromFiles(self.fpath, camIndex, self.numOfCams, dtype=np.float32)
+            if not self.parameter.has_key("filetype"):
+                self.parameter["filetype"] = "png"
+            self.lf = load_lf3d_fromFiles(self.fpath, camIndex, self.numOfCams, ftype=self.parameter["filetype"], dtype=np.float32)
 
             self.shape = self.lf.shape
             self.results = np.zeros((self.shape[1], self.shape[2], 5), dtype=np.float32)
@@ -73,9 +77,19 @@ class StructureTensorProcessor(SubLFProcessor):
                 tensor = np.zeros((self.shape[3], self.shape[0], self.shape[2], 3), dtype=np.float32)
 
                 repi = refocus_epi(epi, focus)
+
+
+                iscale = self.parameter["inner_scale"]
+                if self.parameter.has_key("prefilter"):
+                    iscale = 0.1
+                    if self.parameter["prefilter"] == "epidevx":
+                        for c in range(self.shape[3]):
+                            repi[:, :, c] = vigra.filters.gaussianGradient(repi[:, :, c].astype(np.float32), self.parameter["inner_scale"])[:, :, 0]
+
+
                 for c in range(self.shape[3]):
                     tensor[c, :, :, :] = vigra.filters.structureTensor(repi[:, :, c],
-                                                                       self.parameter["inner_scale"],
+                                                                       iscale,
                                                                        self.parameter["outer_scale"])
 
                 ### mean over color channels ###
@@ -237,15 +251,14 @@ class DenseLightFieldEngine(object):
                                        translate=translate)
 
                 # push all points from the cloud into the current iteration layer of the worldGrid instance
-                ### TODO: check y,x dimension of cloud is equal to results?
                 for n in range(cloud.shape[0]):
                     for m in range(cloud.shape[1]):
                         self.worldGrid.setWorldValue(cloud[n, m, 0], cloud[n, m, 1], i, np.array([cloud[n, m, 2], results[n, m, 1]]), results[n, m, 2:])
 
                 # save all disparity steps as image
-                imsave(self.parameter["resultpath"]+"_layer_%4.4i.png" % i, self.worldGrid.grid[:, :, i, 0])
-                imsave(self.parameter["resultpath"]+"_depth_%4.4i.png" % i, self.processor.results[:, :, 0])
-                imsave(self.parameter["resultpath"]+"_coherence_%4.4i.png" % i, self.processor.results[:, :, 1])
+                plt.imsave(self.parameter["resultpath"]+"_layer_%4.4i.png" % i, self.worldGrid.grid[:, :, i, 0], cmap=plt.cm.hot)
+                plt.imsave(self.parameter["resultpath"]+"_depth_%4.4i.png" % i, self.processor.results[:, :, 0], cmap=plt.cm.hot)
+                plt.imsave(self.parameter["resultpath"]+"_coherence_%4.4i.png" % i, self.processor.results[:, :, 1], cmap=plt.cm.hot)
 
                 print "done -->"
             else:
@@ -268,8 +281,8 @@ class DenseLightFieldEngine(object):
 
         if doubleDepthProp is not None:
             imsave(self.parameter["resultpath"]+"doubleDepthProp.png", doubleDepthProp[:, :])
-        imsave(self.parameter["resultpath"]+"_finalDepth.png", cloud[:, :, 2])
-        imsave(self.parameter["resultpath"]+"_finalCoherence.png", cloud[:, :, 3])
+        plt.imsave(self.parameter["resultpath"]+"_finalDepth.png", cloud[:, :, 2], cmap=plt.cm.hot)
+        plt.imsave(self.parameter["resultpath"]+"_finalCoherence.png", cloud[:, :, 3], cmap=plt.cm.hot)
         plyWriter.cloud = cloud
         plyWriter.color = color
         plyWriter.save()

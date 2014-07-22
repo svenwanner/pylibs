@@ -18,9 +18,11 @@ parameter = {"filepath": context+"/rendered/fullRes",
          "outer_scale": 1.1,
          "min_coherence": 0.95,
          "focal_length_mm": 16,
-         "baseline": 0.01004347826086956522,
+         "baseline": 0.01,
          "min_depth": 1.40,
-         "max_depth": 2.1}
+         "max_depth": 2.1,
+         "prefilter":"epidevx",
+	     "filetype":"png"}
 
 
 processor = StructureTensorProcessor(parameter)
