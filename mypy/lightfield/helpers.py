@@ -9,24 +9,23 @@ from scipy.misc import imread
 import skimage.color as color
 
 def changeColorspace(lf3d, cspace="luv"):
-    assert lf3d.shape[3] == 3, "only 3 channel light fields can be changed in colorspace"
+    if lf3d.shape[3] == 3:
+        if lf3d.dtype == np.uint8:
+            lf3d = lf3d.astype(np.float32)
+        if np.amax(lf3d) > 1.0:
+            lf3d[:] /= 255.0
 
-    if lf3d.dtype == np.uint8:
-        lf3d = lf3d.astype(np.float32)
-    if np.amax(lf3d) > 1.0:
-        lf3d[:] /= 255.0
-
-    if cspace == "hsv":
-        for i in range(lf3d.shape[0]):
-            lf3d[i, :, :, :] = color.rgb2hsv(lf3d[i, :, :, :])
-    elif cspace == "luv":
-        for i in range(lf3d.shape[0]):
-            #lf3d[i, :, :, :] = color.rgb2luv(lf3d[i, :, :, :])
-            lf3d[i, :, :, :] = vigra.colors.transform_RGB2Luv(lf3d[i, :, :, :])
-    elif cspace == "lab":
-        for i in range(lf3d.shape[0]):
-            #lf3d[i, :, :, :] = color.rgb2lab(lf3d[i, :, :, :])
-            lf3d[i, :, :, :] = vigra.colors.transform_RGB2Lab(lf3d[i, :, :, :])
+        if cspace == "hsv":
+            for i in range(lf3d.shape[0]):
+                lf3d[i, :, :, :] = color.rgb2hsv(lf3d[i, :, :, :])
+        elif cspace == "luv":
+            for i in range(lf3d.shape[0]):
+                #lf3d[i, :, :, :] = color.rgb2luv(lf3d[i, :, :, :])
+                lf3d[i, :, :, :] = vigra.colors.transform_RGB2Luv(lf3d[i, :, :, :])
+        elif cspace == "lab":
+            for i in range(lf3d.shape[0]):
+                #lf3d[i, :, :, :] = color.rgb2lab(lf3d[i, :, :, :])
+                lf3d[i, :, :, :] = vigra.colors.transform_RGB2Lab(lf3d[i, :, :, :])
     return lf3d
 
 
@@ -95,16 +94,32 @@ def loadSequence(fnames, dtype=np.float32):
         channels = 3
         if im.shape[2] == 4:
             im = im[:, :, 0:3]
+    # else: #TODO check problem here and avoid to convert  gray to rgb
+    #     channels = 3
+    #     tmp = np.zeros((im.shape[0], im.shape[1], 3))
+    #     tmp[:, :, 0] = im[:]; tmp[:, :, 1] = im[:]; tmp[:, :, 2] = im[:]
+    #     im = tmp
 
     sequence = np.zeros((len(fnames), im.shape[0], im.shape[1], channels), dtype=dtype)
-    sequence[0, :, :, 0:channels] = im[:]
+    if channels == 1:
+        sequence[0, :, :, 0] = im[:]
+    else:
+        sequence[0, :, :, 0:channels] = im[:]
 
     for i in range(1, len(fnames)):
         im = imread(fnames[i])
         if len(im.shape) == 3:
             if im.shape[2] == 4:
                 im = im[:, :, 0:3]
-        sequence[i, :, :, 0:channels] = im[:]
+        # else: #TODO check problem here and avoid to convert  gray to rgb
+        #     channels = 3
+        #     tmp = np.zeros((im.shape[0], im.shape[1], 3))
+        #     tmp[:, :, 0] = im[:]; tmp[:, :, 1] = im[:]; tmp[:, :, 2] = im[:]
+        #     im = tmp
+        if channels == 1:
+            sequence[i, :, :, 0] = im[:]
+        else:
+            sequence[i, :, :, 0:channels] = im[:]
 
     if dtype == np.float32:
         if np.amax(sequence > 1.0):
@@ -206,3 +221,4 @@ def refocus_epi(epi, focus):
                 tmp[h, :, c] = np.roll(epi[h, :, c], shift=(h - epi.shape[0] / 2) * focus)
 
     return tmp
+

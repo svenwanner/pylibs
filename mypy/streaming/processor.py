@@ -31,23 +31,23 @@ class SubLFProcessor(object):
     def load(self, camIndex):
         assert isinstance(camIndex, int)
 
-        try:
-            if not self.parameter.has_key("filetype"):
-                self.parameter["filetype"] = "png"
-            self.lf = load_lf3d_fromFiles(self.fpath, camIndex, self.numOfCams, ftype=self.parameter["filetype"], dtype=np.float32)
+        # try:
+        if not self.parameter.has_key("filetype"):
+            self.parameter["filetype"] = "png"
+        self.lf = load_lf3d_fromFiles(self.fpath, camIndex, self.numOfCams, ftype=self.parameter["filetype"], dtype=np.float32)
 
-            self.shape = self.lf.shape
-            self.results = np.zeros((self.shape[1], self.shape[2], 5), dtype=np.float32)
-            self.cv = np.copy(self.lf[self.shape[0]/2, :, :, 0:self.shape[3]])
-            if self.cv.dtype != np.uint8:
-                self.cv *= 255.0
-                self.cv = self.cv.astype(np.uint8)
+        self.shape = self.lf.shape
+        self.results = np.zeros((self.shape[1], self.shape[2], 5), dtype=np.float32)
+        self.cv = np.copy(self.lf[self.shape[0]/2, :, :, 0:self.shape[3]])
+        if self.cv.dtype != np.uint8:
+            self.cv *= 255.0
+            self.cv = self.cv.astype(np.uint8)
 
-            self.lf = changeColorspace(self.lf, self.colorpace)
-            return True
-        except Exception as e:
-            print e
-            return False
+        self.lf = changeColorspace(self.lf, self.colorpace)
+        return True
+        # except Exception as e:
+        #     print e
+        #     return False
 
     def getResults(self):
         return self.results
