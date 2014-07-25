@@ -8,6 +8,22 @@ from scipy.misc import imread
 
 import skimage.color as color
 
+image_types = ["png", "jpg", "jpeg", "tif", "bmp", "ppm", "TIF", "JPG", "JPEG", "PNG"]
+
+def getFilenameList(fpath, switchOrder=False):
+    if not fpath.endswith(os.path.sep):
+        fpath += os.path.sep
+    fnames = []
+    for ftype in image_types:
+        for f in glob(fpath+"*."+ftype):
+            fnames.append(f)
+    fnames.sort()
+
+    if switchOrder:
+        fnames.reverse()
+    return fnames
+
+
 def changeColorspace(lf3d, cspace="luv"):
     if lf3d.shape[3] == 3:
         if lf3d.dtype == np.uint8:

@@ -1,7 +1,9 @@
+import sys
 import numpy as np
 from multiprocessing import Process,Queue, cpu_count
 
 from mypy.tools.linearAlgebra import normalize_vec
+from mypy.lightfield.helpers import getFilenameList
 
 cpus_available = cpu_count()
 
@@ -38,7 +40,11 @@ def computeMissingParameter(parameter):
     # compute real visible scene width and height
     vwsx = 2.0*parameter["camInitialPos"][2]*np.tan(parameter["fov"])+parameter["maxBaseline_mm"]/100.0
     vwsy = 2.0*parameter["camInitialPos"][2]*np.tan(fov_h)
-    parameter["visibleWorldArea"] = [vwsx, vwsy]
+    parameter["visibleWorldArea_m"] = [vwsx, vwsy]
+
+    #TODO: check this #compute optimal accuracy if not set by user
+    if not parameter.has_key("worldAccuracy_m") or parameter["worldAccuracy_m"] <= 0.0:
+        parameter["worldAccuracy_m"] = parameter["camInitialPos"][2]*np.tan(2*parameter["fov"]/parameter["sensorSize_px"][1])
 
     for key in parameter.keys():
         print key, ":", parameter[key]
@@ -52,9 +58,23 @@ def main(parameter):
 
     is_processing = True
 
+    # read available image filenames
+    fnames = getFilenameList(parameter["filesPath"], parameter["switchFilesOrder"])
+
     #compute missing parameter and final storage container
     parameter = computeMissingParameter(parameter)
-    #final_storage = np.zeros(, dtype=np.float32)
+
+    # check if number of frames to compute and images available is consistent
+    if len(fnames) < parameter["totalNumOfFrames"]:
+        print "number of image files found is less than computed number of frames check parameter settings",
+        print " subImageVolumeSize, numOfSubImageVolumes, frameShift and the number of your image files!"
+        sys.exit()
+
+    #define data container
+    # shape = [parameter["sensorSize_px"][0],
+    #          parameter["sensorSize_px"][1],
+    #          parameter["colorChannels"][0]]
+    #result_stack = np.zeros((), dtype=np.float32)
 
     #set up filestreaming object
 
@@ -71,13 +91,17 @@ def main(parameter):
 if __name__ == "__main__":
 
     parameter = {
+        "filesPath": "/home/swanner/Desktop/denseSampledTestScene/rendered/fullRes/",
+        "switchFilesOrder": False,
+        "resultsPath": "/home/swanner/Desktop/denseSampledTestScene/results_FR/",
+        "rgb": True,
         "sensorSize_mm": 32,
-        "focalLength_mm": 35,
-        "baseline_mm": 1.020408163265306,
+        "focalLength_mm": 16,
+        "baseline_mm": 0.01004347826086956522,
         "sensorSize_px": [540, 960],
         "subImageVolumeSize": 9,
         "frameShift": 9,
-        "numOfSubImageVolumes": 11,
+        "numOfSubImageVolumes": 5,
         "camInitialPos": [0.0, 0.0, 2.0],
         "camTransVector": [1.0, 0.0, 0.0],
         "camLookAtVector": [0.0, 0.0, -1.0]
