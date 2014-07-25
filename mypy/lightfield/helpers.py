@@ -29,7 +29,7 @@ def changeColorspace(lf3d, cspace="luv"):
     return lf3d
 
 
-def getFilenames(fpath, index=0, amount=-1, ftype="png"):
+def getFilenames(fpath, index=0, amount=-1, ftype="png", switchOrder=False):
     """
     Load a filename list from path, start index and amount of filenames to load
     as well as the filetype can be specified. By default a list of all filenames
@@ -56,6 +56,9 @@ def getFilenames(fpath, index=0, amount=-1, ftype="png"):
     for f in glob(fpath+"*"+ftype):
         fnames.append(f)
     fnames.sort()
+
+    if switchOrder:
+        fnames.reverse()
 
     last_index = index + amount
     if amount == -1 or index + amount >= len(fnames):
@@ -101,25 +104,28 @@ def loadSequence(fnames, dtype=np.float32):
     #     im = tmp
 
     sequence = np.zeros((len(fnames), im.shape[0], im.shape[1], channels), dtype=dtype)
-    if channels == 1:
-        sequence[0, :, :, 0] = im[:]
-    else:
+
+    if channels == 3:
         sequence[0, :, :, 0:channels] = im[:]
+    else:
+        sequence[0, :, :, 0] = im[:]
 
     for i in range(1, len(fnames)):
         im = imread(fnames[i])
         if len(im.shape) == 3:
             if im.shape[2] == 4:
                 im = im[:, :, 0:3]
+
         # else: #TODO check problem here and avoid to convert  gray to rgb
         #     channels = 3
         #     tmp = np.zeros((im.shape[0], im.shape[1], 3))
         #     tmp[:, :, 0] = im[:]; tmp[:, :, 1] = im[:]; tmp[:, :, 2] = im[:]
         #     im = tmp
-        if channels == 1:
-            sequence[i, :, :, 0] = im[:]
-        else:
+
+        if channels == 3:
             sequence[i, :, :, 0:channels] = im[:]
+        else:
+            sequence[i, :, :, 0] = im[:]
 
     if dtype == np.float32:
         if np.amax(sequence > 1.0):

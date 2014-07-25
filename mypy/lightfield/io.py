@@ -23,7 +23,7 @@ def finalResultViewer(final_exr, save_to=None):
         print "Error reading final.exr!"
 
 
-def load_lf3d_fromFiles(fpath, index=0, amount=-1, dtype=np.float32, ftype="png"):
+def load_lf3d_fromFiles(fpath, index=0, amount=-1, dtype=np.float32, ftype="png", switchOrder=False):
     """
     Load a filename list from path, start index and amount of filenames to load
     as well as the filetype can be specified. By default a list of all filenames
@@ -38,13 +38,13 @@ def load_lf3d_fromFiles(fpath, index=0, amount=-1, dtype=np.float32, ftype="png"
     :param ftype: str "png","tif","ppm","bmp","jpg"
     :return: ndarray of range [numOfImgs, sy, sx, channels]
     """
-    fnames = getFilenames(fpath, index, amount, ftype)
+    fnames = getFilenames(fpath, index, amount, ftype, switchOrder)
     return loadSequence(fnames, dtype)
 
 
 
 
-def load_3d(path, rgb=False, roi=None):
+def load_3d(path, rgb=True, roi=None, switchOrder=False):
     """
     load a 3d light field from filesequence. The images need to be in .png, .tif or .jpg
 
@@ -69,6 +69,10 @@ def load_3d(path, rgb=False, roi=None):
         for f in glob(path + "*.tif"):
             fnames.append(f)
     fnames.sort()
+
+    if switchOrder:
+        fnames.reverse()
+
 
 
     sposx = 0
