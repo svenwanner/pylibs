@@ -153,3 +153,59 @@ def load_3d(path, rgb=False, roi=None):
         lf[:] /= 255
 
     return lf
+
+
+
+def readEpi_fromSequence(fpath, position=0, direction='h'):
+    """
+    load a 3d light field from filesequence. The images need to be in .png, .tif or .jpg
+
+    :rtype : light field 3D volume
+    :param path: string path to load filesequence from
+    :param rgb: bool to define number of channels in light field returned
+    :param roi: dict to define a region of interest {"size":[h,w],"pos":[y,x]}
+    :return lf: lf numpy array of structure [num_of_cams,height,width,channels]
+    """
+    assert isinstance(fpath, str)
+
+    fnames = []
+    for f in glob(fpath + "*.png"):
+        fnames.append(f)
+    if len(fnames) == 0:
+        for f in glob(fpath + "*.jpg"):
+            fnames.append(f)
+    if len(fnames) == 0:
+        for f in glob(fpath + "*.bmp"):
+            fnames.append(f)
+    if len(fnames) == 0:
+        for f in glob(fpath + "*.ppm"):
+            fnames.append(f)
+    if len(fnames) == 0:
+        for f in glob(fpath + "*.tif"):
+            fnames.append(f)
+    fnames.sort()
+
+    im = misc.imread(fnames[0])
+    channels = 1
+    if len(im.shape) == 3:
+        channels = 3
+
+    if direction == 'h':
+        epi = np.zeros((len(fnames), im.shape[1], channels))
+    if direction == 'v':
+        epi = np.zeros((len(fnames), im.shape[0], channels))
+
+    for n,f in enumerate(fnames):
+        im = misc.imread(fnames[n])
+        if direction == 'h':
+            if len(im.shape) == 3:
+                epi[n, :, 0:3] = im[position, :, 0:3]
+            else:
+                epi[n, :, 0] = im[position, :]
+        if direction == 'v':
+           if len(im.shape) == 3:
+               epi[n, :, 0:3] = im[ :, position, 0:3]
+           else:
+               epi[n, :, 0] = im[:, position]
+
+    return epi[:, :, 0:channels]
