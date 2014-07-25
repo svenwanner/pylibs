@@ -9,28 +9,27 @@ from scipy.misc import imread
 import skimage.color as color
 
 def changeColorspace(lf3d, cspace="luv"):
-    assert lf3d.shape[3] == 3, "only 3 channel light fields can be changed in colorspace"
+    if lf3d.shape[3] == 3:
+        if lf3d.dtype == np.uint8:
+            lf3d = lf3d.astype(np.float32)
+        if np.amax(lf3d) > 1.0:
+            lf3d[:] /= 255.0
 
-    if lf3d.dtype == np.uint8:
-        lf3d = lf3d.astype(np.float32)
-    if np.amax(lf3d) > 1.0:
-        lf3d[:] /= 255.0
-
-    if cspace == "hsv":
-        for i in range(lf3d.shape[0]):
-            lf3d[i, :, :, :] = color.rgb2hsv(lf3d[i, :, :, :])
-    elif cspace == "luv":
-        for i in range(lf3d.shape[0]):
-            #lf3d[i, :, :, :] = color.rgb2luv(lf3d[i, :, :, :])
-            lf3d[i, :, :, :] = vigra.colors.transform_RGB2Luv(lf3d[i, :, :, :])
-    elif cspace == "lab":
-        for i in range(lf3d.shape[0]):
-            #lf3d[i, :, :, :] = color.rgb2lab(lf3d[i, :, :, :])
-            lf3d[i, :, :, :] = vigra.colors.transform_RGB2Lab(lf3d[i, :, :, :])
+        if cspace == "hsv":
+            for i in range(lf3d.shape[0]):
+                lf3d[i, :, :, :] = color.rgb2hsv(lf3d[i, :, :, :])
+        elif cspace == "luv":
+            for i in range(lf3d.shape[0]):
+                #lf3d[i, :, :, :] = color.rgb2luv(lf3d[i, :, :, :])
+                lf3d[i, :, :, :] = vigra.colors.transform_RGB2Luv(lf3d[i, :, :, :])
+        elif cspace == "lab":
+            for i in range(lf3d.shape[0]):
+                #lf3d[i, :, :, :] = color.rgb2lab(lf3d[i, :, :, :])
+                lf3d[i, :, :, :] = vigra.colors.transform_RGB2Lab(lf3d[i, :, :, :])
     return lf3d
 
 
-def getFilenames(fpath, index=0, amount=-1, ftype="png"):
+def getFilenames(fpath, index=0, amount=-1, ftype="png", switchOrder=False):
     """
     Load a filename list from path, start index and amount of filenames to load
     as well as the filetype can be specified. By default a list of all filenames
@@ -57,6 +56,9 @@ def getFilenames(fpath, index=0, amount=-1, ftype="png"):
     for f in glob(fpath+"*"+ftype):
         fnames.append(f)
     fnames.sort()
+
+    if switchOrder:
+        fnames.reverse()
 
     last_index = index + amount
     if amount == -1 or index + amount >= len(fnames):
@@ -97,14 +99,20 @@ def loadSequence(fnames, dtype=np.float32):
             im = im[:, :, 0:3]
 
     sequence = np.zeros((len(fnames), im.shape[0], im.shape[1], channels), dtype=dtype)
-    sequence[0, :, :, 0:channels] = im[:]
+    if channels == 3:
+        sequence[0, :, :, 0:channels] = im[:]
+    else:
+        sequence[0, :, :, 0] = im[:]
 
     for i in range(1, len(fnames)):
         im = imread(fnames[i])
         if len(im.shape) == 3:
             if im.shape[2] == 4:
                 im = im[:, :, 0:3]
-        sequence[i, :, :, 0:channels] = im[:]
+        if channels == 3:
+            sequence[i, :, :, 0:channels] = im[:]
+        else:
+            sequence[i, :, :, 0] = im[:]
 
     if dtype == np.float32:
         if np.amax(sequence > 1.0):
