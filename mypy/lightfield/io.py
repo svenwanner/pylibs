@@ -98,27 +98,55 @@ def load_3d(path, rgb=False, roi=None):
 
     if roi is None:
         if rgb:
-            lf[0, :, :, :] = im[:, :, 0:3]
+            if len(im.shape) == 3:
+                lf[0, :, :, :] = im[:, :, 0:3]
+            else:
+                for c in range(3):
+                    lf[0, :, :, c] = im[:]
         else:
-            lf[0, :, :, 0] = 0.3 * im[:, :, 0] + 0.59 * im[:, :, 1] + 0.11 * im[:, :, 2]
+            if len(im.shape) == 3:
+                lf[0, :, :, 0] = 0.3 * im[:, :, 0] + 0.59 * im[:, :, 1] + 0.11 * im[:, :, 2]
+            else:
+                lf[0, :, :, 0] == im[:]
     else:
         if rgb:
-            lf[0, :, :, 0:3] = im[sposx:eposx, sposy:eposy, 0:3]
+            if len(im.shape) == 3:
+                lf[0, :, :, 0:3] = im[sposx:eposx, sposy:eposy, 0:3]
+            else:
+                for c in range(3):
+                    lf[0, :, :, c] = im[sposx:eposx, sposy:eposy]
         else:
-            lf[0, :, :, 0] = im[sposx:eposx, sposy:eposy]
+            if len(im.shape) == 3:
+                lf[0, :, :, 0] = 0.3 * im[sposx:eposx, sposy:eposy, 0] + 0.59 * im[sposx:eposx, sposy:eposy, 1] + 0.11 * im[sposx:eposx, sposy:eposy, 2]
+            else:
+                lf[0, :, :, 0] = im[sposx:eposx, sposy:eposy]
 
     for n in range(1, len(fnames)):
         im = misc.imread(fnames[n])
         if rgb:
             if roi is None:
-                lf[n, :, :, :] = im[:, :, 0:3]
+                if len(im.shape) == 3:
+                    lf[n, :, :, :] = im[:, :, 0:3]
+                else:
+                    for c in range(3):
+                        lf[n, :, :, c] = im[:]
             else:
-                lf[n, :, :, :] = im[sposx:eposx, sposy:eposy, 0:3]
+                if len(im.shape) == 3:
+                    lf[n, :, :, :] = im[sposx:eposx, sposy:eposy, 0:3]
+                else:
+                    for c in range(3):
+                        lf[n, :, :, c] = im[sposx:eposx, sposy:eposy]
         else:
             if roi is None:
-                lf[n, :, :, 0] = 0.3 * im[:, :, 0] + 0.59 * im[:, :, 1] + 0.11 * im[:, :, 2]
+                if len(im.shape) == 3:
+                    lf[n, :, :, 0] = 0.3 * im[:, :, 0] + 0.59 * im[:, :, 1] + 0.11 * im[:, :, 2]
+                else:
+                    lf[n, :, :, 0] = im[:]
             else:
-                lf[n, :, :, 0] = im[sposx:eposx, sposy:eposy]
+                if len(im.shape) == 3:
+                    lf[n, :, :, 0] = 0.3 * im[sposx:eposx, sposy:eposy, 0] + 0.59 * im[sposx:eposx, sposy:eposy, 1] + 0.11 * im[sposx:eposx, sposy:eposy, 2]
+                else:
+                    lf[n, :, :, 0] = im[sposx:eposx, sposy:eposy]
 
     amax = np.amax(lf)
     if amax >= 1:
