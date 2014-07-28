@@ -42,9 +42,8 @@ def computeMissingParameter(parameter):
     vwsy = 2.0*parameter["camInitialPos"][2]*np.tan(fov_h)
     parameter["visibleWorldArea_m"] = [vwsx, vwsy]
 
-    #TODO: check this #compute optimal accuracy if not set by user
     if not parameter.has_key("worldAccuracy_m") or parameter["worldAccuracy_m"] <= 0.0:
-        parameter["worldAccuracy_m"] = parameter["camInitialPos"][2]*np.tan(2*parameter["fov"]/parameter["sensorSize_px"][1])
+        parameter["worldAccuracy_m"] = vwsy/parameter["sensorSize_px"][0]
 
     for key in parameter.keys():
         print key, ":", parameter[key]
@@ -71,9 +70,9 @@ def main(parameter):
         sys.exit()
 
     #define data container
-    # shape = [parameter["sensorSize_px"][0],
-    #          parameter["sensorSize_px"][1],
-    #          parameter["colorChannels"][0]]
+    shape = [parameter["sensorSize_px"][0],
+             parameter["sensorSize_px"][1],
+             parameter["colorChannels"][0]]
     #result_stack = np.zeros((), dtype=np.float32)
 
     #set up filestreaming object
@@ -97,12 +96,12 @@ if __name__ == "__main__":
         "rgb": True,
         "sensorSize_mm": 32,
         "focalLength_mm": 16,
-        "baseline_mm": 0.01004347826086956522,
+        "baseline_mm": 1.0,
         "sensorSize_px": [540, 960],
-        "subImageVolumeSize": 9,
-        "frameShift": 9,
-        "numOfSubImageVolumes": 5,
-        "camInitialPos": [0.0, 0.0, 2.0],
+        "subImageVolumeSize": 3,
+        "frameShift": 3,
+        "numOfSubImageVolumes": 67,
+        "camInitialPos": [-1.0, 0.0, 2.6],
         "camTransVector": [1.0, 0.0, 0.0],
         "camLookAtVector": [0.0, 0.0, -1.0]
     }
