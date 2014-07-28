@@ -1,9 +1,11 @@
 import sys
+import vigra
 import numpy as np
 from multiprocessing import Process,Queue, cpu_count
 
 from mypy.tools.linearAlgebra import normalize_vec
 from mypy.lightfield.helpers import getFilenameList
+from mypy.lightfield.depth.structureTensor2D import evaluateStructureTensor
 from mypy.lightfield.io import load_3d
 
 from scipy.misc import imshow
@@ -36,8 +38,10 @@ class Processor(object):
 
     def setData(self, subLF):
         if isinstance(subLF, type([])):
+            print "set file list - ", subLF
             self.lf = self.__load__(subLF)
         elif isinstance(subLF, np.ndarray):
+            print "set ndarray - ", subLF.shape
             self.lf = subLF
         else:
             print "Abort, unknown subLF type!"
@@ -81,6 +85,14 @@ class StructureTensorClassic(Processor):
     def __init__(self, parameter):
         Processor.__init__(self, parameter)
 
+    def orientation(self, epi, inner_scale, outer_scale):
+        tensor_channels = np.zeros((self.lf.shape[3], epi.shape[0], epi.shape[1], 3), dtype=np.float32)
+        for c in range(self.lf.shape[3]):
+            tensor_channels[c, :, :, :] = vigra.filters.structureTensor(epi[:, :, c], inner_scale, outer_scale)
+
+        orientation, coherence = evaluateStructureTensor(np.sum(tensor_channels,axis=0))
+
+
     def worldContainerShape(self):
         return ()
 
@@ -90,6 +102,25 @@ class StructureTensorClassic(Processor):
 
     def process(self):
         print "process data..."
+        y = 0
+        iscale = self.params["innerScale"]
+        oscale = self.params["outerScale"]
+        while True:
+            jobs = []
+            for i in range(cpus_available):
+                if y >= self.lf.shape[1]: break
+                epi = self.lf[:, y, :, :]
+                y += 1
+
+                p = Process(target=self.orientation, args=(epi, iscale, oscale))
+                jobs.append(p)
+                p.start()
+
+            for j in jobs:
+                j.join()
+
+
+
         print "finished"
 
     def postprocess(self):
@@ -110,8 +141,10 @@ def computeMissingParameter(parameter):
     parameter["fov"] = np.arctan2(parameter["sensorSize_mm"], 2.0*parameter["focalLength_mm"])
     # compute focal length is pixel
     parameter["focalLength_px"] = float(parameter["focalLength_mm"])/float(parameter["sensorSize_mm"])*parameter["sensorSize_px"][1]
-    # compute the total number of frames
-    parameter["totalNumOfFrames"] = parameter["subImageVolumeSize"]+(parameter["numOfSubImageVolumes"]-1)*parameter["frameShift"]
+    ## compute the total number of frames
+    #parameter["totalNumOfFrames"] = parameter["subImageVolumeSize"]+(parameter["numOfSubImageVolumes"]-1)*parameter["subImageVolumeSize"]
+    # compute number of sub image volumes
+    parameter["numOfSubImageVolumes"] = int(np.floor(parameter["totalNumOfFrames"]/float(parameter["frameShift"])))
     # compute the maximum traveling distance of the camera
     parameter["maxBaseline_mm"] = float(parameter["totalNumOfFrames"]-1)*parameter["baseline_mm"]
     # compute the final camera position and the center position of the camera track
@@ -154,10 +187,12 @@ def computeMissingParameter(parameter):
 class Engine(object):
 
     def __init__(self, parameter):
-        # compute missing parameter
-        self.params = computeMissingParameter(parameter)
         # read available image filenames
-        self.fnames = getFilenameList(self.params["filesPath"], self.params["switchFilesOrder"])
+        self.fnames = getFilenameList(parameter["filesPath"], parameter["switchFilesOrder"])
+        # compute missing parameter
+        parameter["totalNumOfFrames"] = len(self.fnames)
+        self.params = computeMissingParameter(parameter)
+
         self.world = None
 
         # set processor instance
@@ -179,10 +214,14 @@ class Engine(object):
 
         self.processor.world = self.world
         for n in range(self.params["numOfSubImageVolumes"]):
+
             sindex, findex = self.computeListIndices(n)
             fnames = self.fnames[sindex:findex]
+            if len(fnames) < self.params["subImageVolumeSize"]:
+                break
 
             self.processor.setData(fnames)
+            self.processor.world = self.world
             self.processor.start()
 
 
@@ -209,14 +248,15 @@ if __name__ == "__main__":
         "resultsPath": "/home/swanner/Desktop/denseSampledTestScene/results3_FR/",
         "rgb": True,
         "processor": "structureTensorClassic",
+        "innerScale": 0.6,
+        "outerScale": 1.3,
         "sensorSize_mm": 32,
         "focalLength_mm": 16,
         "focuses": [2, 3],
         "baseline_mm": 0.8695652173913043,
         "sensorSize_px": [540, 960],
         "subImageVolumeSize": 11,
-        "numOfSubImageVolumes": 21,
-        "frameShift": 1,
+        "frameShift": 11,
         "camInitialPos": [-1.0, 0.0, 2.6],
         "camTransVector": [1.0, 0.0, 0.0],
         "camLookAtVector": [0.0, 0.0, -1.0],
