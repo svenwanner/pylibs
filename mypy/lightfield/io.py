@@ -1,3 +1,4 @@
+import sys
 import numpy as np
 import pylab as plt
 from glob import glob
@@ -49,31 +50,38 @@ def load_3d(path, rgb=True, roi=None, switchOrder=False):
     load a 3d light field from filesequence. The images need to be in .png, .tif or .jpg
 
     :rtype : light field 3D volume
-    :param path: string path to load filesequence from
+    :param path: string path to load filesequence from, path can also be a list of filenames already
     :param rgb: bool to define number of channels in light field returned
     :param roi: dict to define a region of interest {"size":[h,w],"pos":[y,x]}
     :return lf: lf numpy array of structure [num_of_cams,height,width,channels]
     """
-    assert isinstance(path, str)
     assert isinstance(rgb, bool)
     if roi is not None:
         assert isinstance(roi, dict)
 
     fnames = []
-    for f in glob(path + "*.png"):
-        fnames.append(f)
-    if len(fnames) == 0:
+    if isinstance(path, str):
+        for f in glob(path + "*.png"):
+            fnames.append(f)
         for f in glob(path + "*.jpg"):
             fnames.append(f)
-    if len(fnames) == 0:
         for f in glob(path + "*.tif"):
             fnames.append(f)
-    fnames.sort()
+        for f in glob(path + "*.ppm"):
+            fnames.append(f)
+        for f in glob(path + "*.bmp"):
+            fnames.append(f)
+        for f in glob(path + "*.TIF"):
+            fnames.append(f)
+        fnames.sort()
+    elif isinstance(path, type([])):
+        fnames = path
+    else:
+        print "Wrong input type for path paramater, need a string or a list of filenames!"
+        sys.exit()
 
     if switchOrder:
         fnames.reverse()
-
-
 
     sposx = 0
     eposx = 0
@@ -89,6 +97,7 @@ def load_3d(path, rgb=True, roi=None, switchOrder=False):
         eposx = roi["pos"][0] + roi["size"][0]
         sposy = roi["pos"][1]
         eposy = roi["pos"][1] + roi["size"][1]
+
         if rgb:
             lf = np.zeros((len(fnames), roi["size"][0], roi["size"][1], 3), dtype=np.float32)
         else:

@@ -4,11 +4,108 @@ from multiprocessing import Process,Queue, cpu_count
 
 from mypy.tools.linearAlgebra import normalize_vec
 from mypy.lightfield.helpers import getFilenameList
+from mypy.lightfield.io import load_3d
+
+from scipy.misc import imshow
 
 cpus_available = cpu_count()
 
 
+#########################################################################################################
+#########################################################################################################
+#########################################################################################################
+
+
+class Processor(object):
+
+    def __init__(self, parameter):
+        assert isinstance(parameter, type({}))
+        self.params = parameter
+        self.lf = None
+        self.world = None
+
+    def __load__(self, filelist):
+        assert isinstance(filelist, type([]))
+        roi = None
+        swor = False
+        if self.params.has_key("roi"):
+            roi = self.params["roi"]
+        if self.params.has_key("switchFilesOrder"):
+            swor = self.params["switchFilesOrder"]
+        return load_3d(filelist, roi=roi, switchOrder=swor)
+
+    def setData(self, subLF):
+        if isinstance(subLF, type([])):
+            self.lf = self.__load__(subLF)
+        elif isinstance(subLF, np.ndarray):
+            self.lf = subLF
+        else:
+            print "Abort, unknown subLF type!"
+            sys.exit()
+
+        print "Processor has loaded data successfully!"
+
+    def worldContainerShape(self):
+        """
+        Here a world container needs to be specified. The world container is the full sensor
+        area over all cameras projected into the world space using the camera distance and the
+        accuracy or discretization of the sensor area. The world array stores all computations
+        from each camera position or sub light field and thus has as many result layer as iterations
+        are necessary. At each world position for each iteration a vector is stored which length
+        needs to be specified here but is at least one for the depth value. The general form of the
+        world array is as follows:
+        world.shape = (x,y,layer,values) values by default are assumed as 0:depth
+        """
+        pass
+
+    def start(self):
+        self.preprocess()
+        self.process()
+        self.postprocess()
+
+
+    def preprocess(self):
+        pass
+
+    def process(self):
+        pass
+
+    def postprocess(self):
+        pass
+
+
+
+
+class StructureTensorClassic(Processor):
+
+    def __init__(self, parameter):
+        Processor.__init__(self, parameter)
+
+    def worldContainerShape(self):
+        return ()
+
+    def preprocess(self):
+        print "preprocess data..."
+        print "finished"
+
+    def process(self):
+        print "process data..."
+        print "finished"
+
+    def postprocess(self):
+        pass
+
+
+
+#########################################################################################################
+#########################################################################################################
+#########################################################################################################
+
+
 def computeMissingParameter(parameter):
+    # if no frameShift set use sub volume site as shift
+    if not parameter.has_key("frameShift"):
+        parameter["frameShift"] = parameter["subImageVolumeSize"]
     # compute the field of view of the camera
     parameter["fov"] = np.arctan2(parameter["sensorSize_mm"], 2.0*parameter["focalLength_mm"])
     # compute focal length is pixel
@@ -19,6 +116,8 @@ def computeMissingParameter(parameter):
     parameter["maxBaseline_mm"] = float(parameter["totalNumOfFrames"]-1)*parameter["baseline_mm"]
     # compute the final camera position and the center position of the camera track
     parameter["camInitialPos"] = np.array(parameter["camInitialPos"])
+    if not parameter.has_key("frameShift"):
+        parameter["frameShift"] = parameter["subImageVolumeSize"]
     if not parameter.has_key("camTransVector") or not parameter.has_key("camLookAtVector"):
         print "Warning, either camTransVector or camLookAtVector is missing, default values are used instead!"
         parameter["camTransVector"] = np.array([1.0, 0.0, 0.0])
@@ -52,57 +151,76 @@ def computeMissingParameter(parameter):
 
 
 
+class Engine(object):
+
+    def __init__(self, parameter):
+        # compute missing parameter
+        self.params = computeMissingParameter(parameter)
+        # read available image filenames
+        self.fnames = getFilenameList(self.params["filesPath"], self.params["switchFilesOrder"])
+        self.world = None
+
+        # set processor instance
+        if self.params["processor"] == "structureTensorClassic":
+            self.processor = StructureTensorClassic(self.params)
+
+        # check if number of frames to compute and images available is consistent
+        if len(self.fnames) < self.params["totalNumOfFrames"]:
+            print "number of image files found is less than computed number of frames check parameter settings",
+            print " subImageVolumeSize, numOfSubImageVolumes, frameShift and the number of your image files!"
+            sys.exit()
+
+        self.world = np.zeros(self.processor.worldContainerShape(), dtype=np.float32)
+
+    def computeListIndices(self, n):
+        return n*self.params["frameShift"], n*self.params["frameShift"]+self.params["subImageVolumeSize"]
+
+    def run(self):
+
+        self.processor.world = self.world
+        for n in range(self.params["numOfSubImageVolumes"]):
+            sindex, findex = self.computeListIndices(n)
+            fnames = self.fnames[sindex:findex]
+
+            self.processor.setData(fnames)
+            self.processor.start()
+
+
+
+
+
+
+
+#########################################################################################################
+#########################################################################################################
+#########################################################################################################
 
 def main(parameter):
 
-    is_processing = True
-
-    # read available image filenames
-    fnames = getFilenameList(parameter["filesPath"], parameter["switchFilesOrder"])
-
-    #compute missing parameter and final storage container
-    parameter = computeMissingParameter(parameter)
-
-    # check if number of frames to compute and images available is consistent
-    if len(fnames) < parameter["totalNumOfFrames"]:
-        print "number of image files found is less than computed number of frames check parameter settings",
-        print " subImageVolumeSize, numOfSubImageVolumes, frameShift and the number of your image files!"
-        sys.exit()
-
-    #define data container
-    shape = [parameter["sensorSize_px"][0],
-             parameter["sensorSize_px"][1],
-             parameter["colorChannels"][0]]
-    #result_stack = np.zeros((), dtype=np.float32)
-
-    #set up filestreaming object
-
-    #set up sub light field processor
-
-
-
-    while is_processing:
-        # if filestreaming object is ready pass data to sub light field processor
-        is_processing = False
-
+    engine = Engine(parameter)
+    engine.run()
 
 
 if __name__ == "__main__":
 
     parameter = {
-        "filesPath": "/home/swanner/Desktop/denseSampledTestScene/rendered/fullRes/",
+        "filesPath": "/home/swanner/Desktop/denseSampledTestScene/rendered3/fullRes/",
         "switchFilesOrder": False,
-        "resultsPath": "/home/swanner/Desktop/denseSampledTestScene/results_FR/",
+        "resultsPath": "/home/swanner/Desktop/denseSampledTestScene/results3_FR/",
         "rgb": True,
+        "processor": "structureTensorClassic",
         "sensorSize_mm": 32,
         "focalLength_mm": 16,
-        "baseline_mm": 1.0,
+        "focuses": [2, 3],
+        "baseline_mm": 0.8695652173913043,
         "sensorSize_px": [540, 960],
-        "subImageVolumeSize": 3,
-        "frameShift": 3,
-        "numOfSubImageVolumes": 67,
+        "subImageVolumeSize": 11,
+        "numOfSubImageVolumes": 21,
+        "frameShift": 1,
         "camInitialPos": [-1.0, 0.0, 2.6],
         "camTransVector": [1.0, 0.0, 0.0],
-        "camLookAtVector": [0.0, 0.0, -1.0]
+        "camLookAtVector": [0.0, 0.0, -1.0],
+        "roi": {"pos": [270-150, 480-150], "size": [300, 300]}
     }
+
     main(parameter)
