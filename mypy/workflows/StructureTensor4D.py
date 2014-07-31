@@ -54,11 +54,11 @@ def preImgScharr(lf3d, config=None, direction='h'):
 def Compute(lf3d, shift, config, direction):
 
     if direction == 'h':
-        tensor = compute_horizontal(lf3d, shift, config)
+        tensor, grad = compute_horizontal(lf3d, shift, config)
     if direction == 'v':
-        tensor = compute_vertical(lf3d, shift, config)
+        tensor, grad = compute_vertical(lf3d, shift, config)
 
-    return tensor
+    return tensor, grad
 
 def mergeOrientations_wta(orientation1, coherence1, orientation2, coherence2):
     winner = np.where(coherence2 > coherence1)
@@ -344,6 +344,8 @@ def structureTensor4D(config):
 
     orientation = np.zeros((lf_shape[1], lf_shape[2]), dtype=np.float32)
     coherence = np.zeros((lf_shape[1], lf_shape[2]), dtype=np.float32)
+    orientationTrad = np.zeros((lf_shape[1], lf_shape[2]), dtype=np.float32)
+    coherenceTrad = np.zeros((lf_shape[1], lf_shape[2]), dtype=np.float32)
     logging.debug("Allocated memory!")
 
 ### compute both directions independent from each other ###
@@ -366,49 +368,52 @@ def structureTensor4D(config):
         print(strTensorh.shape)
 
         orientationL, coherenceL = orientationClassic(strTensorh, strTensorv, config,shift)
-        orientation, coherence = mergeOrientations_wta(orientation, coherence, orientationL, coherenceL)
+        orientationTrad, coherenceTrad = mergeOrientations_wta(orientationTrad, coherenceTrad, orientationL, coherenceL)
+
+        if config.output_level >= 3:
+            plt.imsave(config.result_path+config.result_label+"orientation_global_traditional_{0}.png".format(shift), orientationTrad, cmap=plt.cm.jet)
+            plt.imsave(config.result_path+config.result_label+"coherence_global_traditional_{0}.png".format(shift), coherenceTrad, cmap=plt.cm.jet)
 
 
-        # print(gradh.shape)
-        # print(gradv.shape)
 
-        # print("4D structure tensor")
-        #
-        # Ix_plus_Iy_square = (gradh[gradh.shape[0]/2, :, :, 0] + gradv[gradh.shape[0]/2, :, :, 0])**2
-        # Iu_plus_Iv_square = (gradh[gradh.shape[0]/2, :, :, 1] + gradv[gradh.shape[0]/2, :, :, 1])**2
-        # Ix_plus_Iy_mul_Iu_plus_Iv = (gradh[gradh.shape[0]/2, :, :, 0] + gradv[gradh.shape[0]/2, :, :, 0])*(gradh[gradh.shape[0]/2, :, :, 1] + gradv[gradh.shape[0]/2, :, :, 1])
-        #
-        # Ix_plus_Iy_square = vigra.filters.gaussianSmoothing(Ix_plus_Iy_square, config.outer_scale)
-        # Iu_plus_Iv_square = vigra.filters.gaussianSmoothing(Iu_plus_Iv_square, config.outer_scale)
-        # Ix_plus_Iy_mul_Iu_plus_Iv = vigra.filters.gaussianSmoothing(Ix_plus_Iy_mul_Iu_plus_Iv, config.outer_scale)
-        #
-        #
-        # ### compute coherence value ###
-        # up = np.sqrt((Iu_plus_Iv_square[ :, :]-Ix_plus_Iy_square[ :, :])**2 + 4*Ix_plus_Iy_mul_Iu_plus_Iv[ :, :]**2)
-        # down = (Iu_plus_Iv_square[ :, :]+Ix_plus_Iy_square[ :, :] + 1e-25)
-        # coherence = up / down
-        #
-        # ### compute disparity value ###
-        # orientation = vigra.numpy.arctan2(2*Ix_plus_Iy_mul_Iu_plus_Iv[ :, :], Iu_plus_Iv_square[ :, :]-Ix_plus_Iy_square[ :, :]) / 2.0
-        # orientation = vigra.numpy.tan(orientation[:])
-        #
-        # ### mark out of boundary orientation estimation ###
-        # invalid_ubounds = np.where(orientation > 1.1)
-        # invalid_lbounds = np.where(orientation < -1.1)
-        #
-        # ### set coherence of invalid values to zero ###
-        # coherence[invalid_ubounds] = 0
-        # coherence[invalid_lbounds] = 0
-        #
-        # ### set orientation of invalid values to related maximum/minimum value
-        # orientation[invalid_ubounds] = 1.1
-        # orientation[invalid_lbounds] = -1.1
-        #
-        # if config.output_level >= 2:
-        #     plt.imsave(config.result_path+config.result_label+"orientation_4D_{0}.png".format(shift), orientation, cmap=plt.cm.jet)
-        #     plt.imsave(config.result_path+config.result_label+"coherence_4D_{0}.png".format(shift), coherence, cmap=plt.cm.jet)
+        print(gradh.shape)
+        print(gradv.shape)
+
+        print("4D structure tensor")
+
+        Ix_plus_Iy_square = (gradh[gradh.shape[0]/2, :, :, 0] + gradv[gradh.shape[0]/2, :, :, 0])**2
+        Iu_plus_Iv_square = (gradh[gradh.shape[0]/2, :, :, 1] + gradv[gradh.shape[0]/2, :, :, 1])**2
+        Ix_plus_Iy_mul_Iu_plus_Iv = (gradh[gradh.shape[0]/2, :, :, 0] + gradv[gradh.shape[0]/2, :, :, 0])*(gradh[gradh.shape[0]/2, :, :, 1] + gradv[gradh.shape[0]/2, :, :, 1])
+
+        Ix_plus_Iy_square = vigra.filters.gaussianSmoothing(Ix_plus_Iy_square, config.outer_scale)
+        Iu_plus_Iv_square = vigra.filters.gaussianSmoothing(Iu_plus_Iv_square, config.outer_scale)
+        Ix_plus_Iy_mul_Iu_plus_Iv = vigra.filters.gaussianSmoothing(Ix_plus_Iy_mul_Iu_plus_Iv, config.outer_scale)
 
 
+        ### compute coherence value ###
+        up = np.sqrt((Iu_plus_Iv_square[ :, :]-Ix_plus_Iy_square[ :, :])**2 + 4*Ix_plus_Iy_mul_Iu_plus_Iv[ :, :]**2)
+        down = (Iu_plus_Iv_square[ :, :]+Ix_plus_Iy_square[ :, :] + 1e-25)
+        coherence = up / down
+
+        ### compute disparity value ###
+        orientation = vigra.numpy.arctan2(2*Ix_plus_Iy_mul_Iu_plus_Iv[ :, :], Iu_plus_Iv_square[ :, :]-Ix_plus_Iy_square[ :, :]) / 2.0
+        orientation = vigra.numpy.tan(orientation[:])
+
+        ### mark out of boundary orientation estimation ###
+        invalid_ubounds = np.where(orientation > 1.1)
+        invalid_lbounds = np.where(orientation < -1.1)
+
+        ### set coherence of invalid values to zero ###
+        coherence[invalid_ubounds] = 0
+        coherence[invalid_lbounds] = 0
+
+        ### set orientation of invalid values to related maximum/minimum value
+        orientation[invalid_ubounds] = 1.1
+        orientation[invalid_lbounds] = -1.1
+
+        if config.output_level >= 2:
+            plt.imsave(config.result_path+config.result_label+"orientation_4D_{0}.png".format(shift), orientation, cmap=plt.cm.jet)
+            plt.imsave(config.result_path+config.result_label+"coherence_4D_{0}.png".format(shift), coherence, cmap=plt.cm.jet)
 
     if config.output_level >= 2:
         plt.imsave(config.result_path+config.result_label+"orientation_final.png", orientation[:, :], cmap=plt.cm.jet)

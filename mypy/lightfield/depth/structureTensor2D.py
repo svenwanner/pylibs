@@ -206,7 +206,7 @@ class StructureTensorForward(StructureTensor):
 
         epi = vigra.filters.gaussianSmoothing(epi, sigma=params["inner_scale"])
 
-        # epi = vigra.filters.convolve(epi, scharrh)
+        epi = vigra.filters.convolve(epi, scharrh)
         d_2dim = vigra.filters.convolve(epi, scharrh)
         d_1dim = vigra.filters.convolve(epi, scharrv)
 
@@ -245,7 +245,7 @@ class StructureTensorBackward(StructureTensor):
 
         epi = vigra.filters.gaussianSmoothing(epi, sigma=params["inner_scale"])
 
-        # epi = vigra.filters.convolve(epi, scharrh)
+        epi = vigra.filters.convolve(epi, scharrh)
         d_2dim = vigra.filters.convolve(epi, scharrh)
         d_1dim = vigra.filters.convolve(epi, scharrv)
 
