@@ -13,8 +13,6 @@ import pylab as plt
 from scipy.misc import imsave
 
 cpus_available = cpu_count()
-global_index = 0
-global_processors = []
 
 def imshow(im, cmap="jet"):
     cmaps = {"jet":plt.cm.hot, "hot":plt.cm.hot, "gray":plt.cm.gray}
@@ -66,6 +64,7 @@ class Processor(object):
         self.world = None
         self.orientation_lf = None
         self.coherence_lf = None
+        self.ID = 0
 
     def __load__(self, filelist):
         assert isinstance(filelist, type([]))
@@ -164,8 +163,7 @@ class StructureTensorClassic(Processor):
         return orientation, coherence
 
     def preprocess(self):
-        print "preprocess data..."
-        print "finished"
+        pass
 
     def process(self):
         print "process data..."
@@ -187,10 +185,8 @@ class StructureTensorClassic(Processor):
             self.coherence_lf[:, y, :] = coherence[:]
 
         #imshow(self.orientation_lf[self.orientation_lf.shape[0]/2, :, :])
-        global global_index
-        imsave("/home/swanner/Desktop/tmp_%4.4i.png"%global_index,  self.orientation_lf[self.orientation_lf.shape[0]/2, :, :])
-        global_index += 1
-        print "value at", global_index, "is", self.orientation_lf[self.orientation_lf.shape[0]/2, 100, 100]
+        imsave("/home/swanner/Desktop/tmp_%4.4i.png"%self.ID,  self.orientation_lf[self.orientation_lf.shape[0]/2, :, :])
+        print "value at", self.ID, "is", self.orientation_lf[self.orientation_lf.shape[0]/2, 100, 100]
 
         print "finished"
 
@@ -263,6 +259,7 @@ class Engine(object):
         # compute missing parameter
         parameter["totalNumOfFrames"] = len(self.fnames)
         self.params = computeMissingParameter(parameter)
+        self.global_processors = {}
 
         self.world = None
 
@@ -277,44 +274,46 @@ class Engine(object):
     def computeListIndices(self, n):
         return n*self.params["frameShift"], n*self.params["frameShift"]+self.params["subImageVolumeSize"]
 
-    def process2thread(self, params):
+    def process2thread(self, params, index):
         # set processor instance
-        #global global_processors
         if self.params["processor"] == "structureTensorClassic":
-            processor = StructureTensorClassic(self.params)
-        processor.setData(params)
-        processor.start()
+            self.global_processors[index] = StructureTensorClassic(self.params)
+        self.global_processors[index].ID = index
+        self.global_processors[index].setData(params)
+        self.global_processors[index].start()
 
     def run(self):
         global global_index
-        global global_processors
 
         n = 0
         while True:
 
-            if global_index >= self.params["numOfSubImageVolumes"]:
+            if n >= self.params["numOfSubImageVolumes"]:
                 break
 
-            fname_list = []
+            fname_list = {}
+            print "cpus_available",cpus_available
             for i in range(cpus_available):
                 sindex, findex = self.computeListIndices(n)
+                fname_list[n] = self.fnames[sindex:findex]
+                if len(fname_list[n]) < self.params["subImageVolumeSize"]:
+                    if len(fname_list[n]) > 0:
+                        fname_list[n] = None
                 n += 1
-                fname_list.append(self.fnames[sindex:findex])
-                if len(fname_list[i]) < self.params["subImageVolumeSize"]:
-                    if len(fname_list) > 0:
-                        fname_list.pop(i)
 
-            if len(fname_list) == 0:
+            if len(fname_list.keys()) == 0:
                 break
 
             pool = Pool(cpus_available)
 
-            for fname in fname_list:
-                pool.apply_async(self.process2thread, (fname,))
+            for index in fname_list.keys():
+                if fname_list[index] is None:
+                    break
+                pool.apply_async(self.process2thread, (fname_list[index], index))
 
             pool.close()
             pool.join()
-            #global_processors = []
+            self.global_processors.clear()
 
 
 
