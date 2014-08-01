@@ -90,7 +90,26 @@ class Processor(object):
         print "Processor has loaded data successfully!"
 
     def orientationToWorld(self):
-        pass
+        shape = self.orientation_lf.shape
+        cv_orientation = self.orientation_lf[shape[0]/2, :, :]
+        cv_coherence = self.coherence_lf[shape[0]/2, :, :]
+        self.world = np.zeros((shape[1], shape[2], 4), dtype=np.float32)
+        #invalids = np.where(cv_coherence == 0)
+
+        print "reproject data..."
+        for y in xrange(self.world.shape[0]):
+            for x in xrange(self.world.shape[1]):
+                depth = self.params["focalLength_px"]*self.params["baseline_mm"]/(cv_orientation[y, x]+1e-16)/100.0
+                self.world[y, x, 0] = float((float(x)-cv_orientation.shape[1]/2.0)*depth/float(self.params["focalLength_px"]))
+                self.world[y, x, 1] = float((float(y)-cv_orientation.shape[0]/2.0)*depth/float(self.params["focalLength_px"]))
+                if  cv_coherence[y, x] == 0:
+                    self.world[y, x, 2] = 0.0
+                else:
+                    self.world[y, x, 2] = depth
+                self.world[y, x, 3] = cv_coherence[y, x]
+
+        imsave("/home/swanner/Desktop/depth_%4.4i.png"%self.ID,  self.world[:, :, 2])
+        print "depth at", self.ID, "is", self.world[100, 100, 2]
 
     def refocusEpi(self, epi, focus):
         repi = np.zeros_like(epi)
@@ -167,7 +186,6 @@ class StructureTensorClassic(Processor):
 
     def process(self):
         print "process data..."
-        y = 0
         iscale = self.params["innerScale"]
         oscale = self.params["outerScale"]
         focuses = self.params["focuses"]
@@ -178,17 +196,16 @@ class StructureTensorClassic(Processor):
         for y in xrange(self.lf.shape[1]):
             epi = self.lf[:, y, :, :].astype(np.float32)
             if self.params.has_key("prefilter"):
-                for c in range(epi.shape[2]):
-                    epi[:, :, c] = vigra.filters.gaussianGradient(epi[:, :, c], float(self.params["prefilter"]))[:, :, 0]
+                if self.params["prefilter"] > 0:
+                    for c in range(epi.shape[2]):
+                        epi[:, :, c] = vigra.filters.gaussianGradient(epi[:, :, c], float(self.params["prefilter"]))[:, :, 0]
             orientation, coherence = self.orientation(epi, iscale, oscale, focuses)
             self.orientation_lf[:, y, :] = orientation[:]
             self.coherence_lf[:, y, :] = coherence[:]
 
         #imshow(self.orientation_lf[self.orientation_lf.shape[0]/2, :, :])
-        imsave("/home/swanner/Desktop/tmp_%4.4i.png"%self.ID,  self.orientation_lf[self.orientation_lf.shape[0]/2, :, :])
-        print "value at", self.ID, "is", self.orientation_lf[self.orientation_lf.shape[0]/2, 100, 100]
-
-        print "finished"
+        imsave("/home/swanner/Desktop/disp_%4.4i.png"%self.ID,  self.orientation_lf[self.orientation_lf.shape[0]/2, :, :])
+        print "disp at", self.ID, "is", self.orientation_lf[self.orientation_lf.shape[0]/2, 100, 100]
 
     def postprocess(self):
         pass
@@ -313,6 +330,10 @@ class Engine(object):
 
             pool.close()
             pool.join()
+
+            for key in self.global_processors.keys():
+                pass
+
             self.global_processors.clear()
 
 
