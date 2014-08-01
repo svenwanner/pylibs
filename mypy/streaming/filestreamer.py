@@ -1,16 +1,55 @@
 import sys
 import vigra
 import numpy as np
-from multiprocessing import Process,Queue, cpu_count
+from scipy.ndimage import shift
+from multiprocessing import cpu_count
+from multiprocessing.pool import ThreadPool as Pool
 
 from mypy.tools.linearAlgebra import normalize_vec
 from mypy.lightfield.helpers import getFilenameList
-from mypy.lightfield.depth.structureTensor2D import evaluateStructureTensor
 from mypy.lightfield.io import load_3d
 
-from scipy.misc import imshow
+import pylab as plt
+from scipy.misc import imsave
 
 cpus_available = cpu_count()
+global_index = 0
+global_processors = []
+
+def imshow(im, cmap="jet"):
+    cmaps = {"jet":plt.cm.hot, "hot":plt.cm.hot, "gray":plt.cm.gray}
+    if len(im.shape) == 2:
+        plt.imshow(im, cmap=cmaps[cmap])
+    else:
+        plt.imshow(im[:, :, 0:3])
+    plt.title("range:"+str(np.amin(im))+","+str(np.amax(im)))
+    plt.show()
+
+
+class Orientation(object):
+    def __init__(self,  epi, inner_scale, outer_scale, focuses):
+        self.epi = epi
+        self.inner_scale = inner_scale
+        self.outer_scale = outer_scale
+        self.focuses = focuses
+
+    def __call__(self):
+        return self.compute()
+
+    def compute(self):
+        tmp_orientation = None
+        tmp_coherence = None
+        final_orientation = np.zeros((self.epi.shape[0], self.epi.shape[1]), dtype=np.float32)
+        final_coherence = np.zeros((self.epi.shape[0], self.epi.shape[1]), dtype=np.float32)
+        for focus in self.focuses:
+            tensor_channels = np.zeros((self.lf.shape[3], self.epi.shape[0], self.epi.shape[1], 3), dtype=np.float32)
+            for c in range(self.lf.shape[3]):
+                repi = self.refocusEpi(self.epi, focus)
+                tensor_channels[c, :, :, :] = vigra.filters.structureTensor(repi[:, :, c], self.inner_scale, self.outer_scale)
+            tmp_orientation, tmp_coherence = self.evaluateStructureTensor(np.sum(tensor_channels, axis=0))
+            final_orientation, final_coherence = self.mergeOrientations_wta(final_orientation, final_coherence, tmp_orientation+focus, tmp_coherence)
+        return final_orientation, final_coherence
+
 
 
 #########################################################################################################
@@ -25,6 +64,8 @@ class Processor(object):
         self.params = parameter
         self.lf = None
         self.world = None
+        self.orientation_lf = None
+        self.coherence_lf = None
 
     def __load__(self, filelist):
         assert isinstance(filelist, type([]))
@@ -49,23 +90,21 @@ class Processor(object):
 
         print "Processor has loaded data successfully!"
 
-    def worldContainerShape(self):
-        """
-        Here a world container needs to be specified. The world container is the full sensor
-        area over all cameras projected into the world space using the camera distance and the
-        accuracy or discretization of the sensor area. The world array stores all computations
-        from each camera position or sub light field and thus has as many result layer as iterations
-        are necessary. At each world position for each iteration a vector is stored which length
-        needs to be specified here but is at least one for the depth value. The general form of the
-        world array is as follows:
-        world.shape = (x,y,layer,values) values by default are assumed as 0:depth
-        """
+    def orientationToWorld(self):
         pass
+
+    def refocusEpi(self, epi, focus):
+        repi = np.zeros_like(epi)
+        for c in range(epi.shape[2]):
+            for y in range(epi.shape[0]):
+                repi[y, :, c] = shift(epi[y, :, c], shift=(y - epi.shape[0]/2)*focus)
+        return repi
 
     def start(self):
         self.preprocess()
         self.process()
         self.postprocess()
+        self.orientationToWorld()
 
 
     def preprocess(self):
@@ -85,16 +124,44 @@ class StructureTensorClassic(Processor):
     def __init__(self, parameter):
         Processor.__init__(self, parameter)
 
-    def orientation(self, epi, inner_scale, outer_scale):
-        tensor_channels = np.zeros((self.lf.shape[3], epi.shape[0], epi.shape[1], 3), dtype=np.float32)
-        for c in range(self.lf.shape[3]):
-            tensor_channels[c, :, :, :] = vigra.filters.structureTensor(epi[:, :, c], inner_scale, outer_scale)
+    def orientation(self, epi, inner_scale, outer_scale, focuses):
+        tmp_orientation = None
+        tmp_coherence = None
+        final_orientation = np.zeros((epi.shape[0], epi.shape[1]), dtype=np.float32)
+        final_coherence = np.zeros((epi.shape[0], epi.shape[1]), dtype=np.float32)
+        for focus in focuses:
+            tensor_channels = np.zeros((self.lf.shape[3], epi.shape[0], epi.shape[1], 3), dtype=np.float32)
+            for c in range(self.lf.shape[3]):
+                repi = self.refocusEpi(epi, focus)
+                tensor_channels[c, :, :, :] = vigra.filters.structureTensor(repi[:, :, c], inner_scale, outer_scale)
+            tmp_orientation, tmp_coherence = self.evaluateStructureTensor(np.sum(tensor_channels, axis=0))
+            final_orientation, final_coherence = self.mergeOrientations_wta(final_orientation, final_coherence, tmp_orientation+focus, tmp_coherence)
+        return final_orientation, final_coherence
 
-        orientation, coherence = evaluateStructureTensor(np.sum(tensor_channels,axis=0))
+    def mergeOrientations_wta(self, orientation1, coherence1, orientation2, coherence2):
+        winner = np.where(coherence2 > coherence1)
+        orientation1[winner] = orientation2[winner]
+        coherence1[winner] = coherence2[winner]
+        return orientation1, coherence1
 
-
-    def worldContainerShape(self):
-        return ()
+    def evaluateStructureTensor(self, tensor):
+        ### compute coherence value ###
+        up = np.sqrt((tensor[ :, :, 2]-tensor[:, :, 0])**2 + 4*tensor[ :, :, 1]**2)
+        down = (tensor[ :, :, 2]+tensor[:, :, 0] + 1e-25)
+        coherence = up / down
+        ### compute disparity value ###
+        orientation = vigra.numpy.arctan2(2*tensor[:, :, 1], tensor[:, :, 2]-tensor[:, :, 0]) / 2.0
+        orientation = vigra.numpy.tan(orientation[:])
+        ### mark out of boundary orientation estimation ###
+        invalid_ubounds = np.where(orientation > 1.1)
+        invalid_lbounds = np.where(orientation < -1.1)
+        ### set coherence of invalid values to zero ###
+        coherence[invalid_ubounds] = 0
+        coherence[invalid_lbounds] = 0
+        ### set orientation of invalid values to related maximum/minimum value
+        orientation[invalid_ubounds] = 1.1
+        orientation[invalid_lbounds] = -1.1
+        return orientation, coherence
 
     def preprocess(self):
         print "preprocess data..."
@@ -105,21 +172,25 @@ class StructureTensorClassic(Processor):
         y = 0
         iscale = self.params["innerScale"]
         oscale = self.params["outerScale"]
-        while True:
-            jobs = []
-            for i in range(cpus_available):
-                if y >= self.lf.shape[1]: break
-                epi = self.lf[:, y, :, :]
-                y += 1
+        focuses = self.params["focuses"]
 
-                p = Process(target=self.orientation, args=(epi, iscale, oscale))
-                jobs.append(p)
-                p.start()
+        self.orientation_lf = np.zeros((self.lf.shape[0], self.lf.shape[1], self.lf.shape[2]), dtype=np.float32)
+        self.coherence_lf = np.zeros((self.lf.shape[0], self.lf.shape[1], self.lf.shape[2]), dtype=np.float32)
 
-            for j in jobs:
-                j.join()
+        for y in xrange(self.lf.shape[1]):
+            epi = self.lf[:, y, :, :].astype(np.float32)
+            if self.params.has_key("prefilter"):
+                for c in range(epi.shape[2]):
+                    epi[:, :, c] = vigra.filters.gaussianGradient(epi[:, :, c], float(self.params["prefilter"]))[:, :, 0]
+            orientation, coherence = self.orientation(epi, iscale, oscale, focuses)
+            self.orientation_lf[:, y, :] = orientation[:]
+            self.coherence_lf[:, y, :] = coherence[:]
 
-
+        #imshow(self.orientation_lf[self.orientation_lf.shape[0]/2, :, :])
+        global global_index
+        imsave("/home/swanner/Desktop/tmp_%4.4i.png"%global_index,  self.orientation_lf[self.orientation_lf.shape[0]/2, :, :])
+        global_index += 1
+        print "value at", global_index, "is", self.orientation_lf[self.orientation_lf.shape[0]/2, 100, 100]
 
         print "finished"
 
@@ -195,34 +266,57 @@ class Engine(object):
 
         self.world = None
 
-        # set processor instance
-        if self.params["processor"] == "structureTensorClassic":
-            self.processor = StructureTensorClassic(self.params)
-
         # check if number of frames to compute and images available is consistent
         if len(self.fnames) < self.params["totalNumOfFrames"]:
             print "number of image files found is less than computed number of frames check parameter settings",
             print " subImageVolumeSize, numOfSubImageVolumes, frameShift and the number of your image files!"
             sys.exit()
 
-        self.world = np.zeros(self.processor.worldContainerShape(), dtype=np.float32)
+        #self.world = np.zeros(self.processor.worldContainerShape(), dtype=np.float32)
 
     def computeListIndices(self, n):
         return n*self.params["frameShift"], n*self.params["frameShift"]+self.params["subImageVolumeSize"]
 
+    def process2thread(self, params):
+        # set processor instance
+        #global global_processors
+        if self.params["processor"] == "structureTensorClassic":
+            processor = StructureTensorClassic(self.params)
+        processor.setData(params)
+        processor.start()
+
     def run(self):
+        global global_index
+        global global_processors
 
-        self.processor.world = self.world
-        for n in range(self.params["numOfSubImageVolumes"]):
+        n = 0
+        while True:
 
-            sindex, findex = self.computeListIndices(n)
-            fnames = self.fnames[sindex:findex]
-            if len(fnames) < self.params["subImageVolumeSize"]:
+            if global_index >= self.params["numOfSubImageVolumes"]:
                 break
 
-            self.processor.setData(fnames)
-            self.processor.world = self.world
-            self.processor.start()
+            fname_list = []
+            for i in range(cpus_available):
+                sindex, findex = self.computeListIndices(n)
+                n += 1
+                fname_list.append(self.fnames[sindex:findex])
+                if len(fname_list[i]) < self.params["subImageVolumeSize"]:
+                    if len(fname_list) > 0:
+                        fname_list.pop(i)
+
+            if len(fname_list) == 0:
+                break
+
+            pool = Pool(cpus_available)
+
+            for fname in fname_list:
+                pool.apply_async(self.process2thread, (fname,))
+
+            pool.close()
+            pool.join()
+            #global_processors = []
+
+
 
 
 
@@ -260,7 +354,8 @@ if __name__ == "__main__":
         "camInitialPos": [-1.0, 0.0, 2.6],
         "camTransVector": [1.0, 0.0, 0.0],
         "camLookAtVector": [0.0, 0.0, -1.0],
-        "roi": {"pos": [270-150, 480-150], "size": [300, 300]}
+        "roi": {"pos": [270-150, 480-150], "size": [300, 300]},
+        "prefilter": 0.4
     }
 
     main(parameter)
