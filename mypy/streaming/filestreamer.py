@@ -14,6 +14,14 @@ from scipy.misc import imsave
 
 cpus_available = cpu_count()
 
+
+
+#########################################################################################################
+###################                                                              ########################
+#########################################################################################################
+
+
+
 def imshow(im, cmap="jet"):
     cmaps = {"jet":plt.cm.hot, "hot":plt.cm.hot, "gray":plt.cm.gray}
     if len(im.shape) == 2:
@@ -22,6 +30,14 @@ def imshow(im, cmap="jet"):
         plt.imshow(im[:, :, 0:3])
     plt.title("range:"+str(np.amin(im))+","+str(np.amax(im)))
     plt.show()
+
+
+
+
+#########################################################################################################
+##################    O R I E N T A T I O N C O M P U T A T I O N   C L A S S    ########################
+#########################################################################################################
+
 
 
 class Orientation(object):
@@ -51,7 +67,7 @@ class Orientation(object):
 
 
 #########################################################################################################
-#########################################################################################################
+###################            P R O C E S S O R   T E M P L A T E S             ########################
 #########################################################################################################
 
 
@@ -108,8 +124,8 @@ class Processor(object):
                     self.world[y, x, 2] = depth
                 self.world[y, x, 3] = cv_coherence[y, x]
 
-        imsave("/home/swanner/Desktop/depth_%4.4i.png"%self.ID,  self.world[:, :, 2])
-        print "depth at", self.ID, "is", self.world[100, 100, 2]
+        # imsave("/home/swanner/Desktop/depth_%4.4i.png"%self.ID,  self.world[:, :, 2])
+        # print "depth at", self.ID, "is", self.world[100, 100, 2]
 
     def refocusEpi(self, epi, focus):
         repi = np.zeros_like(epi)
@@ -212,61 +228,11 @@ class StructureTensorClassic(Processor):
 
 
 
+
+
 #########################################################################################################
+###################                P R O C E S S I N G    E N G I N E            ########################
 #########################################################################################################
-#########################################################################################################
-
-
-def computeMissingParameter(parameter):
-    # if no frameShift set use sub volume site as shift
-    if not parameter.has_key("frameShift"):
-        parameter["frameShift"] = parameter["subImageVolumeSize"]
-    # compute the field of view of the camera
-    parameter["fov"] = np.arctan2(parameter["sensorSize_mm"], 2.0*parameter["focalLength_mm"])
-    # compute focal length is pixel
-    parameter["focalLength_px"] = float(parameter["focalLength_mm"])/float(parameter["sensorSize_mm"])*parameter["sensorSize_px"][1]
-    ## compute the total number of frames
-    #parameter["totalNumOfFrames"] = parameter["subImageVolumeSize"]+(parameter["numOfSubImageVolumes"]-1)*parameter["subImageVolumeSize"]
-    # compute number of sub image volumes
-    parameter["numOfSubImageVolumes"] = int(np.floor(parameter["totalNumOfFrames"]/float(parameter["frameShift"])))
-    # compute the maximum traveling distance of the camera
-    parameter["maxBaseline_mm"] = float(parameter["totalNumOfFrames"]-1)*parameter["baseline_mm"]
-    # compute the final camera position and the center position of the camera track
-    parameter["camInitialPos"] = np.array(parameter["camInitialPos"])
-    if not parameter.has_key("frameShift"):
-        parameter["frameShift"] = parameter["subImageVolumeSize"]
-    if not parameter.has_key("camTransVector") or not parameter.has_key("camLookAtVector"):
-        print "Warning, either camTransVector or camLookAtVector is missing, default values are used instead!"
-        parameter["camTransVector"] = np.array([1.0, 0.0, 0.0])
-        parameter["camLookAtVector"] = np.array([0.0, 0.0, -1.0])
-    else:
-        parameter["camTransVector"] = np.array(parameter["camTransVector"])
-        parameter["camLookAtVector"] = np.array(parameter["camLookAtVector"])
-        parameter["camTransVector"] = normalize_vec(parameter["camTransVector"])
-        parameter["camLookAtVector"] = normalize_vec(parameter["camLookAtVector"])
-    parameter["camFinalPos"] = parameter["camInitialPos"] + parameter["maxBaseline_mm"]*parameter["camTransVector"]/100.0
-    # define camera z-coordinate as horopter distance
-    parameter["horopter_m"] = parameter["camInitialPos"][2]
-    # define horopter vector
-    parameter["horopter_vec"] = parameter["camLookAtVector"]*float(parameter["horopter_m"])
-
-    # compute vertical field of view
-    sensorSize_y = float(parameter["sensorSize_mm"])*parameter["sensorSize_px"][0]/float(parameter["sensorSize_px"][1])
-    fov_h = np.arctan2(sensorSize_y, 2.0*parameter["focalLength_mm"])
-    # compute real visible scene width and height
-    vwsx = 2.0*parameter["camInitialPos"][2]*np.tan(parameter["fov"])+parameter["maxBaseline_mm"]/100.0
-    vwsy = 2.0*parameter["camInitialPos"][2]*np.tan(fov_h)
-    parameter["visibleWorldArea_m"] = [vwsx, vwsy]
-
-    if not parameter.has_key("worldAccuracy_m") or parameter["worldAccuracy_m"] <= 0.0:
-        parameter["worldAccuracy_m"] = vwsy/parameter["sensorSize_px"][0]
-
-    for key in parameter.keys():
-        print key, ":", parameter[key]
-
-    return parameter
-
-
 
 class Engine(object):
 
@@ -275,10 +241,8 @@ class Engine(object):
         self.fnames = getFilenameList(parameter["filesPath"], parameter["switchFilesOrder"])
         # compute missing parameter
         parameter["totalNumOfFrames"] = len(self.fnames)
-        self.params = computeMissingParameter(parameter)
+        self.params = self.computeMissingParameter(parameter)
         self.global_processors = {}
-
-        self.world = None
 
         # check if number of frames to compute and images available is consistent
         if len(self.fnames) < self.params["totalNumOfFrames"]:
@@ -286,7 +250,59 @@ class Engine(object):
             print " subImageVolumeSize, numOfSubImageVolumes, frameShift and the number of your image files!"
             sys.exit()
 
-        #self.world = np.zeros(self.processor.worldContainerShape(), dtype=np.float32)
+        wx = int(np.ceil(parameter["visibleWorldArea_m"][0]/parameter["worldAccuracy_m"]))
+        wy = int(np.ceil(parameter["visibleWorldArea_m"][1]/parameter["worldAccuracy_m"]))
+        self.world_size = (wy, wx, 4, self.params["numOfSubImageVolumes"])
+        print "created world grid of shape:", self.world_size
+        self.world = np.zeros(self.world_size, np.float32)
+
+    def computeMissingParameter(self, parameter):
+        # if no frameShift set use sub volume site as shift
+        if not parameter.has_key("frameShift"):
+            parameter["frameShift"] = parameter["subImageVolumeSize"]
+        # compute the field of view of the camera
+        parameter["fov"] = np.arctan2(parameter["sensorSize_mm"], 2.0*parameter["focalLength_mm"])
+        # compute focal length is pixel
+        parameter["focalLength_px"] = float(parameter["focalLength_mm"])/float(parameter["sensorSize_mm"])*parameter["sensorSize_px"][1]
+        # compute number of sub image volumes
+        parameter["numOfSubImageVolumes"] = int(np.floor(parameter["totalNumOfFrames"]/float(parameter["frameShift"])))
+        # compute the maximum traveling distance of the camera
+        parameter["maxBaseline_mm"] = float(parameter["totalNumOfFrames"]-1)*parameter["baseline_mm"]
+        # compute the final camera position and the center position of the camera track
+        parameter["camInitialPos"] = np.array(parameter["camInitialPos"])
+        if not parameter.has_key("frameShift"):
+            parameter["frameShift"] = parameter["subImageVolumeSize"]
+        if not parameter.has_key("camTransVector") or not parameter.has_key("camLookAtVector"):
+            print "Warning, either camTransVector or camLookAtVector is missing, default values are used instead!"
+            parameter["camTransVector"] = np.array([1.0, 0.0, 0.0])
+            parameter["camLookAtVector"] = np.array([0.0, 0.0, -1.0])
+        else:
+            parameter["camTransVector"] = np.array(parameter["camTransVector"])
+            parameter["camLookAtVector"] = np.array(parameter["camLookAtVector"])
+            parameter["camTransVector"] = normalize_vec(parameter["camTransVector"])
+            parameter["camLookAtVector"] = normalize_vec(parameter["camLookAtVector"])
+        parameter["camFinalPos"] = parameter["camInitialPos"] + parameter["maxBaseline_mm"]*parameter["camTransVector"]/100.0
+        parameter["camCenterPos"] = parameter["camInitialPos"] + parameter["maxBaseline_mm"]*parameter["camTransVector"]/200.0
+        # define camera z-coordinate as horopter distance
+        parameter["horopter_m"] = parameter["camInitialPos"][2]
+        # define horopter vector
+        parameter["horopter_vec"] = parameter["camLookAtVector"]*float(parameter["horopter_m"])
+
+        # compute vertical field of view
+        sensorSize_y = float(parameter["sensorSize_mm"])*parameter["sensorSize_px"][0]/float(parameter["sensorSize_px"][1])
+        fov_h = np.arctan2(sensorSize_y, 2.0*parameter["focalLength_mm"])
+        # compute real visible scene width and height
+        vwsx = 2.0*parameter["camInitialPos"][2]*np.tan(parameter["fov"])+parameter["maxBaseline_mm"]/100.0
+        vwsy = 2.0*parameter["camInitialPos"][2]*np.tan(fov_h)
+        parameter["visibleWorldArea_m"] = [vwsx, vwsy]
+
+        if not parameter.has_key("worldAccuracy_m") or parameter["worldAccuracy_m"] <= 0.0:
+            parameter["worldAccuracy_m"] = vwsy/parameter["sensorSize_px"][0]
+
+        for key in parameter.keys():
+            print key, ":", parameter[key]
+
+        return parameter
 
     def computeListIndices(self, n):
         return n*self.params["frameShift"], n*self.params["frameShift"]+self.params["subImageVolumeSize"]
@@ -298,6 +314,41 @@ class Engine(object):
         self.global_processors[index].ID = index
         self.global_processors[index].setData(params)
         self.global_processors[index].start()
+
+    def computeCurrentCamPosition(self, index):
+        slfs = self.params["subImageVolumeSize"]
+        b = self.params["baseline_mm"]
+        ipos = self.params["camInitialPos"]
+        tvec = self.params["camTransVector"]
+        return ipos + (index * slfs + slfs/2 - 1) * b/100.0 * tvec
+
+    def computeCamShiftVector(self, currentPos):
+        return self.params["camCenterPos"]-currentPos
+
+    def projectPointsToCenter(self, processor):
+        camp_pos = self.computeCurrentCamPosition(processor.ID)
+        cam_shift = self.computeCamShiftVector(camp_pos)
+        print "camp_pos of index", processor.ID, ":", camp_pos
+        print "cam shift:", cam_shift
+
+        for y in range(processor.world.shape[0]):
+            for x in range(processor.world.shape[1]):
+                for i in range(3):
+                processor.world[y, x, i] += cam_shift[i]
+
+    def world2grid(self, x, y):
+        # x=0, y=0 -> m=sh/2, m=sw/2
+        # x=-wsx/2, y 
+        return [int((self.world_size[0]/2.0-y)/self.world_size[0]*self.N),
+                        int(self.M-int((self.world_size[1]/2.0-x)/self.world_size[1]*self.M))]
+
+    def addPointsToWorld(self, points):
+        for y in range(points.shape[0]):
+            for x in range(points.shape[1]):
+                n, m = self.world2grid(points[y, x, 0],points[y, x, 1])
+                if n >= 0 and n < self.world.shape[0] and m >= 0 and m < self.world.shape[1]:
+                    for i in range(4):
+                        self.world[n, m, i] = points[y, x, i]
 
     def run(self):
         global global_index
@@ -332,7 +383,8 @@ class Engine(object):
             pool.join()
 
             for key in self.global_processors.keys():
-                pass
+                self.projectPointsToCenter(self.global_processors[key])
+                self.addPointsToWorld(self.global_processors[key].world)
 
             self.global_processors.clear()
 
@@ -340,12 +392,8 @@ class Engine(object):
 
 
 
-
-
-
-
 #########################################################################################################
-#########################################################################################################
+###################                 M A I N   R O U T I N E S                    ########################
 #########################################################################################################
 
 def main(parameter):
