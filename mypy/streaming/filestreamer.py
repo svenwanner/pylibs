@@ -237,6 +237,10 @@ class Engine(object):
         self.params = self.computeMissingParameter(parameter)
         self.global_processors = {}
 
+        global cpus_available
+        if self.params.has_key("numOfProcessors") and (0 < self.params["numOfProcessors"] < cpus_available):
+            cpus_available = self.params["numOfProcessors"]
+
         # check if number of frames to compute and images available is consistent
         if len(self.fnames) < self.params["totalNumOfFrames"]:
             print "number of image files found is less than computed number of frames check parameter settings",
@@ -245,9 +249,11 @@ class Engine(object):
 
         wx = int(np.ceil(parameter["visibleWorldArea_m"][0]/parameter["worldAccuracy_m"]))
         wy = int(np.ceil(parameter["visibleWorldArea_m"][1]/parameter["worldAccuracy_m"]))
-        self.world_size = (wy, wx, 4, self.params["numOfSubImageVolumes"])
-        print "created world grid of shape:", self.world_size
-        self.world = np.zeros(self.world_size, np.float32)
+        self.worldgrid_shape = (wy, wx, 4, self.params["numOfSubImageVolumes"])
+        self.world_size = (parameter["visibleWorldArea_m"][0], parameter["visibleWorldArea_m"][1])
+        print "created world grid of shape:", self.worldgrid_shape
+        print "visible world size is:", self.world_size
+        self.world = np.zeros(self.worldgrid_shape, np.float32)
 
     def computeMissingParameter(self, parameter):
         # if no frameShift set use sub volume site as shift
@@ -333,16 +339,37 @@ class Engine(object):
         imsave(self.params["resultsPath"]+"coherence_%4.4i.png" % processor.ID,  processor.world[:, :, 3])
 
     def world2grid(self, x, y):
-        # x=0, y=0 -> m=sh/2, m=sw/2
-        # x=-wsx/2, y 
-        return [int((self.world_size[0]/2.0-y)/self.world_size[0]*self.world.shape[0]),
-                        int(self.M-int((self.world_size[1]/2.0-x)/self.world_size[1]*self.world.shape[1]))]
+        if -self.world_size[1]/2.0 <= y <= self.world_size[1]/2.0:
+            if -self.world_size[0]/2.0 <= x <= self.world_size[0]/2.0:
+                n = int((self.world_size[1]/2.0-y)/self.world_size[1]*self.worldgrid_shape[0])
+                m = int(self.worldgrid_shape[1]-int((self.world_size[0]/2.0-x)/self.world_size[0]*self.worldgrid_shape[1]))
+                return n, m
+            else:
+                print "x coordinate out of range!"
+                return None, None
+        else:
+            print "y coordinate out of range!"
+            return None, None
+
+
+    def grid2world(self, n, m):
+        if 0 <= n <= self.N:
+            if 0 <= m <= self.M:
+                return [(float(self.worldgrid_shape[0])/2.0-float(n))/float(self.worldgrid_shape[0])*self.world_size[0],
+                        (float(m)-float(self.worldgrid_shape[1])/2.0)/float(self.worldgrid_shape[1])*self.world_size[1]]
+            else:
+                return None
+        else:
+            return None
 
     def addPointsToWorld(self, points):
+        print "type points:", type(points)
         for y in range(points.shape[0]):
             for x in range(points.shape[1]):
-                n, m = self.world2grid(points[y, x, 0],points[y, x, 1])
-                if n >= 0 and n < self.world.shape[0] and m >= 0 and m < self.world.shape[1]:
+                #print "try to project point", y, x, "with values", points[y, x, 0], points[y, x, 1]
+                n, m = self.world2grid(points[y, x, 0], points[y, x, 1])
+                #print "projected to index:", n, m
+                if n is not None and m is not None and 0 <= n < self.world.shape[0] and m >= 0 and m < self.world.shape[1]:
                     for i in range(4):
                         self.world[n, m, i] = points[y, x, i]
 
@@ -377,9 +404,12 @@ class Engine(object):
             pool.close()
             pool.join()
 
+            k=0
             for key in self.global_processors.keys():
                 self.projectPointsToCenter(self.global_processors[key])
-                #self.addPointsToWorld(self.global_processors[key].world)
+                self.addPointsToWorld(self.global_processors[key].world)
+                imsave(self.params["resultsPath"]+"reprojected_%4.4i.png" % self.global_processors[key].ID, self.world[:, :, 2, k])
+                k+=1
 
             self.global_processors.clear()
 
@@ -418,7 +448,8 @@ if __name__ == "__main__":
         "camTransVector": [1.0, 0.0, 0.0],
         "camLookAtVector": [0.0, 0.0, -1.0],
         "roi": {"pos": [270-150, 480-150], "size": [300, 300]},
-        "prefilter": 0.4
+        "prefilter": 0.4,
+        "numOfProcessors:": 0
     }
 
     main(parameter)
