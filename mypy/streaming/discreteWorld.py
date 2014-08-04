@@ -84,7 +84,7 @@ class discreteWorldSpace(object):
     def getResultMedian(self):
         cloud = np.zeros((self.N+1, self.M+1, 4))
         color = np.zeros((self.N+1, self.M+1, 3))
-        doubleDepthProp  = np.zeros((self.N+1, self.M+1))
+        doubleDepthProp = np.zeros((self.N+1, self.M+1))
 
         for n in range(self.N+1):
             for m in range(self.M+1):

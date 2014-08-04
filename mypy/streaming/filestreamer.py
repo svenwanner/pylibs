@@ -17,10 +17,8 @@ cpus_available = cpu_count()
 
 
 #########################################################################################################
-###################                                                              ########################
+###################            H E L P E R   F U N C T I O N S                   ########################
 #########################################################################################################
-
-
 
 def imshow(im, cmap="jet"):
     cmaps = {"jet":plt.cm.hot, "hot":plt.cm.hot, "gray":plt.cm.gray}
@@ -30,7 +28,6 @@ def imshow(im, cmap="jet"):
         plt.imshow(im[:, :, 0:3])
     plt.title("range:"+str(np.amin(im))+","+str(np.amax(im)))
     plt.show()
-
 
 
 
@@ -123,9 +120,6 @@ class Processor(object):
                 else:
                     self.world[y, x, 2] = depth
                 self.world[y, x, 3] = cv_coherence[y, x]
-
-        # imsave("/home/swanner/Desktop/depth_%4.4i.png"%self.ID,  self.world[:, :, 2])
-        # print "depth at", self.ID, "is", self.world[100, 100, 2]
 
     def refocusEpi(self, epi, focus):
         repi = np.zeros_like(epi)
@@ -220,8 +214,7 @@ class StructureTensorClassic(Processor):
             self.coherence_lf[:, y, :] = coherence[:]
 
         #imshow(self.orientation_lf[self.orientation_lf.shape[0]/2, :, :])
-        imsave("/home/swanner/Desktop/disp_%4.4i.png"%self.ID,  self.orientation_lf[self.orientation_lf.shape[0]/2, :, :])
-        print "disp at", self.ID, "is", self.orientation_lf[self.orientation_lf.shape[0]/2, 100, 100]
+        imsave(self.params["resultsPath"]+"disp_%4.4i.png"%self.ID,  self.orientation_lf[self.orientation_lf.shape[0]/2, :, :])
 
     def postprocess(self):
         pass
@@ -334,13 +327,16 @@ class Engine(object):
         for y in range(processor.world.shape[0]):
             for x in range(processor.world.shape[1]):
                 for i in range(3):
-                processor.world[y, x, i] += cam_shift[i]
+                    processor.world[y, x, i] += cam_shift[i]
+
+        imsave(self.params["resultsPath"]+"depth_%4.4i.png" % processor.ID,  processor.world[:, :, 2])
+        imsave(self.params["resultsPath"]+"coherence_%4.4i.png" % processor.ID,  processor.world[:, :, 3])
 
     def world2grid(self, x, y):
         # x=0, y=0 -> m=sh/2, m=sw/2
         # x=-wsx/2, y 
-        return [int((self.world_size[0]/2.0-y)/self.world_size[0]*self.N),
-                        int(self.M-int((self.world_size[1]/2.0-x)/self.world_size[1]*self.M))]
+        return [int((self.world_size[0]/2.0-y)/self.world_size[0]*self.world.shape[0]),
+                        int(self.M-int((self.world_size[1]/2.0-x)/self.world_size[1]*self.world.shape[1]))]
 
     def addPointsToWorld(self, points):
         for y in range(points.shape[0]):
@@ -360,7 +356,7 @@ class Engine(object):
                 break
 
             fname_list = {}
-            print "cpus_available",cpus_available
+            print "cpus_available", cpus_available
             for i in range(cpus_available):
                 sindex, findex = self.computeListIndices(n)
                 fname_list[n] = self.fnames[sindex:findex]
@@ -372,19 +368,18 @@ class Engine(object):
             if len(fname_list.keys()) == 0:
                 break
 
-            pool = Pool(cpus_available)
+            pool = Pool(len(fname_list.keys()))
 
             for index in fname_list.keys():
-                if fname_list[index] is None:
-                    break
-                pool.apply_async(self.process2thread, (fname_list[index], index))
+                if fname_list[index] is not None and len(fname_list[index]) > 0:
+                    pool.apply_async(self.process2thread, (fname_list[index], index))
 
             pool.close()
             pool.join()
 
             for key in self.global_processors.keys():
                 self.projectPointsToCenter(self.global_processors[key])
-                self.addPointsToWorld(self.global_processors[key].world)
+                #self.addPointsToWorld(self.global_processors[key].world)
 
             self.global_processors.clear()
 
