@@ -1,8 +1,10 @@
 import sys
+import time
 import vigra
 import numpy as np
 from scipy.ndimage import shift
 from multiprocessing import cpu_count
+from scipy.stats.mstats import mquantiles
 from multiprocessing.pool import ThreadPool as Pool
 
 from mypy.tools.linearAlgebra import normalize_vec
@@ -30,38 +32,70 @@ def imshow(im, cmap="jet"):
     plt.show()
 
 
+def vectorialMedian(world):
+    assert isinstance(world, np.ndarray)
+    cloud = []
 
-#########################################################################################################
-##################    O R I E N T A T I O N C O M P U T A T I O N   C L A S S    ########################
-#########################################################################################################
-
-
-
-class Orientation(object):
-    def __init__(self,  epi, inner_scale, outer_scale, focuses):
-        self.epi = epi
-        self.inner_scale = inner_scale
-        self.outer_scale = outer_scale
-        self.focuses = focuses
-
-    def __call__(self):
-        return self.compute()
-
-    def compute(self):
-        tmp_orientation = None
-        tmp_coherence = None
-        final_orientation = np.zeros((self.epi.shape[0], self.epi.shape[1]), dtype=np.float32)
-        final_coherence = np.zeros((self.epi.shape[0], self.epi.shape[1]), dtype=np.float32)
-        for focus in self.focuses:
-            tensor_channels = np.zeros((self.lf.shape[3], self.epi.shape[0], self.epi.shape[1], 3), dtype=np.float32)
-            for c in range(self.lf.shape[3]):
-                repi = self.refocusEpi(self.epi, focus)
-                tensor_channels[c, :, :, :] = vigra.filters.structureTensor(repi[:, :, c], self.inner_scale, self.outer_scale)
-            tmp_orientation, tmp_coherence = self.evaluateStructureTensor(np.sum(tensor_channels, axis=0))
-            final_orientation, final_coherence = self.mergeOrientations_wta(final_orientation, final_coherence, tmp_orientation+focus, tmp_coherence)
-        return final_orientation, final_coherence
+    for y in xrange(world.shape[0]):
+        for x in xrange(world.shape[1]):
+            confidences = world[y, x, 3, :]
+            depths = world[y, x, 2, :]
+            csum = np.sum(confidences)
+            if csum > 0:
+                dq = mquantiles(depths)[1]
+                cloud.append([world[y, x, 0, 0], world[y, x, 1, 0], dq])
+    return cloud
 
 
+class PlyWriter(object):
+    def __init__(self, filename=None, cloud=None, format="EN"):
+        self.filename = filename
+        self.cloud = cloud
+        self.format = format
+
+        if filename is not None and cloud is not None:
+            self.save()
+
+    def save(self, append=False):
+        if not self.filename.endswith(".ply"):
+            self.filename += ".ply"
+
+        if append:
+            f = open(self.filename, 'r')
+            lines = f.readlines()
+            vertices = int(lines[2][15:-1])
+            f.close()
+            f = open(self.filename, 'w')
+            self.write_header(f, self.cloud, vertices)
+            for n, line in enumerate(lines):
+                if n > 10:
+                    f.write(line)
+        else:
+            f = open(self.filename, 'w')
+            self.write_header(f, self.cloud)
+
+        self.write_points(f, self.cloud)
+
+        f.close()
+
+    def write_header(self, f, points, additional_points=0):
+        f.write('ply\n')
+        f.write('format ascii 1.0\n')
+        f.write('element vertex %d\n' % (len(points)+additional_points))
+        f.write('property float x\n')
+        f.write('property float y\n')
+        f.write('property float z\n')
+        f.write('end_header\n')
+
+    def write_points(self, f, points, colors=None, confidence=None, intensity=None):
+        print "write", len(points), "points..."
+        for n, point in enumerate(points):
+            line = ""
+            line += "{0} {1} {2}".format(point[0], point[1], point[2])
+            line += "\n"
+            if self.format == "DE":
+                line = line.replace(".", ",")
+            f.write(line)
 
 #########################################################################################################
 ###################            P R O C E S S O R   T E M P L A T E S             ########################
@@ -183,12 +217,11 @@ class StructureTensorClassic(Processor):
         ### mark out of boundary orientation estimation ###
         invalid_ubounds = np.where(orientation > 1.1)
         invalid_lbounds = np.where(orientation < -1.1)
+        invalid = np.where(coherence < self.params["coherenceThreshold"])
         ### set coherence of invalid values to zero ###
         coherence[invalid_ubounds] = 0
         coherence[invalid_lbounds] = 0
-        ### set orientation of invalid values to related maximum/minimum value
-        orientation[invalid_ubounds] = 1.1
-        orientation[invalid_lbounds] = -1.1
+        coherence[invalid] = 0
         return orientation, coherence
 
     def preprocess(self):
@@ -237,9 +270,6 @@ class Engine(object):
         self.params = self.computeMissingParameter(parameter)
         self.global_processors = {}
 
-        global cpus_available
-        if self.params.has_key("numOfProcessors") and (0 < self.params["numOfProcessors"] < cpus_available):
-            cpus_available = self.params["numOfProcessors"]
 
         # check if number of frames to compute and images available is consistent
         if len(self.fnames) < self.params["totalNumOfFrames"]:
@@ -259,6 +289,9 @@ class Engine(object):
         # if no frameShift set use sub volume site as shift
         if not parameter.has_key("frameShift"):
             parameter["frameShift"] = parameter["subImageVolumeSize"]
+        # set default coherence threshold if not available
+        if not parameter.has_key("coherenceThreshold"):
+            parameter["coherenceThreshold"] = 0.9
         # compute the field of view of the camera
         parameter["fov"] = np.arctan2(parameter["sensorSize_mm"], 2.0*parameter["focalLength_mm"])
         # compute focal length is pixel
@@ -298,6 +331,16 @@ class Engine(object):
         if not parameter.has_key("worldAccuracy_m") or parameter["worldAccuracy_m"] <= 0.0:
             parameter["worldAccuracy_m"] = vwsy/parameter["sensorSize_px"][0]
 
+        if not parameter.has_key("numOfProcessors"):
+            print "no parameter numOfProcessors set, use cpus_available instead!"
+            parameter["numOfProcessors"] = cpus_available
+        elif parameter["numOfProcessors"] <= 0:
+            print "numOfProcessors set to < 0, cpus_available used instead!"
+            parameter["numOfProcessors"] = cpus_available
+
+        if not parameter.has_key("pointcloudMerging"):
+            parameter["pointcloudMerging"] = "median"
+
         for key in parameter.keys():
             print key, ":", parameter[key]
 
@@ -306,13 +349,18 @@ class Engine(object):
     def computeListIndices(self, n):
         return n*self.params["frameShift"], n*self.params["frameShift"]+self.params["subImageVolumeSize"]
 
-    def process2thread(self, params, index):
+    def processor2thread(self, params, index):
         # set processor instance
         if self.params["processor"] == "structureTensorClassic":
             self.global_processors[index] = StructureTensorClassic(self.params)
         self.global_processors[index].ID = index
         self.global_processors[index].setData(params)
         self.global_processors[index].start()
+
+    def worldProjection2thread(self, processor):
+        self.projectPointsToCenter(processor)
+        self.addPointsToWorld(processor.world)
+        imsave(self.params["resultsPath"]+"reprojected_%4.4i.png" % processor.ID, self.world[:, :, 2, processor.ID])
 
     def computeCurrentCamPosition(self, index):
         slfs = self.params["subImageVolumeSize"]
@@ -325,66 +373,62 @@ class Engine(object):
         return self.params["camCenterPos"]-currentPos
 
     def projectPointsToCenter(self, processor):
-        camp_pos = self.computeCurrentCamPosition(processor.ID)
-        cam_shift = self.computeCamShiftVector(camp_pos)
-        print "camp_pos of index", processor.ID, ":", camp_pos
+        cam_pos = self.computeCurrentCamPosition(processor.ID)
+        cam_shift = self.computeCamShiftVector(cam_pos)
+        print "cam_pos of index", processor.ID, ":", cam_pos
         print "cam shift:", cam_shift
 
         for y in range(processor.world.shape[0]):
             for x in range(processor.world.shape[1]):
-                for i in range(3):
-                    processor.world[y, x, i] += cam_shift[i]
+
+                if y==270 and x >200 and x<210:
+                    print "shift local world point to global position: x =", processor.world[y, x, 0], " y =", processor.world[y, x, 1], " -> ",
+
+                processor.world[y, x, 0] -= cam_shift[0]
+                processor.world[y, x, 1] -= cam_shift[1]
+
+                if y==270 and x >200 and x<210:
+                    print "x' =", processor.world[y, x, 0]," y' =", processor.world[y, x, 1]
 
         imsave(self.params["resultsPath"]+"depth_%4.4i.png" % processor.ID,  processor.world[:, :, 2])
         imsave(self.params["resultsPath"]+"coherence_%4.4i.png" % processor.ID,  processor.world[:, :, 3])
 
     def world2grid(self, x, y):
-        if -self.world_size[1]/2.0 <= y <= self.world_size[1]/2.0:
-            if -self.world_size[0]/2.0 <= x <= self.world_size[0]/2.0:
-                n = int((self.world_size[1]/2.0-y)/self.world_size[1]*self.worldgrid_shape[0])
-                m = int(self.worldgrid_shape[1]-int((self.world_size[0]/2.0-x)/self.world_size[0]*self.worldgrid_shape[1]))
+        n = int(round((self.world_size[1]/2.0-y)/self.world_size[1]*self.worldgrid_shape[0]))
+        m = int(round(self.worldgrid_shape[1]-int((self.world_size[0]/2.0-x)/self.world_size[0]*self.worldgrid_shape[1])))
+        if 0 <= n < self.worldgrid_shape[0]:
+            if 0 <= m < self.worldgrid_shape[1]:
                 return n, m
             else:
-                print "x coordinate out of range!"
                 return None, None
         else:
-            print "y coordinate out of range!"
             return None, None
 
-
-    def grid2world(self, n, m):
-        if 0 <= n <= self.N:
-            if 0 <= m <= self.M:
-                return [(float(self.worldgrid_shape[0])/2.0-float(n))/float(self.worldgrid_shape[0])*self.world_size[0],
-                        (float(m)-float(self.worldgrid_shape[1])/2.0)/float(self.worldgrid_shape[1])*self.world_size[1]]
-            else:
-                return None
-        else:
-            return None
-
     def addPointsToWorld(self, points):
-        print "type points:", type(points)
         for y in range(points.shape[0]):
             for x in range(points.shape[1]):
                 #print "try to project point", y, x, "with values", points[y, x, 0], points[y, x, 1]
                 n, m = self.world2grid(points[y, x, 0], points[y, x, 1])
                 #print "projected to index:", n, m
-                if n is not None and m is not None and 0 <= n < self.world.shape[0] and m >= 0 and m < self.world.shape[1]:
+                if n is not None and m is not None:
                     for i in range(4):
                         self.world[n, m, i] = points[y, x, i]
+
+    def world2PointCloud(self):
+        if self.params["pointcloudMerging"] == "median":
+            cloud = vectorialMedian(self.world)
+        plyWriter = PlyWriter(self.params["resultsPath"]+"cloud.ply", cloud)
 
     def run(self):
         global global_index
 
         n = 0
         while True:
-
             if n >= self.params["numOfSubImageVolumes"]:
                 break
 
             fname_list = {}
-            print "cpus_available", cpus_available
-            for i in range(cpus_available):
+            for i in range(self.params["numOfProcessors"]):
                 sindex, findex = self.computeListIndices(n)
                 fname_list[n] = self.fnames[sindex:findex]
                 if len(fname_list[n]) < self.params["subImageVolumeSize"]:
@@ -399,19 +443,29 @@ class Engine(object):
 
             for index in fname_list.keys():
                 if fname_list[index] is not None and len(fname_list[index]) > 0:
-                    pool.apply_async(self.process2thread, (fname_list[index], index))
+                    pool.apply_async(self.processor2thread, (fname_list[index], index))
 
             pool.close()
             pool.join()
 
-            k=0
-            for key in self.global_processors.keys():
-                self.projectPointsToCenter(self.global_processors[key])
-                self.addPointsToWorld(self.global_processors[key].world)
-                imsave(self.params["resultsPath"]+"reprojected_%4.4i.png" % self.global_processors[key].ID, self.world[:, :, 2, k])
-                k+=1
+            if False: #TODO: is not running, check why!
+                pool2 = Pool(len(self.global_processors.keys()))
+
+                for key in self.global_processors.keys():
+                    print "start reprojection thread..."
+                    pool2.apply_async(self.worldProjection2thread, (self.global_processors[key]))
+
+                pool2.close()
+                pool2.join()
+            else:
+                for key in self.global_processors.keys():
+                    self.projectPointsToCenter(self.global_processors[key])
+                    self.addPointsToWorld(self.global_processors[key].world)
+                    imsave(self.params["resultsPath"]+"reprojected_%4.4i.png" % self.global_processors[key].ID, self.world[:, :, 2, self.global_processors[key].ID])
 
             self.global_processors.clear()
+
+        self.world2PointCloud()
 
 
 
@@ -429,14 +483,40 @@ def main(parameter):
 
 if __name__ == "__main__":
 
-    parameter = {
-        "filesPath": "/home/swanner/Desktop/denseSampledTestScene/rendered3/fullRes/",
+    parameter_LR = {
+        "filesPath": "/home/swanner/Desktop/denseSampledTestScene/rendered_LR",
         "switchFilesOrder": False,
-        "resultsPath": "/home/swanner/Desktop/denseSampledTestScene/results3_FR/",
+        "resultsPath": "/home/swanner/Desktop/denseSampledTestScene/results_LR/",
         "rgb": True,
         "processor": "structureTensorClassic",
         "innerScale": 0.6,
         "outerScale": 1.3,
+        "coherenceThreshold": 0.95,
+        "sensorSize_mm": 32,
+        "focalLength_mm": 16,
+        "focuses": [0],
+        "baseline_mm": 0.8695652173913043,
+        "sensorSize_px": [108, 192],
+        "subImageVolumeSize": 11,
+        "frameShift": 11,
+        "camInitialPos": [-1.0, 0.0, 2.6],
+        "camTransVector": [1.0, 0.0, 0.0],
+        "camLookAtVector": [0.0, 0.0, -1.0],
+        #"roi": {"pos": [270-150, 480-150], "size": [300, 300]},
+        "prefilter": 0.4,
+        "numOfProcessors": 4,
+        "pointcloudMerging": "median"
+    }
+
+    parameter = {
+        "filesPath": "/home/swanner/Desktop/denseSampledTestScene/rendered/imgs",
+        "switchFilesOrder": False,
+        "resultsPath": "/home/swanner/Desktop/denseSampledTestScene/results_FR/",
+        "rgb": True,
+        "processor": "structureTensorClassic",
+        "innerScale": 0.6,
+        "outerScale": 1.3,
+        "coherenceThreshold": 0.90,
         "sensorSize_mm": 32,
         "focalLength_mm": 16,
         "focuses": [2, 3],
@@ -447,9 +527,38 @@ if __name__ == "__main__":
         "camInitialPos": [-1.0, 0.0, 2.6],
         "camTransVector": [1.0, 0.0, 0.0],
         "camLookAtVector": [0.0, 0.0, -1.0],
-        "roi": {"pos": [270-150, 480-150], "size": [300, 300]},
+        #"roi": {"pos": [270-150, 480-150], "size": [300, 300]},
         "prefilter": 0.4,
-        "numOfProcessors:": 0
+        "numOfProcessors": 4,
+        "pointcloudMerging": "median"
     }
 
-    main(parameter)
+    parameter4 = {
+        "filesPath": "/home/swanner/RexData/lfa/lightFields/denseSampled/HCIOutside/merged/",
+        "switchFilesOrder": True,
+        "resultsPath": "/home/swanner/RexData/lfa/lightFields/denseSampled/HCIOutside/result/",
+        "rgb": True,
+        "processor": "structureTensorClassic",
+        "innerScale": 0.8,
+        "outerScale": 1.6,
+        "coherenceThreshold": 0.85,
+        "sensorSize_mm": 35.9,
+        "focalLength_mm": 50,
+        "focuses": [0, 1, 2],
+        "baseline_mm": 1.0,
+        "sensorSize_px": [2026, 2154],
+        "subImageVolumeSize": 7,
+        "frameShift": 7,
+        "camInitialPos": [-0.05, 0.0, 3.0],
+        "camTransVector": [1.0, 0.0, 0.0],
+        "camLookAtVector": [0.0, 0.0, -1.0],
+        #"roi": {"pos": [270-150, 480-150], "size": [300, 300]},
+        "prefilter": 0.4,
+        "numOfProcessors": 4,
+        "pointcloudMerging": "median"
+    }
+
+    start = time.clock()
+    main(parameter4)
+    elapsed = time.clock() - start
+    print "duration:",elapsed*1000.0,"s"
