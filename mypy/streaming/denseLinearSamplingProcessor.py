@@ -4,82 +4,121 @@ import vigra
 import numpy as np
 import scipy as sp
 
-from mypy.tools.cg import transformations as trans
+from mypy.tools.cg import transformations as transformations
 
 
-def compute_camera_trail(initial_position, euler_angles, number_of_sampling_points, baseline, translation_vector):
+########################################################################################################################
+#                               C A M E R A   T R A I L   C O M P U T A T I O N
+########################################################################################################################
 
-    """Return dictionary with camera index and spacial position of the camera
-    >>> initial_position = np.array([2.63167, -5.28107, 4.63259])
-    >>> euler_angles = np.array([2.63167, -5.28107, 4.63259])
-    >>> number_of_sampling_points = 231
-    >>> baseline = 0.0153837881352217
-    >>> translation_vector = np.array[(2.4268112182617188, 2.574542999267578, -0.038271427154541016)]
-    >>> trail = compute_camera_trail(initial_position, euler_angles, number_of_sampling_points, baseline, translation_vector)
-    >>> positions = np.zeros((3,3))
-    >>> positions[0,0] = trail[1][0]; positions[0,1] = trail[1][1]; positions[0,2] = trail[1][2]
-    >>> positions[1,0] = trail[2][0]; positions[1,1] = trail[2][1]; positions[1,2] = trail[2][2]
-    >>> positions[2,0] = trail[230][0]; positions[2,1] = trail[230][1]; positions[2,2] = trail[230][2]
-    >>> gt = np.array([[2.6422219276428223, -5.269871711730957, 4.632420063018799], [2.652773141860962, -5.258677959442139, 4.632253646850586], [5.058481693267822, -2.7065224647521973, 4.594315052032471]])
-    >>> numpy.allclose(positions, gt)
+def compute_linear_trail_from_translation(pos1, num_of_sampling_points, baseline, translation_vector):
+    """
+    Returns dictionary with camera index and spacial position of the
+    camera based on the initial camera position, number of sampling points,
+    baseline and a camera tranlation unit vector.
+    Further the baseline, the translation direction and the trail length
+    is returned
     """
 
-    assert isinstance(initial_position, np.ndarray)
-    assert len(initial_position.shape[0]) == 3
-    assert isinstance(euler_angles, np.ndarray)
-    assert len(euler_angles.shape[0]) == 3
-    assert isinstance(number_of_sampling_points, int)
+    assert isinstance(pos1, np.ndarray)
+    assert pos1.shape[0] == 3
+    assert isinstance(num_of_sampling_points, int)
     assert isinstance(baseline, float)
     assert isinstance(translation_vector, np.ndarray)
-    assert len(translation_vector.shape[0]) == 3
+    assert translation_vector.shape[0] == 3
+
+    length = baseline * (num_of_sampling_points-1)
+
+    trail = {}
+    for n in range(num_of_sampling_points):
+        trail[n] = pos1 + n * baseline * translation_vector
+
+    return trail, baseline, translation_vector, length
+
+
+def compute_linear_trail_from_positions(pos1, pos2, num_of_sampling_points):
+    """
+    Returns dictionary with camera index and spacial position of the
+    camera based on two positions and the number of sampling points.
+    Further the baseline, the translation direction and the trail length
+    is returned
+    """
+
+    assert isinstance(pos1, np.ndarray)
+    assert pos1.shape[0] == 3
+    assert isinstance(pos2, np.ndarray)
+    assert pos2.shape[0] == 3
+    assert isinstance(num_of_sampling_points, int)
+
+    trail_vec = pos2-pos1
+    length = transformations.vector_length(trail_vec)
+    baseline = length/(num_of_sampling_points-1)
+    direction = transformations.vector_normed(trail_vec)
+
+    trail = {}
+    for n in range(num_of_sampling_points):
+        trail[n] = pos1 + n * baseline * direction
+
+    return trail, baseline, direction, length
 
 
 
-    pass
+#=======================================================================================================================
+#                               T E S T   C A M E R A   T R A I L   C O M P U T A T I O N
+def test_compute_linear_trail():
+    trail_gt = {0: np.array([ 2.63167, -5.28107,  4.63259]), 1: np.array([2.64222135, -5.2698763 ,  4.63242361]), 230: np.array([ 5.05848, -2.70652,  4.59432])}
+    baseline_gt = 0.015383674768
+    translation_vector_gt = np.array([ 0.68587954  ,0.72763471, -0.0108161 ])
+    length_gt = 3.53824519663
 
+    #TODO: maximum depth of scene is maximum_scene_depth = 12 m
 
+    initial_position = np.array([2.63167, -5.28107, 4.63259])
+    final_position = np.array([5.05848, -2.70652, 4.59432])
+    number_of_sampling_points = 231
+    trail, baseline, translation_vector, length = compute_linear_trail_from_positions(initial_position, final_position, number_of_sampling_points)
 
+    assert np.allclose(baseline, baseline_gt)
+    assert np.allclose(length_gt, length)
+    assert np.allclose(translation_vector, translation_vector_gt)
+    for key in trail_gt.keys():
+        assert np.allclose(trail[key], trail_gt[key])
 
+    trail, baseline, translation_vector, length = compute_linear_trail_from_translation(initial_position, number_of_sampling_points, baseline, translation_vector)
 
-if __name__ == "__main__":
-    import doctest
-    import random
-    np.set_printoptions(suppress=True, precision=5)
-    doctest.testmod()
-
-
-
-# from mypy.tools.cg import _transformations as ftrans
-# vx = np.array([1, 0, 0])
-# vy = np.array([0, 1, 0])
-# vz = np.array([0, 0, 1])
-# v0 = np.array([1, 1, 1])
-# v1 = np.array([-1, -1, -1])
+    assert np.allclose(baseline, baseline_gt)
+    assert np.allclose(length_gt, length)
+    assert np.allclose(translation_vector, translation_vector_gt)
+    for key in trail_gt.keys():
+        assert np.allclose(trail[key], trail_gt[key])
 #
-# print ftrans.identity_matrix()
-# print "\nrandom_vector(10):", ftrans.random_vector(10)
-# print "\nvector_product(vx, vy):", trans.vector_product(vx, vy)
-# print "\nangle_between_vectors(vx, vy):", trans.angle_between_vectors(vx, vy)
-# unit = trans.unit_vector(v0)
-# print "\nunit_vector(v0):", unit
-# print "\nnp.sqrt(np.sum(unit[:]**2)):", np.sqrt(np.sum(unit[:]**2))
-# print "\nvector_norm(v0):", trans.vector_norm(v0)
-# print "\nrandom_rotation_matrix():", trans.random_rotation_matrix()
-# print "\nrandom_quaternion():", trans.random_quaternion()
-# print "\nquaternion_matrix(quaternion):", trans.quaternion_matrix(trans.random_quaternion())
-# quaternion = trans.quaternion_from_euler(np.pi/2.0, 0.0, np.pi/2.0, axes='sxyz')
-# print "\nquaternion_from_euler(ai, aj, ak, axes='sxyz'):", quaternion
-# print "\neuler_from_quaternion(quaternion, axes='sxyz'):", trans.euler_from_quaternion(quaternion, axes='sxyz')
-# matrix = trans.euler_matrix(np.pi/2.0, 0.0, np.pi/2.0, axes='sxyz')
-# print "\neuler_matrix(ai, aj, ak, axes='sxyz'):", matrix
-#
-# alpha, beta, gamma = np.pi/2.0, 0, np.pi/2.0
-# origin, xaxis, yaxis, zaxis = [0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]
-# I = trans.identity_matrix()
-# Rx = trans.rotation_matrix(alpha, xaxis)
-# Ry = trans.rotation_matrix(beta, yaxis)
-# Rz = trans.rotation_matrix(gamma, zaxis)
-# R = trans.concatenate_matrices(Rx, Ry, Rz)
-# euler = trans.euler_from_matrix(R, 'rxyz')
-# print "\n", R
-# print "\n", euler
+#=======================================================================================================================
+
+
+
+
+
+
+
+########################################################################################################################
+#                           V I S I B L E   S C E N E F R A M E    C O M P U T A T I O N
+########################################################################################################################
+
+def compute_visible_sceneframe(camera_position, look_at_vector, focal_length_mm, sensor_width_mm, sensor_resolution_yx, maximum_depth):
+    """
+    """
+    assert isinstance(camera_position, np.ndarray)
+    assert camera_position.shape[0] == 3
+    assert isinstance(look_at_vector, np.ndarray)
+    assert look_at_vector.shape[0] == 3
+    assert isinstance(focal_length_mm, float)
+    assert isinstance(sensor_width_mm, float)
+    assert isinstance(sensor_resolution_yx, type([]))
+    assert isinstance(maximum_depth, float)
+
+    sensorSize_y = sensor_width_mm * sensor_resolution_yx[0]/float(sensor_resolution_yx[1])
+    fov_v = np.arctan2(sensor_width_mm, 2.0*focal_length_mm)
+    fov_h = np.arctan2(sensorSize_y, 2.0*focal_length_mm)
+    # vwsx = 2.0*parameter["camInitialPos"][2]*np.tan(parameter["fov"])+parameter["maxBaseline_mm"]/100.0
+    # vwsy = 2.0*parameter["camInitialPos"][2]*np.tan(fov_h)
+

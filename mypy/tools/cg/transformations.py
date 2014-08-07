@@ -197,6 +197,22 @@ __docformat__ = 'restructuredtext en'
 __all__ = []
 
 
+
+
+def vector_length(vec):
+    return numpy.sqrt(numpy.sum(vec[:]**2))
+
+def vector_normed(vec):
+    return vec[:]/vector_length(vec)
+
+
+
+
+
+
+
+
+
 def identity_matrix():
     """Return 4x4 identity/unit matrix.
 
