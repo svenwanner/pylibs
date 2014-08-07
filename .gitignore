@@ -2,3 +2,5 @@
 *~
 *.idea/
 *mypy/pointclouds/PointcloudTests/
+*.so
+*build/
