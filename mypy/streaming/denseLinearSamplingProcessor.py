@@ -97,28 +97,93 @@ def test_compute_linear_trail():
 
 
 
-
-
-
 ########################################################################################################################
-#                           V I S I B L E   S C E N E F R A M E    C O M P U T A T I O N
+#                                             C A M E R A  O B J E C T
 ########################################################################################################################
 
-def compute_visible_sceneframe(camera_position, look_at_vector, focal_length_mm, sensor_width_mm, sensor_resolution_yx, maximum_depth):
-    """
-    """
-    assert isinstance(camera_position, np.ndarray)
-    assert camera_position.shape[0] == 3
-    assert isinstance(look_at_vector, np.ndarray)
-    assert look_at_vector.shape[0] == 3
-    assert isinstance(focal_length_mm, float)
-    assert isinstance(sensor_width_mm, float)
-    assert isinstance(sensor_resolution_yx, type([]))
-    assert isinstance(maximum_depth, float)
+class Camera(object):
 
-    sensorSize_y = sensor_width_mm * sensor_resolution_yx[0]/float(sensor_resolution_yx[1])
-    fov_v = np.arctan2(sensor_width_mm, 2.0*focal_length_mm)
-    fov_h = np.arctan2(sensorSize_y, 2.0*focal_length_mm)
-    # vwsx = 2.0*parameter["camInitialPos"][2]*np.tan(parameter["fov"])+parameter["maxBaseline_mm"]/100.0
-    # vwsy = 2.0*parameter["camInitialPos"][2]*np.tan(fov_h)
+    def __init__(self, focal_length_mm, sensor_width_mm, resolution):
 
+        assert isinstance(focal_length_mm, float)
+        assert isinstance(sensor_width_mm, float)
+        assert isinstance(resolution, type([]))
+        assert len(resolution) == 2
+        assert isinstance(resolution[0], int)
+
+        self.f_mm = focal_length_mm
+        self.f_px = focal_length_mm/sensor_width_mm * resolution[1]
+        self.resolution = resolution
+        self.sensor = [float(self.resolution[0])/float(self.resolution[1])*sensor_width_mm, sensor_width_mm]
+        self.position = None
+        self.look_at = None
+        self.euler_rotation_xyz = None
+        self.rotation_matrix = None
+        self.world_matrix = None
+        self.max_depth = None
+
+    def setPosition(self, position):
+        self.position = position
+
+    def setLookAt(self, look_at):
+        assert isinstance(look_at, np.ndarray)
+        assert look_at.shape[0] == 3
+        self.look_at = look_at
+        self.compute_euler_rotation()
+
+    def setRotation(self, euler_rotation_xyz):
+        assert isinstance(euler_rotation_xyz, np.ndarray)
+        assert euler_rotation_xyz.shape[0] == 3
+        self.euler_rotation_xyz = euler_rotation_xyz
+        ax = euler_rotation_xyz[0]
+        ay = euler_rotation_xyz[1]
+        az = euler_rotation_xyz[2]
+        self.rotation_matrix = transformations.euler_matrix(ax, ay, az, axes='sxyz')
+        print "\nself.rotation_matrix", self.rotation_matrix
+        self.world_matrix = transformations.compose_matrix(angles=euler_rotation_xyz, translate=self.position)
+        self.compute_look_at()
+
+    def compute_euler_rotation(self):
+        assert self.look_at is not None
+
+    def compute_look_at(self):
+        assert self.euler_rotation_xyz is not None
+        assert self.rotation_matrix is not None
+        self.look_at = np.array([0.0, 0.0, -1.0, 0.0])
+        self.look_at = np.mat(self.look_at) * np.mat(self.rotation_matrix)
+        self.look_at = self.look_at[0]
+
+        print "\n", type(np.array(self.look_at))
+        print "self.look_at", self.look_at[0, 0:3]/np.pi*180.0
+
+
+    def changePosition(self, position, euler_rotation_xyz=None, look_at=None):
+        assert isinstance(position, np.ndarray)
+        assert position.shape[0] == 3
+
+        if euler_rotation_xyz is not None:
+            self.setRotation(euler_rotation_xyz)
+        elif look_at is not None:
+            self.setLookAt(look_at)
+
+        self.position = position
+
+#=======================================================================================================================
+#
+def test_Camera():
+    focal_length = 22.0
+    sensor_width = 32.0
+    resolution = [540, 960]
+    position = np.array([2.67388, -5.23629, 4.63192])
+    euler_rotation_xyz = np.array([63.559/180.0*np.pi, 0.62/180.0*np.pi, 46.692/180.0*np.pi])
+
+    cam = Camera(focal_length, sensor_width, resolution)
+    cam.setPosition(position)
+    cam.setRotation(euler_rotation_xyz)
+
+    assert cam.f_mm == 22.0
+    assert cam.f_px == 660.0
+    assert cam.resolution == [540, 960]
+    assert cam.sensor == [18.0, 32.0]
+#
+#=======================================================================================================================

@@ -1,1 +1,1 @@
-nosetests ./../streaming/denseLinearSamplingProcessor.py
+nosetests -v --nocapture ./../streaming/denseLinearSamplingProcessor.py
