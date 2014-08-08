@@ -18,6 +18,11 @@ def compute_linear_trail_from_translation(pos1, num_of_sampling_points, baseline
     baseline and a camera tranlation unit vector.
     Further the baseline, the translation direction and the trail length
     is returned
+
+    :param pos1: ndarray initial camera coordinates x,y,z
+    :param num_of_sampling_points: int number of camera positions
+    :param baseline: float distance between two neighbored cameras
+    :param translation_vector: ndarray direction of camera movement
     """
 
     assert isinstance(pos1, np.ndarray)
@@ -42,6 +47,10 @@ def compute_linear_trail_from_positions(pos1, pos2, num_of_sampling_points):
     camera based on two positions and the number of sampling points.
     Further the baseline, the translation direction and the trail length
     is returned
+
+    :param pos1: ndarray initial camera coordinates x,y,z
+    :param pos2: ndarray final camera coordinates x,y,z
+    :param num_of_sampling_points: int number of camera positions
     """
 
     assert isinstance(pos1, np.ndarray)
@@ -102,6 +111,19 @@ def test_compute_linear_trail():
 ########################################################################################################################
 
 class Camera(object):
+    """
+    This class represents a camera by providing all important parameter.
+    Accessible are:
+    f_mm -> focal length in mm
+    f_px -> focal length in px
+    resolution -> sensor resolution
+    position -> world position
+    look_at -> camera look at vector
+    euler_rotation_xyz -> euler rotation angles sorted x,y,z
+    rotation_matrix -> camera rotation matrix
+    world_matrix -> camera world matrix
+    max_depth -> maximum distance the camera can see
+    """
 
     def __init__(self, focal_length_mm, sensor_width_mm, resolution):
 
@@ -123,15 +145,20 @@ class Camera(object):
         self.max_depth = None
 
     def setPosition(self, position):
+        """
+        set the camera position.
+
+        :param position: ndarray camera coordinates x,y,z
+        """
         self.position = position
 
-    def setLookAt(self, look_at):
-        assert isinstance(look_at, np.ndarray)
-        assert look_at.shape[0] == 3
-        self.look_at = look_at
-        self.compute_euler_rotation()
-
     def setRotation(self, euler_rotation_xyz):
+        """
+        set the rotation angles. The function automatically computes
+        the rotation and the world matrix and the look at vector as well.
+
+        :param euler_rotation_xyz: ndarray of euler angles x,y,z
+        """
         assert isinstance(euler_rotation_xyz, np.ndarray)
         assert euler_rotation_xyz.shape[0] == 3
         self.euler_rotation_xyz = euler_rotation_xyz
@@ -139,32 +166,30 @@ class Camera(object):
         ay = euler_rotation_xyz[1]
         az = euler_rotation_xyz[2]
         self.rotation_matrix = transformations.euler_matrix(ax, ay, az, axes='sxyz')
-        print "\nself.rotation_matrix", self.rotation_matrix
         self.world_matrix = transformations.compose_matrix(angles=euler_rotation_xyz, translate=self.position)
         self.compute_look_at()
 
-    def compute_euler_rotation(self):
-        assert self.look_at is not None
-
     def compute_look_at(self):
+        """
+        computes the cameras look at vector
+        """
         assert self.euler_rotation_xyz is not None
         assert self.rotation_matrix is not None
-        self.look_at = np.array([0.0, 0.0, -1.0, 0.0])
-        self.look_at = np.mat(self.look_at) * np.mat(self.rotation_matrix)
-        self.look_at = self.look_at[0]
+        self.look_at = np.mat([0.0, 0.0, -1.0, 0.0])
+        self.look_at = self.look_at * np.linalg.inv(np.mat(self.rotation_matrix))
+        self.look_at = np.array(self.look_at[0, 0:3])
 
-        print "\n", type(np.array(self.look_at))
-        print "self.look_at", self.look_at[0, 0:3]/np.pi*180.0
-
-
-    def changePosition(self, position, euler_rotation_xyz=None, look_at=None):
+    def changePosition(self, position, euler_rotation_xyz=None):
+        """
+        changes the cameras position and if set the rotation
+        :param position: ndarray camera coordinates x,y,z
+        :param euler_rotation_xyz: ndarray of euler angles x,y,z [default=None]
+        """
         assert isinstance(position, np.ndarray)
         assert position.shape[0] == 3
 
         if euler_rotation_xyz is not None:
             self.setRotation(euler_rotation_xyz)
-        elif look_at is not None:
-            self.setLookAt(look_at)
 
         self.position = position
 
@@ -177,6 +202,17 @@ def test_Camera():
     position = np.array([2.67388, -5.23629, 4.63192])
     euler_rotation_xyz = np.array([63.559/180.0*np.pi, 0.62/180.0*np.pi, 46.692/180.0*np.pi])
 
+    look_at_gt = np.array([-0.65486208,  0.61066204, -0.44524995])
+    rotation_matrix_gt = np.array([[0.6858798, -0.31737131, 0.65486208, 0.0],
+                                   [0.72763439, 0.3124741, -0.61066204, 0.0],
+                                   [-0.01082083, 0.89534093, 0.44524995, 0.0],
+                                   [0.0, 0.0, 0.0, 1.0]])
+    world_matrix_gt = np.array([[0.6858798, -0.31737131, 0.65486208, 2.67388],
+                                [0.72763439, 0.3124741, -0.61066204, -5.23629],
+                                [-0.01082083, 0.89534093, 0.44524995, 4.63192],
+                                [0.0, 0.0, 0.0, 1.0]])
+
+
     cam = Camera(focal_length, sensor_width, resolution)
     cam.setPosition(position)
     cam.setRotation(euler_rotation_xyz)
@@ -185,5 +221,8 @@ def test_Camera():
     assert cam.f_px == 660.0
     assert cam.resolution == [540, 960]
     assert cam.sensor == [18.0, 32.0]
+    assert np.allclose(cam.rotation_matrix, rotation_matrix_gt)
+    assert np.allclose(cam.world_matrix, world_matrix_gt)
+    assert np.allclose(cam.look_at, look_at_gt)
 #
 #=======================================================================================================================
