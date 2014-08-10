@@ -28,8 +28,6 @@ class PlyWriter(object):
         self.cloud = cloud
         self.format = format
         self.color = None
-        self.setColor(color)
-
         self.num_of_vertices = 0
 
     def __call__(self):
@@ -57,7 +55,7 @@ class PlyWriter(object):
     def setColor(self, color=None):
         # if parameter is not None and is ndarray set this as color
         if type(color) is np.ndarray:
-            assert self.cloud.shape[0] != self.color.shape[0]
+            assert self.cloud.shape[0] == color.shape[0]
             self.color = color
         else:
             # if cloud has 7 dimensions interpret last 3 as rgb
@@ -90,9 +88,10 @@ class PlyWriter(object):
         f.write('property float x\n')
         f.write('property float y\n')
         f.write('property float z\n')
-        f.write('property uchar red\n')
-        f.write('property uchar green\n')
-        f.write('property uchar blue\n')
+        if self.color is not None:
+            f.write('property uchar red\n')
+            f.write('property uchar green\n')
+            f.write('property uchar blue\n')
         f.write('end_header\n')
 
     def write_points(self):
@@ -101,14 +100,15 @@ class PlyWriter(object):
             if self.cloud[n][2] > 0:
                 line = ""
                 line += "{0} {1} {2}".format(self.cloud[n, 0], self.cloud[n, 1], self.cloud[n, 2])
-                if self.color.shape[1] == 3:
-                    line += " {0} {1} {2}".format(int(np.round(self.color[n, 0]*255)),
-                                                  int(np.round(self.color[n, 1]*255)),
-                                                  int(np.round(self.color[n, 2]*255)))
-                else:
-                    line += " {0} {1} {2}".format(int(np.round(self.color[n, 0]*255)),
-                                                  int(np.round(self.color[n, 0]*255)),
-                                                  int(np.round(self.color[n, 0]*255)))
+                if self.color is not None:
+                    if self.color.shape[1] == 3:
+                        line += " {0} {1} {2}".format(int(np.round(self.color[n, 0]*255)),
+                                                      int(np.round(self.color[n, 1]*255)),
+                                                      int(np.round(self.color[n, 2]*255)))
+                    else:
+                        line += " {0} {1} {2}".format(int(np.round(self.color[n, 0]*255)),
+                                                      int(np.round(self.color[n, 0]*255)),
+                                                      int(np.round(self.color[n, 0]*255)))
                 line += "\n"
                 if self.format == "DE":
                     line = line.replace(".", ",")
@@ -221,6 +221,7 @@ class DepthProjector(object):
 
     def save(self, filename, cformat="EN"):
         writer = PlyWriter(filename, self.cloud, format=cformat)
+        writer.setColor(color=np.random.randint(0, 255, self.cloud.shape[0]*3).reshape((self.cloud.shape[0], 3)))
         writer.save()
 
 
