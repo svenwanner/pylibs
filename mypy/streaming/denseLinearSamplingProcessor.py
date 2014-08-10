@@ -15,15 +15,25 @@ from mypy.tools.cg import transformations as transformations
 ########################################################################################################################
 
 class PlyWriter(object):
-    def __init__(self, filename=None, cloud=None, format="EN"):
+    """
+    The PlyWriter saves a pointcloud to file in the .ply format
+    the class needs a filename<str> and a cloud<ndarray[n,4]>
+    cloud dimensions are 0:x, 1:y, 2:z, 3:coherence
+    additionally dimensions 4,5,6 can be set, these are interpreted as rgb
+    rgb values can also be passed as ndarray with the same shape[0] as cloud in the constructor
+    if no color is set in one of the ways described, the coherence is used as color
+    """
+    def __init__(self, filename=None, cloud=None, color=None, format="EN"):
         self.filename = filename
         self.cloud = cloud
         self.format = format
+        self.color = None
+        self.setColor(color)
 
         self.num_of_vertices = 0
 
-        if filename is not None and cloud is not None:
-            self.save()
+    def __call__(self):
+        self.save()
 
     def save(self, append=False):
         if not self.filename.endswith(".ply"):
@@ -44,6 +54,35 @@ class PlyWriter(object):
         self.write(f)
         f.close()
 
+    def setColor(self, color=None):
+        # if parameter is not None and is ndarray set this as color
+        if type(color) is np.ndarray:
+            assert self.cloud.shape[0] != self.color.shape[0]
+            self.color = color
+        else:
+            # if cloud has 7 dimensions interpret last 3 as rgb
+            if self.cloud.shape[1] == 7:
+                self.color = self.cloud[:, 4:]
+            # else use coherence as color
+            else:
+                self.color = np.zeros((self.cloud.shape[0], 1))
+                self.color[:, 0] = self.cloud[:, 3]
+
+        # re-range data to [0,1]
+        min_col = np.amin(self.color)
+        self.color = self.color.astype(np.float32)
+        if min_col < 0:
+            self.color[:] -= min_col
+        max_color = np.amax(self.color)
+        if max_color < 1.0:
+            pass
+        elif max_color > 1.0 and (max_color <= 10 or max_color > 255):
+            self.color[:] /= max_color
+        elif max_color > 1.0 and max_color <= 255:
+            self.color[:] /= 255.0
+        else:
+            assert False, "color range cannot be handled!"
+
     def write_header(self, f):
         f.write('ply\n')
         f.write('format ascii 1.0\n')
@@ -51,14 +90,25 @@ class PlyWriter(object):
         f.write('property float x\n')
         f.write('property float y\n')
         f.write('property float z\n')
+        f.write('property uchar red\n')
+        f.write('property uchar green\n')
+        f.write('property uchar blue\n')
         f.write('end_header\n')
 
     def write_points(self):
         string = ""
         for n in range(self.cloud.shape[0]):
-            if(self.cloud[n][2] > 0):
+            if self.cloud[n][2] > 0:
                 line = ""
-                line += "{0} {1} {2}".format(self.cloud[n][0], self.cloud[n][1], self.cloud[n][2])
+                line += "{0} {1} {2}".format(self.cloud[n, 0], self.cloud[n, 1], self.cloud[n, 2])
+                if self.color.shape[1] == 3:
+                    line += " {0} {1} {2}".format(int(np.round(self.color[n, 0]*255)),
+                                                  int(np.round(self.color[n, 1]*255)),
+                                                  int(np.round(self.color[n, 2]*255)))
+                else:
+                    line += " {0} {1} {2}".format(int(np.round(self.color[n, 0]*255)),
+                                                  int(np.round(self.color[n, 0]*255)),
+                                                  int(np.round(self.color[n, 0]*255)))
                 line += "\n"
                 if self.format == "DE":
                     line = line.replace(".", ",")
@@ -139,11 +189,16 @@ class DepthProjector(object):
             self.cameras[n].setPosition(trail[n])
             self.cameras[n].setRotation(euler_rotation_xyz)
 
+    def transform(self, point, cam_index):
+        #wm = np.linalg.inv(np.mat(self.cameras[n].world_matrix))
+        wm = np.mat(self.cameras[cam_index].world_matrix, dtype=np.float64)
+        return wm * point
+
     def reconstruct(self, min_reliability=0.0):
         assert isinstance(min_reliability, float)
         assert 0.0 <= min_reliability < 1.0
 
-        for n, depth_grid in enumerate(self.depth_maps):
+        for cam_index, depth_grid in enumerate(self.depth_maps):
             valid_coh = np.where(depth_grid[:, :, 1] > min_reliability)
             m = self.cloud.shape[0]
             self.cloud.resize((self.cloud.shape[0]+valid_coh[0].shape[0], 4))
@@ -154,19 +209,19 @@ class DepthProjector(object):
                         self.cloud[m, 3] = depth_grid[y, x, 1]
                         _z = -depth_grid[y, x, 0]
                         if not np.isinf(_z):
-                            _y = (float(y) - depth_grid.shape[0]/2.0) * _z/self.cameras[n].f_px
-                            _x = (float(x) - depth_grid.shape[1]/2.0) * _z/self.cameras[n].f_px
+                            _y = (float(y) - depth_grid.shape[0]/2.0) * _z/self.cameras[cam_index].f_px
+                            _x = (float(x) - depth_grid.shape[1]/2.0) * _z/self.cameras[cam_index].f_px
                             point = np.mat([_x, _y, _z, 1], dtype=np.float64).T
-                            #wm = np.linalg.inv(np.mat(self.cameras[n].world_matrix))
-                            wm = np.mat(self.cameras[n].world_matrix, dtype=np.float64)
-                            point = wm * point
+                            if self.cameras[cam_index].world_matrix is not None:
+                                point = self.transform(point, cam_index)
                             self.cloud[m, 0] = point[0, 0]
                             self.cloud[m, 1] = point[1, 0]
                             self.cloud[m, 2] = point[2, 0]
                         m += 1
 
-    def save(self, filename, format="EN"):
-        writer = PlyWriter(filename, self.cloud, format)
+    def save(self, filename, cformat="EN"):
+        writer = PlyWriter(filename, self.cloud, format=cformat)
+        writer.save()
 
 
 
