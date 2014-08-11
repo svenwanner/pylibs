@@ -136,11 +136,11 @@ def structureTensor2D(config):
 
         if config.prefilter > 0:
             if config.prefilter == PREFILTER.IMGD:
-                lf3dh = prefilter.preImgDerivation(lf3dh, scale=config.prefilter_scale, direction='v')
+                lf3dh = prefilter.preImgDerivation(lf3dh, scale=config.prefilter_scale, direction='h')
             if config.prefilter == PREFILTER.IMGD2:
                 lf3dh = prefilter.preImgLaplace(lf3dh, scale=config.prefilter_scale)
             if config.prefilter == PREFILTER.SCHARR:
-                lf3dh = prefilter.preImgScharr(lf3dh, config, direction='v')
+                lf3dh = prefilter.preImgScharr(lf3dh, config, direction='h')
             if config.prefilter == PREFILTER.DOG:
                 lf3dh = prefilter.preDoG(lf3dh, config)
 
