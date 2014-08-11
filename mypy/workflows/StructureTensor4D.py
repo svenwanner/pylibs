@@ -147,59 +147,106 @@ def compute_horizontal(lf3dh, shift, config):
     scharr2dim = vigra.filters.Kernel1D()
     scharr2dim.initExplicitly(-1, 1, K)
 
+    GD = vigra.filters.Kernel1D()
+    GD.initGaussianDerivative(config.inner_scale,1)
+
     grad = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], lf3d.shape[3], 2), dtype=np.float32)
     tensor = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], lf3d.shape[3], 3), dtype=np.float32)
     gradient = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], 2), dtype=np.float32)
     ten = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], 3), dtype=np.float32)
 
-    for i in range(lf3d.shape[3]):
+    if(config.structure_tensor_type == "classic"):
+        for i in range(lf3d.shape[3]):
+            if (config.prefilter == "True"):
+                ### Prefilter ###
+                print("apply gaussian derivative prefilter along 3rd dimension")
+                lf3d[:, :, :, i] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 2, GD)
+                lf3d[:, :, :, i] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 0, gaussianInner)
 
-        ### Inner gaussian filter ###
-        print("apply gaussian filter along 3rd dimension")
-        lf3d[:, :, :, i] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 2, gaussianInner)
-        print("apply gaussian filter along 1rd dimension")
-        lf3d[:, :, :, i] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 0, gaussianInner)
-        # print("apply gaussian filter along 2rd dimension")
-        # lf3d = vigra.filters.convolveOneDimension(lf3d, 1, gaussianInner)
+            ### Derivative computation ###
+            print("apply Gaussian derivative filter along 1st dimension")
+            grad[:, :, :, i, 0] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 0, GD)
+            grad[:, :, :, i, 0] = vigra.filters.convolveOneDimension(grad[:, :, :, i, 0], 2, gaussianInner)
+            print("apply Gaussian derivative filter along 3rd dimension")
+            grad[:, :, :, i, 1] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 2, GD)
+            grad[:, :, :, i, 1] = vigra.filters.convolveOneDimension(grad[:, :, :, i, 1], 0, gaussianInner)
 
-        ### EPI prefilter ###
-        print("apply scharr pre-filter along 3rd dimension")
-        lf3d[:, :, :, i] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 2, scharr1dim)
-        lf3d[:, :, :, i] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 0, scharr2dim)
+            tensor[:, :, :, i, 0] = grad[:, :, :, i, 0]**2
+            tensor[:, :, :, i, 1] = grad[:, :, :, i, 1]*grad[:, :, :, i, 0]
+            tensor[:, :, :, i, 2] = grad[:, :, :, i, 1]**2
 
-        ### Derivative computation ###
-        print("apply scharr filter along 1st dimension")
-        grad[:, :, :, i, 0] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 0, scharr1dim)
-        grad[:, :, :, i, 0] = vigra.filters.convolveOneDimension(grad[:, :, :, i, 0], 2, scharr2dim)
-        print("apply scharr filter along 3rd dimension")
-        grad[:, :, :, i, 1] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 2, scharr1dim)
-        grad[:, :, :, i, 1] = vigra.filters.convolveOneDimension(grad[:, :, :, i, 1], 0, scharr2dim)
+            print("apply gaussian filter along 3rd dimension")
+            tensor[:, :, :, i, 0] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 0], 2, gaussianOuter)
+            tensor[:, :, :, i, 1] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 1], 2, gaussianOuter)
+            tensor[:, :, :, i, 2] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 2], 2, gaussianOuter)
 
-        tensor[:, :, :, i, 0] = grad[:, :, :, i, 0]**2
-        tensor[:, :, :, i, 1] = grad[:, :, :, i, 1]*grad[:, :, :, i, 0]
-        tensor[:, :, :, i, 2] = grad[:, :, :, i, 1]**2
+            print("apply gaussian filter along 1rd dimension")
+            tensor[:, :, :, i, 0] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 0], 0, gaussianOuter)
+            tensor[:, :, :, i, 1] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 1], 0, gaussianOuter)
+            tensor[:, :, :, i, 2] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 2], 0, gaussianOuter)
 
-        print("apply gaussian filter along 3rd dimension")
-        tensor[:, :, :, i, 0] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 0], 2, gaussianOuter)
-        tensor[:, :, :, i, 1] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 1], 2, gaussianOuter)
-        tensor[:, :, :, i, 2] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 2], 2, gaussianOuter)
+            gradient[:, :, :, 0] += grad[:, :, :, i, 0]
+            gradient[:, :, :, 1] += grad[:, :, :, i, 1]
+            ten[:, :, :, 0] += tensor[:, :, :, i, 0]
+            ten[:, :, :, 1] += tensor[:, :, :, i, 1]
+            ten[:, :, :, 2] += tensor[:, :, :, i, 2]
 
-        print("apply gaussian filter along 1rd dimension")
-        tensor[:, :, :, i, 0] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 0], 0, gaussianOuter)
-        tensor[:, :, :, i, 1] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 1], 0, gaussianOuter)
-        tensor[:, :, :, i, 2] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 2], 0, gaussianOuter)
+        gradient[:, :, :, 0] /= 3
+        gradient[:, :, :, 1] /= 3
+        ten[:, :, :, 0] /= 3
+        ten[:, :, :, 1] /= 3
+        ten[:, :, :, 2] /= 3
 
-        gradient[:, :, :, 0] += grad[:, :, :, i, 0]
-        gradient[:, :, :, 1] += grad[:, :, :, i, 1]
-        ten[:, :, :, 0] += tensor[:, :, :, i, 0]
-        ten[:, :, :, 1] += tensor[:, :, :, i, 1]
-        ten[:, :, :, 2] += tensor[:, :, :, i, 2]
+    if(config.structure_tensor_type == "scharr"):
 
-    gradient[:, :, :, 0] /= 3
-    gradient[:, :, :, 1] /= 3
-    ten[:, :, :, 0] /= 3
-    ten[:, :, :, 1] /= 3
-    ten[:, :, :, 2] /= 3
+        for i in range(lf3d.shape[3]):
+
+            ### Inner gaussian filter ###
+            print("apply gaussian filter along 3rd dimension")
+            lf3d[:, :, :, i] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 2, gaussianInner)
+            print("apply gaussian filter along 1rd dimension")
+            lf3d[:, :, :, i] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 0, gaussianInner)
+            # print("apply gaussian filter along 2rd dimension")
+            # lf3d = vigra.filters.convolveOneDimension(lf3d, 1, gaussianInner)
+            if (config.prefilter == "True"):
+                ### EPI prefilter ###
+                print("apply scharr pre-filter along 3rd dimension")
+                lf3d[:, :, :, i] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 2, scharr1dim)
+                lf3d[:, :, :, i] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 0, scharr2dim)
+
+            ### Derivative computation ###
+            print("apply scharr filter along 1st dimension")
+            grad[:, :, :, i, 0] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 0, scharr1dim)
+            grad[:, :, :, i, 0] = vigra.filters.convolveOneDimension(grad[:, :, :, i, 0], 2, scharr2dim)
+            print("apply scharr filter along 3rd dimension")
+            grad[:, :, :, i, 1] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 2, scharr1dim)
+            grad[:, :, :, i, 1] = vigra.filters.convolveOneDimension(grad[:, :, :, i, 1], 0, scharr2dim)
+
+            tensor[:, :, :, i, 0] = grad[:, :, :, i, 0]**2
+            tensor[:, :, :, i, 1] = grad[:, :, :, i, 1]*grad[:, :, :, i, 0]
+            tensor[:, :, :, i, 2] = grad[:, :, :, i, 1]**2
+
+            print("apply gaussian filter along 3rd dimension")
+            tensor[:, :, :, i, 0] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 0], 2, gaussianOuter)
+            tensor[:, :, :, i, 1] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 1], 2, gaussianOuter)
+            tensor[:, :, :, i, 2] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 2], 2, gaussianOuter)
+
+            print("apply gaussian filter along 1rd dimension")
+            tensor[:, :, :, i, 0] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 0], 0, gaussianOuter)
+            tensor[:, :, :, i, 1] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 1], 0, gaussianOuter)
+            tensor[:, :, :, i, 2] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 2], 0, gaussianOuter)
+
+            gradient[:, :, :, 0] += grad[:, :, :, i, 0]
+            gradient[:, :, :, 1] += grad[:, :, :, i, 1]
+            ten[:, :, :, 0] += tensor[:, :, :, i, 0]
+            ten[:, :, :, 1] += tensor[:, :, :, i, 1]
+            ten[:, :, :, 2] += tensor[:, :, :, i, 2]
+
+        gradient[:, :, :, 0] /= 3
+        gradient[:, :, :, 1] /= 3
+        ten[:, :, :, 0] /= 3
+        ten[:, :, :, 1] /= 3
+        ten[:, :, :, 2] /= 3
 
     return ten, gradient
 
@@ -235,61 +282,106 @@ def compute_vertical(lf3dv, shift, config):
     scharr2dim = vigra.filters.Kernel1D()
     scharr2dim.initExplicitly(-1, 1, K)
 
+    GD = vigra.filters.Kernel1D()
+    GD.initGaussianDerivative(config.inner_scale,1)
+
     grad = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], lf3d.shape[3], 2), dtype=np.float32)
     tensor = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], lf3d.shape[3], 3), dtype=np.float32)
     gradient = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], 2), dtype=np.float32)
     ten = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], 3), dtype=np.float32)
 
-    for i in range(lf3d.shape[3]):
+    if(config.structure_tensor_type == "classic"):
+        for i in range(lf3d.shape[3]):
+            if (config.prefilter == "True"):
+                ### Prefilter ###
+                print("apply gaussian derivative prefilter along 2rd dimension")
+                lf3d[:, :, :, i] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 1, GD)
+                lf3d[:, :, :, i] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 0, gaussianInner)
 
-        ### Inner gaussian filter ###
-        print("apply gaussian filter along 3rd dimension")
-        lf3d[:, :, :, i] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 1, gaussianInner)
-        print("apply gaussian filter along 1rd dimension")
-        lf3d[:, :, :, i] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 0, gaussianInner)
-        # print("apply gaussian filter along 2rd dimension")
-        # lf3d = vigra.filters.convolveOneDimension(lf3d, 1, gaussianInner)
+            ### Derivative computation ###
+            print("apply Gaussian derivative filter along 1st dimension")
+            grad[:, :, :, i, 0] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 0, GD)
+            grad[:, :, :, i, 0] = vigra.filters.convolveOneDimension(grad[:, :, :, i, 0], 1, gaussianInner)
+            print("apply Gaussian derivative filter along 2rd dimension")
+            grad[:, :, :, i, 1] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 1, GD)
+            grad[:, :, :, i, 1] = vigra.filters.convolveOneDimension(grad[:, :, :, i, 1], 0, gaussianInner)
 
-        ### EPI prefilter ###
-        print("apply scharr pre-filter along 3rd dimension")
-        lf3d[:, :, :, i] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 1, scharr1dim)
-        lf3d[:, :, :, i] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 0, scharr2dim)
+            tensor[:, :, :, i, 0] = grad[:, :, :, i, 0]**2
+            tensor[:, :, :, i, 1] = grad[:, :, :, i, 1]*grad[:, :, :, i, 0]
+            tensor[:, :, :, i, 2] = grad[:, :, :, i, 1]**2
 
-        ### Derivative computation ###
-        print("apply scharr filter along 1st dimension")
-        grad[:, :, :, i, 0] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 0, scharr1dim)
-        grad[:, :, :, i, 0] = vigra.filters.convolveOneDimension(grad[:, :, :, i, 0], 1, scharr2dim)
-        print("apply scharr filter along 3rd dimension")
-        grad[:, :, :, i, 1] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 1, scharr1dim)
-        grad[:, :, :, i, 1] = vigra.filters.convolveOneDimension(grad[:, :, :, i, 1], 0, scharr2dim)
+            print("apply gaussian filter along 2rd dimension")
+            tensor[:, :, :, i, 0] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 0], 1, gaussianOuter)
+            tensor[:, :, :, i, 1] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 1], 1, gaussianOuter)
+            tensor[:, :, :, i, 2] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 2], 1, gaussianOuter)
 
-        tensor[:, :, :, i, 0] = grad[:, :, :, i, 0]**2
-        tensor[:, :, :, i, 1] = grad[:, :, :, i, 1]*grad[:, :, :, i, 0]
-        tensor[:, :, :, i, 2] = grad[:, :, :, i, 1]**2
+            print("apply gaussian filter along 1rd dimension")
+            tensor[:, :, :, i, 0] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 0], 0, gaussianOuter)
+            tensor[:, :, :, i, 1] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 1], 0, gaussianOuter)
+            tensor[:, :, :, i, 2] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 2], 0, gaussianOuter)
 
-        print("apply gaussian filter along 3rd dimension")
-        tensor[:, :, :, i, 0] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 0], 1, gaussianOuter)
-        tensor[:, :, :, i, 1] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 1], 1, gaussianOuter)
-        tensor[:, :, :, i, 2] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 2], 1, gaussianOuter)
+            gradient[:, :, :, 0] += grad[:, :, :, i, 0]
+            gradient[:, :, :, 1] += grad[:, :, :, i, 1]
+            ten[:, :, :, 0] += tensor[:, :, :, i, 0]
+            ten[:, :, :, 1] += tensor[:, :, :, i, 1]
+            ten[:, :, :, 2] += tensor[:, :, :, i, 2]
 
-        print("apply gaussian filter along 1rd dimension")
-        tensor[:, :, :, i, 0] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 0], 0, gaussianOuter)
-        tensor[:, :, :, i, 1] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 1], 0, gaussianOuter)
-        tensor[:, :, :, i, 2] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 2], 0, gaussianOuter)
+        gradient[:, :, :, 0] /= 3
+        gradient[:, :, :, 1] /= 3
+        ten[:, :, :, 0] /= 3
+        ten[:, :, :, 1] /= 3
+        ten[:, :, :, 2] /= 3
 
-        gradient[:, :, :, 0] += grad[:, :, :, i, 0]
-        gradient[:, :, :, 1] += grad[:, :, :, i, 1]
-        ten[:, :, :, 0] += tensor[:, :, :, i, 0]
-        ten[:, :, :, 1] += tensor[:, :, :, i, 1]
-        ten[:, :, :, 2] += tensor[:, :, :, i, 2]
+    if(config.structure_tensor_type == "scharr"):
 
-    gradient[:, :, :, 0] /= 3
-    gradient[:, :, :, 1] /= 3
-    ten[:, :, :, 0] /= 3
-    ten[:, :, :, 1] /= 3
-    ten[:, :, :, 2] /= 3
+        for i in range(lf3d.shape[3]):
 
+            ### Inner gaussian filter ###
+            print("apply gaussian filter along 2rd dimension")
+            lf3d[:, :, :, i] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 1, gaussianInner)
+            print("apply gaussian filter along 1rd dimension")
+            lf3d[:, :, :, i] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 0, gaussianInner)
+            # print("apply gaussian filter along 2rd dimension")
+            # lf3d = vigra.filters.convolveOneDimension(lf3d, 1, gaussianInner)
+            if (config.prefilter == "True"):
+                ### EPI prefilter ###
+                print("apply scharr pre-filter along 2rd dimension")
+                lf3d[:, :, :, i] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 1, scharr1dim)
+                lf3d[:, :, :, i] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 0, scharr2dim)
 
+            ### Derivative computation ###
+            print("apply scharr filter along 1st dimension")
+            grad[:, :, :, i, 0] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 0, scharr1dim)
+            grad[:, :, :, i, 0] = vigra.filters.convolveOneDimension(grad[:, :, :, i, 0], 1, scharr2dim)
+            print("apply scharr filter along 2rd dimension")
+            grad[:, :, :, i, 1] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 1, scharr1dim)
+            grad[:, :, :, i, 1] = vigra.filters.convolveOneDimension(grad[:, :, :, i, 1], 0, scharr2dim)
+
+            tensor[:, :, :, i, 0] = grad[:, :, :, i, 0]**2
+            tensor[:, :, :, i, 1] = grad[:, :, :, i, 1]*grad[:, :, :, i, 0]
+            tensor[:, :, :, i, 2] = grad[:, :, :, i, 1]**2
+
+            print("apply gaussian filter along 2rd dimension")
+            tensor[:, :, :, i, 0] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 0], 1, gaussianOuter)
+            tensor[:, :, :, i, 1] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 1], 1, gaussianOuter)
+            tensor[:, :, :, i, 2] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 2], 1, gaussianOuter)
+
+            print("apply gaussian filter along 1rd dimension")
+            tensor[:, :, :, i, 0] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 0], 0, gaussianOuter)
+            tensor[:, :, :, i, 1] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 1], 0, gaussianOuter)
+            tensor[:, :, :, i, 2] = vigra.filters.convolveOneDimension(tensor[:, :, :, i, 2], 0, gaussianOuter)
+
+            gradient[:, :, :, 0] += grad[:, :, :, i, 0]
+            gradient[:, :, :, 1] += grad[:, :, :, i, 1]
+            ten[:, :, :, 0] += tensor[:, :, :, i, 0]
+            ten[:, :, :, 1] += tensor[:, :, :, i, 1]
+            ten[:, :, :, 2] += tensor[:, :, :, i, 2]
+
+        gradient[:, :, :, 0] /= 3
+        gradient[:, :, :, 1] /= 3
+        ten[:, :, :, 0] /= 3
+        ten[:, :, :, 1] /= 3
+        ten[:, :, :, 2] /= 3
 
     return ten, gradient
 
@@ -378,6 +470,7 @@ def structureTensor4D(config):
         print(gradh.shape)
         print(gradv.shape)
 
+
         print("4D structure tensor")
 
         Ix_plus_Iy_square = (gradh[gradh.shape[0]/2, :, :, 0] + gradv[gradh.shape[0]/2, :, :, 0])**2
@@ -410,12 +503,16 @@ def structureTensor4D(config):
         orientation[invalid_ubounds] = 1.1
         orientation[invalid_lbounds] = -1.1
 
-        orientation4D, coherence4D = mergeOrientations_wta(orientation4D, coherence4D, orientation, coherence)
+        orientation += shift
+        # coherence4D = np.copy(coherence)
 
+        winner = np.where(coherence > coherence4D)
+        orientation4D[winner] = orientation[winner]
+        coherence4D[winner] = coherence[winner]
 
         if config.output_level >= 3:
-            plt.imsave(config.result_path+config.result_label+"orientation_4D_{0}.png".format(shift), orientation[:,:], cmap=plt.cm.jet)
-            plt.imsave(config.result_path+config.result_label+"coherence_4D_{0}.png".format(shift), coherence[:,:], cmap=plt.cm.jet)
+            plt.imsave(config.result_path+config.result_label+"orientation_4D_{0}.png".format(shift), orientation4D[:,:], cmap=plt.cm.jet)
+            plt.imsave(config.result_path+config.result_label+"coherence_4D_{0}.png".format(shift), coherence4D[:,:], cmap=plt.cm.jet)
 
     if config.output_level >= 2:
         plt.imsave(config.result_path+config.result_label+"orientation_final.png", orientation4D[:,:], cmap=plt.cm.jet)
@@ -435,6 +532,13 @@ def structureTensor4D(config):
 
     if config.output_level >= 1:
         plt.imsave(config.result_path+config.result_label+"depth_final.png", depth, cmap=plt.cm.jet)
+
+    tmp = np.zeros((lf_shape[1], lf_shape[2], 4), dtype=np.float32)
+    tmp[:, :, 0] = orientation4D[:]
+    tmp[:, :, 1] = coherence4D[:]
+    tmp[:, :, 2] = depth[:]
+    vim = vigra.RGBImage(tmp)
+    vim.writeImage(config.result_path+config.result_label+"final4D.exr")
 
     if config.output_level >= 1:
         if isinstance(config.centerview_path, str):
