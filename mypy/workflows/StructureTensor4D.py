@@ -114,7 +114,7 @@ def orientationClassic(strTensorh, strTensorv, config, shift):
 
         print(orientation.shape)
 
-        if config.output_level >= 3:
+        if config.output_level >= 4:
             plt.imsave(config.result_path+config.result_label+"orientation_merged_local_{0}.png".format(shift), orientation, cmap=plt.cm.jet)
             plt.imsave(config.result_path+config.result_label+"coherence_merged_local_{0}.png".format(shift), coherence, cmap=plt.cm.jet)
 
@@ -342,8 +342,8 @@ def structureTensor4D(config):
 
 ### Allocate memory for results ###
 
-    orientation = np.zeros((lf_shape[1], lf_shape[2]), dtype=np.float32)
-    coherence = np.zeros((lf_shape[1], lf_shape[2]), dtype=np.float32)
+    orientation4D = np.zeros((lf_shape[1], lf_shape[2]), dtype=np.float32)
+    coherence4D = np.zeros((lf_shape[1], lf_shape[2]), dtype=np.float32)
     orientationTrad = np.zeros((lf_shape[1], lf_shape[2]), dtype=np.float32)
     coherenceTrad = np.zeros((lf_shape[1], lf_shape[2]), dtype=np.float32)
     logging.debug("Allocated memory!")
@@ -371,9 +371,8 @@ def structureTensor4D(config):
         orientationTrad, coherenceTrad = mergeOrientations_wta(orientationTrad, coherenceTrad, orientationL, coherenceL)
 
         if config.output_level >= 3:
-            plt.imsave(config.result_path+config.result_label+"orientation_global_traditional_{0}.png".format(shift), orientationTrad, cmap=plt.cm.jet)
-            plt.imsave(config.result_path+config.result_label+"coherence_global_traditional_{0}.png".format(shift), coherenceTrad, cmap=plt.cm.jet)
-
+            plt.imsave(config.result_path+config.result_label+"orientation_global_with_Coherence_Merge_{0}.png".format(shift), orientationTrad, cmap=plt.cm.jet)
+            plt.imsave(config.result_path+config.result_label+"coherence_global_with_Coherence_Merge_{0}.png".format(shift), coherenceTrad, cmap=plt.cm.jet)
 
 
         print(gradh.shape)
@@ -411,13 +410,18 @@ def structureTensor4D(config):
         orientation[invalid_ubounds] = 1.1
         orientation[invalid_lbounds] = -1.1
 
-        if config.output_level >= 2:
-            plt.imsave(config.result_path+config.result_label+"orientation_4D_{0}.png".format(shift), orientation, cmap=plt.cm.jet)
-            plt.imsave(config.result_path+config.result_label+"coherence_4D_{0}.png".format(shift), coherence, cmap=plt.cm.jet)
+        orientation4D, coherence4D = mergeOrientations_wta(orientation4D, coherence4D, orientation, coherence)
+
+
+        if config.output_level >= 3:
+            plt.imsave(config.result_path+config.result_label+"orientation_4D_{0}.png".format(shift), orientation[:,:], cmap=plt.cm.jet)
+            plt.imsave(config.result_path+config.result_label+"coherence_4D_{0}.png".format(shift), coherence[:,:], cmap=plt.cm.jet)
 
     if config.output_level >= 2:
-        plt.imsave(config.result_path+config.result_label+"orientation_final.png", orientation[:, :], cmap=plt.cm.jet)
-        plt.imsave(config.result_path+config.result_label+"coherence_final.png", coherence[:, :], cmap=plt.cm.jet)
+        plt.imsave(config.result_path+config.result_label+"orientation_final.png", orientation4D[:,:], cmap=plt.cm.jet)
+        plt.imsave(config.result_path+config.result_label+"coherence_final.png", coherence4D[:,:], cmap=plt.cm.jet)
+        plt.imsave(config.result_path+config.result_label+"orientation_Cohmerge_final.png", orientationTrad, cmap=plt.cm.jet)
+        plt.imsave(config.result_path+config.result_label+"coherence_Cohmerge_final.png", coherenceTrad, cmap=plt.cm.jet)
 
     logging.info("Computed final disparity map!")
 
