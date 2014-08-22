@@ -6,10 +6,13 @@ import pylab as plt
 import scipy.misc as misc
 import mypy.lightfield.depth.prefilter as prefilter
 from mypy.lightfield import io as lfio
-from scipy.ndimage import median_filter
 
-import mypy.lightfield.depthToCloud as dtc
+import mypy.pointclouds.depthToCloud as dtc
 from mypy.lightfield import helpers as lfhelpers
+
+
+
+
 
 
 #============================================================================================================
@@ -44,10 +47,29 @@ def compute_horizontal(lf3dh, shift, config):
     tmp = lfhelpers.refocus_3d(tmp, shift, 'h')
     logging.debug("New size of lf3dh after shifting to horoptor: " + str(tmp.shape))
 
+    # if config.output_level == 4:
+    #     for i in range(lf3d.shape[0]):
+    #         misc.imsave(config.result_path+config.result_label+"horizontal_Input_shifted_{0}.png".format(i), lf3d[i ,: ,: ,:])
+
     if config.color_space:
         lf3d = prefilter.changeColorSpace(tmp, config.color_space)
     else:
         lf3d = tmp
+
+    # if config.output_level == 4:
+    #     for i in range(lf3d.shape[0]):
+    #         misc.imsave(config.result_path+config.result_label+"horizontal_Input_shifted_color_space_changed_{0}.png".format(i), lf3d[i ,: ,: ,:])
+    #
+    logging.debug("Prefilter status: " + str(config.prefilter))
+    if config.prefilter == isinstance(config.prefilter, int):
+       if config.prefilter == prefilter.PREFILTER.IMGD:
+           lf3d = prefilter.preImgDerivation(lf3d, scale=config.prefilter_scale, direction='h')
+       if config.prefilter == prefilter.PREFILTER.EPID:
+           lf3d = prefilter.preEpiDerivation(lf3d, scale=config.prefilter_scale, direction='h')
+       if config.prefilter == prefilter.PREFILTER.IMGD2:
+            lf3d = prefilter.preImgLaplace(lf3d, scale=config.prefilter_scale)
+       if config.prefilter == prefilter.PREFILTER.EPID2:
+            lf3d = prefilter.preEpiLaplace(lf3d, scale=config.prefilter_scale, direction='h')
 
     if(config.structure_tensor_type == "scharr"):
 
@@ -76,9 +98,9 @@ def compute_horizontal(lf3dh, shift, config):
             print("apply gaussian filter along 2rd dimension")
             lf3d[:, :, :, i] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 1, gaussianInner3)#Additional Smoothing
             print("apply gaussian filter along 3rd dimension")
-            lf3d[:, :, :, i] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 0, gaussianInner2)
+            lf3d[:, :, :, i] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 2, gaussianInner2)
             print("apply gaussian filter along 1rd dimension")
-            lf3d[:, :, :, i] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 2, gaussianInner1)
+            lf3d[:, :, :, i] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 0, gaussianInner1)
             # print("apply gaussian filter along 2rd dimension")
             # lf3d = vigra.filters.convolveOneDimension(lf3d, 1, gaussianInner)
             if (config.prefilter == "True"):
@@ -274,6 +296,17 @@ def compute_vertical(lf3dv, shift, config):
         lf3d = prefilter.changeColorSpace(tmp, config.color_space)
     else:
         lf3d = tmp
+
+    if config.prefilter == isinstance(config.prefilter, int):
+       if config.prefilter == prefilter.PREFILTER.IMGD:
+           lf3d = prefilter.preImgDerivation(lf3d, scale=config.prefilter_scale, direction='v')
+       if config.prefilter == prefilter.PREFILTER.EPID:
+           lf3d = prefilter.preEpiDerivation(lf3d, scale=config.prefilter_scale, direction='v')
+       if config.prefilter == prefilter.PREFILTER.IMGD2:
+            lf3d = prefilter.preImgLaplace(lf3d, scale=config.prefilter_scale)
+       if config.prefilter == prefilter.PREFILTER.EPID2:
+            lf3d = prefilter.preEpiLaplace(lf3d, scale=config.prefilter_scale, direction='v')
+
 
     if(config.structure_tensor_type == "scharr"):
 
@@ -475,7 +508,7 @@ def compute_vertical(lf3dv, shift, config):
         plt.imsave(config.result_path+config.result_label+"orientation_largestEigenvalue_v_shift_{0}.png".format(shift), orientation_largesteigenvector[orientation.shape[0]/2, :, :], cmap=plt.cm.jet)
         plt.imsave(config.result_path+config.result_label+"orientation_v_shift_{0}.png".format(shift), orientation[orientation.shape[0]/2, :, :], cmap=plt.cm.jet)
 
-        plt.imsave(config.result_path+config.result_label+"coherence_v_{0}.png".format(shift), coherence[orientation.shape[0]/2, :, :], cmap=plt.cm.jet)
+        misc.imsave(config.result_path+config.result_label+"coherence_v_{0}.png".format(shift), coherence[orientation.shape[0]/2, :, :], cmap=plt.cm.jet)
 
     orientation[:] += shift
 
@@ -580,36 +613,7 @@ def structureTensor3D(config):
     orientation[invalids] = 0
     coherence[invalids] = 0
 
-    if isinstance(config.median, int) and config.median > 0:
-        print "apply median filter ..."
-        orientation = median_filter(orientation, config.median)
-
-    if isinstance(config.selective_gaussian, float) and config.selective_gaussian > 0:
-        print "apply masked gauss..."
-        mask = coherence[:, :]
-        cv = None
-        if lf3dh is not None:
-            if lf_shape[3] == 3:
-                cv = 0.298*lf3dh[lf_shape[0]/2, :, :, 0]+0.5870*lf3dh[lf_shape[0]/2, :, :, 1]+0.1141*lf3dh[lf_shape[0]/2, :, :, 2]
-            else:
-                cv = lf3dh[lf_shape[0]/2, :, :, 0]
-        elif lf3dv is not None:
-            if lf_shape[3] == 3:
-                cv = 0.298*lf3dv[lf_shape[0]/2, :, :, 0]+0.5870*lf3dv[lf_shape[0]/2, :, :, 1]+0.1141*lf3dv[lf_shape[0]/2, :, :, 2]
-            else:
-                cv = lf3dv[lf_shape[0]/2, :, :, 0]
-
-        borders = vigra.filters.gaussianGradientMagnitude(cv, 1.6)
-        borders /= np.amax(borders)
-        mask *= 1.0-borders
-        mask /= np.amax(mask)
-        gauss = vigra.filters.Kernel2D()
-        vigra.filters.Kernel2D.initGaussian(gauss, config.selective_gaussian)
-        gauss.setBorderTreatment(vigra.filters.BorderTreatmentMode.BORDER_TREATMENT_CLIP)
-        orientation = vigra.filters.normalizedConvolveImage(orientation, mask, gauss)
-
-
-    if config.output_level >= 1:
+    if config.output_level >= 2:
         plt.imsave(config.result_path+config.result_label+"orientation_final.png", orientation[lf_shape[0]/2, :, :], cmap=plt.cm.jet)
         plt.imsave(config.result_path+config.result_label+"coherence_final.png", coherence[lf_shape[0]/2, :, :], cmap=plt.cm.jet)
 
@@ -631,10 +635,10 @@ def structureTensor3D(config):
     vim.writeImage(config.result_path+config.result_label+"final3D.exr")
 
 
-    if config.output_level >= 2:
+    if config.output_level >= 1:
         plt.imsave(config.result_path+config.result_label+"depth_final.png", depth, cmap=plt.cm.jet)
 
-    if config.output_level >= 2:
+    if config.output_level >= 1:
         if isinstance(config.centerview_path, str):
             color = misc.imread(config.centerview_path)
             if isinstance(config.roi, type({})):
@@ -681,11 +685,12 @@ class Config:
 
         self.color_space = prefilter.COLORSPACE.RGB         # colorscape to convert the images into [RGB,LAB,LUV]
         self.prefilter_scale = 0.4                          # scale of the prefilter
-        self.prefilter = "False"          # type of the prefilter [NO,IMGD, EPID, IMGD2, EPID2]
+        self.prefilter = prefilter.PREFILTER.NO          # type of the prefilter [NO,IMGD, EPID, IMGD2, EPID2]
 
         self.median = 5                         # apply median filter on disparity map
         self.nonlinear_diffusion = [0.5, 5]     # apply nonlinear diffusion [0] edge threshold, [1] scale
         self.selective_gaussian = 2.0           # apply a selective gaussian post filter
+        self.tv = {"alpha": 1.0, "steps": 1000} # apply total variation to depth map
 
         self.min_depth = 0.01                   # minimum depth possible
         self.max_depth = 1.0                    # maximum depth possible

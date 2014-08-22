@@ -124,15 +124,17 @@ def structureTensor2D(config):
     try:
         if not config.path_horizontal.endswith("/"):
             config.path_horizontal += "/"
-        lf3dh = lfio.load_3d(config.path_horizontal, rgb=config.rgb, roi=config.roi)
+        tmp = lfio.load_3d(config.path_horizontal, rgb=config.rgb, roi=config.roi)
         print "ok"
         compute_h = True
-        lf_shape = lf3dh.shape
+        lf_shape = tmp.shape
         if config.output_level > 3:
-            print('Image shape of horizontal images: ' + str(lf3dh.shape))
+            print('Image shape of horizontal images: ' + str(tmp.shape))
 
         if config.color_space:
-            lf3dh = prefilter.changeColorSpace(lf3dh, config.color_space)
+            lf3dh = prefilter.changeColorSpace(tmp, config.color_space)
+        else:
+            lf3dh = tmp
 
         if config.prefilter > 0:
             if config.prefilter == PREFILTER.IMGD:
@@ -151,16 +153,18 @@ def structureTensor2D(config):
     try:
         if not config.path_vertical.endswith("/"):
             config.path_vertical += "/"
-        lf3dv = lfio.load_3d(config.path_vertical, rgb=config.rgb, roi=config.roi)
+        tmp = lfio.load_3d(config.path_vertical, rgb=config.rgb, roi=config.roi)
         print "ok"
         compute_v = True
         if lf_shape is None:
-            lf_shape = lf3dv.shape
+            lf_shape = tmp.shape
         if config.output_level > 3:
-            print('Image shape of vertical images: ' + str(lf3dv.shape))
+            print('Image shape of vertical images: ' + str(tmp.shape))
 
         if config.color_space:
-            lf3dv = prefilter.changeColorSpace(lf3dv, config.color_space)
+            lf3dv = prefilter.changeColorSpace(tmp, config.color_space)
+        else:
+            lf3dv = tmp
 
         if config.prefilter > 0:
             if config.prefilter == PREFILTER.IMGD:

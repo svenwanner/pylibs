@@ -156,23 +156,46 @@ class StructureTensorScharr(StructureTensor):
         assert params.has_key("inner_scale")
         assert params.has_key("outer_scale")
 
-        Kernel_H = np.array([[-3, 0, 3], [-10, 0, 10], [-3, 0, 3]]) / 32.0
-        scharrh = vigra.filters.Kernel2D()
-        scharrh.initExplicitly((-1, -1), (1, 1), Kernel_H)
+        K = np.array([-1, 0, 1]) / 2.0
+        scharr1dim = vigra.filters.Kernel1D()
+        scharr1dim.initExplicitly(-1, 1, K)
 
-        Kernel_V = np.array([[-3, -10, -3], [0, 0, 0], [3, 10, 3]]) / 32.0
-        scharrv = vigra.filters.Kernel2D()
-        scharrv.initExplicitly((-1, -1), (1, 1), Kernel_V)
+        K = np.array([3, 10, 3]) / 16.0
+        scharr2dim = vigra.filters.Kernel1D()
+        scharr2dim.initExplicitly(-1, 1, K)
 
         epi = vigra.filters.gaussianSmoothing(epi, sigma=params["inner_scale"])
 
-        epi = vigra.filters.convolve(epi, scharrh)
-        d_2dim = vigra.filters.convolve(epi, scharrh)
-        d_1dim = vigra.filters.convolve(epi, scharrv)
+        # print("apply scharr pre-filter along 2rd dimension")
+        epi = vigra.filters.convolveOneDimension(epi, 1, scharr1dim)
+        epi = vigra.filters.convolveOneDimension(epi, 0, scharr2dim)
 
-        grad = np.zeros((d_1dim.shape[0], d_1dim.shape[1], 2), dtype = np.float32)
-        grad[:, :, 0] = d_1dim[:, :]
-        grad[:, :, 1] = d_2dim[:, :]
+        grad = np.zeros((epi.shape[0], epi.shape[1], 2), dtype = np.float32)
+        ### Derivative computation ###
+        # print("apply scharr filter along 1st dimension")
+        grad[:, :, 0] = vigra.filters.convolveOneDimension(epi, 0, scharr1dim)
+        grad[:, :, 0] = vigra.filters.convolveOneDimension(grad[:, :, 0], 1, scharr2dim)
+        # print("apply scharr filter along 2rd dimension")
+        grad[:, :, 1] = vigra.filters.convolveOneDimension(epi, 1, scharr1dim)
+        grad[:, :, 1] = vigra.filters.convolveOneDimension(grad[:, :, 1], 0, scharr2dim)
+
+        # Kernel_H = np.array([[-3, 0, 3], [-10, 0, 10], [-3, 0, 3]]) / 32.0
+        # scharrh = vigra.filters.Kernel2D()
+        # scharrh.initExplicitly((-1, -1), (1, 1), Kernel_H)
+        #
+        # Kernel_V = np.array([[-3, -10, -3], [0, 0, 0], [3, 10, 3]]) / 32.0
+        # scharrv = vigra.filters.Kernel2D()
+        # scharrv.initExplicitly((-1, -1), (1, 1), Kernel_V)
+        #
+        # epi = vigra.filters.gaussianSmoothing(epi, sigma=params["inner_scale"])
+        #
+        # epi = vigra.filters.convolve(epi, scharrh)
+        # d_2dim = vigra.filters.convolve(epi, scharrh)
+        # d_1dim = vigra.filters.convolve(epi, scharrv)
+        #
+        # grad = np.zeros((d_1dim.shape[0], d_1dim.shape[1], 2), dtype = np.float32)
+        # grad[:, :, 0] = d_1dim[:, :]
+        # grad[:, :, 1] = d_2dim[:, :]
 
         tensor = vigra.filters.vectorToTensor(grad)
 

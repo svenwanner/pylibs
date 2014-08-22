@@ -137,6 +137,16 @@ if __name__ == "__main__":
             maxError = float(sys.argv[6])
             save = str2bool(sys.argv[7])
             plotFIG = str2bool(sys.argv[8])
+        elif name.endswith('png'):
+            data = vigra.readImage(sys.argv[2])
+            print(data.shape)
+            GT = np.copy(data[:, :, 0])
+            minDepth = float(sys.argv[3])
+            maxDepth = float(sys.argv[4])
+            minError = float(sys.argv[5])
+            maxError = float(sys.argv[6])
+            save = str2bool(sys.argv[7])
+            plotFIG = str2bool(sys.argv[8])
         else:
             pass
 
@@ -168,13 +178,13 @@ if __name__ == "__main__":
 
         #### Display MAE,MSE MRE ###
 
-        plot(3, mae, minError, maxError, "Mean Absolute Error: "+ "{0:.5f}".format(mae_no), "MAE [px]",save)
-        plot(4, mse, minError, maxError, "Mean Squared Error: "+ "{0:.5f}".format(mse_no), "MSE [px]",save)
-        plot(5, mre, minError, maxError, "Mean Relative Error: "+ "{0:.2f}".format(mre_pc) , "MRE [%]",save)
+        plot(3, mae, minError, maxError, "Mean_Absolute_Error:_"+ "{0:.5f}".format(mae_no), "MAE [px]",save)
+        plot(4, mse, minError, maxError, "Mean_Squared_Error:_"+ "{0:.5f}".format(mse_no), "MSE [px]",save)
+        plot(5, mre, minError, maxError, "Mean_Relative_Error:_"+ "{0:.2f}".format(mre_pc) , "MRE [%]",save)
 
         print("\033[0m")
-        plot(1, disparity, minDepth, maxDepth, "Disparity Estimation", "Disparity [px]", save)
-        plot(2, GT_img, minDepth, maxDepth, "Ground Truth", "Disparity [px]", save)
+        plot(1, disparity, minDepth, maxDepth, "Disparity_Estimation", "Disparity [px]", save)
+        plot(2, GT_img, minDepth, maxDepth, "Ground_Truth", "Disparity [px]", save)
 
         if (plotFIG == 'True'):
             plt.show()

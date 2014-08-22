@@ -6,9 +6,8 @@ import pylab as plt
 import scipy.misc as misc
 import mypy.lightfield.depth.prefilter as prefilter
 from mypy.lightfield import io as lfio
-from scipy.ndimage import median_filter
 
-import mypy.lightfield.depthToCloud as dtc
+import mypy.pointclouds.depthToCloud as dtc
 from mypy.lightfield import helpers as lfhelpers
 
 
@@ -57,6 +56,17 @@ def compute_horizontal(lf3dh, shift, config):
     # if config.output_level == 4:
     #     for i in range(lf3d.shape[0]):
     #         misc.imsave(config.result_path+config.result_label+"horizontal_Input_shifted_color_space_changed_{0}.png".format(i), lf3d[i ,: ,: ,:])
+
+    logging.debug("Prefilter status: " + str(config.prefilter))
+    if config.prefilter == isinstance(config.prefilter, int):
+       if config.prefilter == prefilter.PREFILTER.IMGD:
+           lf3d = prefilter.preImgDerivation(lf3d, scale=config.prefilter_scale, direction='h')
+       if config.prefilter == prefilter.PREFILTER.EPID:
+            lf3d = prefilter.preEpiDerivation(lf3d, scale=config.prefilter_scale, direction='h')
+       if config.prefilter == prefilter.PREFILTER.IMGD2:
+            lf3d = prefilter.preImgLaplace(lf3d, scale=config.prefilter_scale)
+       if config.prefilter == prefilter.PREFILTER.EPID2:
+            lf3d = prefilter.preEpiLaplace(lf3d, scale=config.prefilter_scale, direction='h')
 
     if(config.structure_tensor_type == "scharr"):
 
@@ -189,6 +199,16 @@ def compute_vertical(lf3dv, shift, config):
     # if config.output_level == 4:
     #    for i in range(lf3d.shape[0]):
     #         misc.imsave(config.result_path+config.result_label+"vertical_Input_shifted_color_space_changed_{0}.png".format(i), lf3d[i ,: ,: ,:])
+
+    if config.prefilter == isinstance(config.prefilter, int):
+       if config.prefilter == prefilter.PREFILTER.IMGD:
+           lf3d = prefilter.preImgDerivation(lf3d, scale=config.prefilter_scale, direction='v')
+       if config.prefilter == prefilter.PREFILTER.EPID:
+            lf3d = prefilter.preEpiDerivation(lf3d, scale=config.prefilter_scale, direction='v')
+       if config.prefilter == prefilter.PREFILTER.IMGD2:
+            lf3d = prefilter.preImgLaplace(lf3d, scale=config.prefilter_scale)
+       if config.prefilter == prefilter.PREFILTER.EPID2:
+            lf3d = prefilter.preEpiLaplace(lf3d, scale=config.prefilter_scale, direction='v')
 
     if(config.structure_tensor_type == "scharr"):
 
@@ -397,36 +417,7 @@ def structureTensor25D(config):
     orientation[invalids] = 0
     coherence[invalids] = 0
 
-    if isinstance(config.median, int) and config.median > 0:
-        print "apply median filter ..."
-        orientation = median_filter(orientation, config.median)
-
-    if isinstance(config.selective_gaussian, float) and config.selective_gaussian > 0:
-        print "apply masked gauss..."
-        mask = coherence[:, :]
-        cv = None
-        if lf3dh is not None:
-            if lf_shape[3] == 3:
-                cv = 0.298*lf3dh[lf_shape[0]/2, :, :, 0]+0.5870*lf3dh[lf_shape[0]/2, :, :, 1]+0.1141*lf3dh[lf_shape[0]/2, :, :, 2]
-            else:
-                cv = lf3dh[lf_shape[0]/2, :, :, 0]
-        elif lf3dv is not None:
-            if lf_shape[3] == 3:
-                cv = 0.298*lf3dv[lf_shape[0]/2, :, :, 0]+0.5870*lf3dv[lf_shape[0]/2, :, :, 1]+0.1141*lf3dv[lf_shape[0]/2, :, :, 2]
-            else:
-                cv = lf3dv[lf_shape[0]/2, :, :, 0]
-
-        borders = vigra.filters.gaussianGradientMagnitude(cv, 1.6)
-        borders /= np.amax(borders)
-        mask *= 1.0-borders
-        mask /= np.amax(mask)
-        gauss = vigra.filters.Kernel2D()
-        vigra.filters.Kernel2D.initGaussian(gauss, config.selective_gaussian)
-        gauss.setBorderTreatment(vigra.filters.BorderTreatmentMode.BORDER_TREATMENT_CLIP)
-        orientationTrad = vigra.filters.normalizedConvolveImage(orientation, mask, gauss)
-
-
-    if config.output_level >= 1:
+    if config.output_level >= 2:
         plt.imsave(config.result_path+config.result_label+"orientation_final.png", orientation[lf_shape[0]/2, :, :], cmap=plt.cm.jet)
         plt.imsave(config.result_path+config.result_label+"coherence_final.png", coherence[lf_shape[0]/2, :, :], cmap=plt.cm.jet)
 
@@ -448,10 +439,10 @@ def structureTensor25D(config):
     vim = vigra.RGBImage(tmp)
     vim.writeImage(config.result_path+config.result_label+"final25D.exr")
 
-    if config.output_level >= 2:
+    if config.output_level >= 1:
         plt.imsave(config.result_path+config.result_label+"depth_final.png", depth, cmap=plt.cm.jet)
 
-    if config.output_level >= 2:
+    if config.output_level >= 1:
         if isinstance(config.centerview_path, str):
             color = misc.imread(config.centerview_path)
             if isinstance(config.roi, type({})):

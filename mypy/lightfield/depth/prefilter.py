@@ -10,7 +10,7 @@ import skimage.color as color
 #============================================================================================================
 
 
-COLORSPACE = enum(RGB=0, LAB=1, LUV=2, GRAY=3, HSV=4, SGRAY = 5)
+COLORSPACE = enum(RGB=0, LAB=1, LUV=2, GRAY=3, HSV=4, SGRAY=5)
 
 
 
@@ -26,26 +26,35 @@ def changeColorSpace(lf3d, cspace=COLORSPACE.RGB):
             print("Change to HSV")
             for i in range(lf3d.shape[0]):
                 lf3d[i, :, :, :] = color.rgb2hsv(lf3d[i, :, :, :])
+            return lf3d
+
         elif cspace == COLORSPACE.LUV:
             print("Change to LUV")
             for i in range(lf3d.shape[0]):
                 #lf3d[i, :, :, :] = color.rgb2luv(lf3d[i, :, :, :])
                 lf3d[i, :, :, :] = vigra.colors.transform_RGB2Luv(lf3d[i, :, :, :])
+            return lf3d
+
         elif cspace == COLORSPACE.LAB:
             print("Change to LAB")
             for i in range(lf3d.shape[0]):
                 #lf3d[i, :, :, :] = color.rgb2lab(lf3d[i, :, :, :])
                 lf3d[i, :, :, :] = vigra.colors.transform_RGB2Lab(lf3d[i, :, :, :])
+            return lf3d
+
         elif cspace == COLORSPACE.GRAY:
             print("Change to GRAY")
+            tmp = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], 1), dtype=np.float32)
             weight = [0.298, 0.5870, 0.1140]#RGB convertion like in Matlab
-            for i in range(lf3d.shape[0]):
-                lf3d[i, :, :, :] = weight[0]*lf3d[i, :, :, 0]+weight[1]*lf3d[i, :, :, 1]+weight[2]*lf3d[i, :, :, 2]
+            tmp[:,:,:,0] = weight[0]*lf3d[:, :, :, 0]+weight[1]*lf3d[:, :, :, 1]+weight[2]*lf3d[:, :, :, 2]
+            return tmp
+
         elif cspace == COLORSPACE.SGRAY:
             print("Change to SPECIAL GRAY")
-            weight = [0, 256, 59536] #RGB [2^0, 2^8, 2^16]scaling factors for each color channel
-            for i in range(lf3d.shape[0]):
-                lf3d[i, :, :, :] = weight[0]*lf3d[i, :, :, 0]+weight[1]*lf3d[i, :, :, 1]+weight[2]*lf3d[i, :, :, 2]
+            tmp = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], 1), dtype=np.float32)
+            weight = [0, 256, 59536] #TODO: look which weighting order is better
+            tmp[:,:,:,0] = weight[0]*lf3d[:, :, :, 0]+weight[1]*lf3d[:, :, :, 1]+weight[2]*lf3d[:, :, :, 2]
+            return tmp
 
     return lf3d
 
