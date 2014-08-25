@@ -135,6 +135,7 @@ class DepthProjector(object):
 
     def __init__(self):
         self.depth_maps = []
+        self.colors = []
         self.cameras = []
         self.cloud = np.zeros((0, 4), dtype=np.float64)
 
@@ -202,6 +203,14 @@ class DepthProjector(object):
             depth[:, :, 0] = depth_map[:, :]
             depth[:, :, 1] = 1
         self.depth_maps.append(depth)
+
+    def addColor(self, img):
+        """
+        Add a color image. Ensure that number of color images is the same as number of cameras and number of depth maps.
+        :param img: <ndarray>
+        """
+        assert isinstance(img, np.ndarray)
+        self.colors.append(img)
 
     def addCamera(self, focal_length_mm, sensor_size_mm, resolution, position, rotation, name="Camera"):
         """
@@ -299,6 +308,8 @@ class DepthProjector(object):
         assert isinstance(min_reliability, float)
         assert 0.0 <= min_reliability < 1.0, "invalid min reliability range!"
         assert len(self.depth_maps) == len(self.cameras), "number of depth maps and cameras unequal!"
+        if len(self.colors) > 0:
+            assert len(self.depth_maps) == len(self.colors), "number of depth maps and colors unequal!"
 
         #loop over depth maps
         for cam_index, depth_grid in enumerate(self.depth_maps):
@@ -307,7 +318,10 @@ class DepthProjector(object):
             #m is the number of points already in the cloud
             m = self.cloud.shape[0]
             #resize the cloud array by the new number of points
-            self.cloud.resize((self.cloud.shape[0]+valid_coh[0].shape[0], 4))
+            if len(self.colors) > 0:
+                self.cloud.resize((self.cloud.shape[0]+valid_coh[0].shape[0], 7))
+            else:
+                self.cloud.resize((self.cloud.shape[0]+valid_coh[0].shape[0], 4))
             #loop over pixel domain
             for u in xrange(depth_grid.shape[0]):
                 for v in xrange(depth_grid.shape[1]):
@@ -330,6 +344,12 @@ class DepthProjector(object):
                             self.cloud[m, 0] = point[0, 0]
                             self.cloud[m, 1] = point[1, 0]
                             self.cloud[m, 2] = point[2, 0]
+                            #if color data available set rgb
+                            if len(self.colors) > 0:
+                                self.cloud[m, 4] = self.colors[0][u, v, 0]
+                                self.cloud[m, 5] = self.colors[0][u, v, 1]
+                                self.cloud[m, 6] = self.colors[0][u, v, 2]
+
                         m += 1
 
     def save(self, filename, cformat="EN"):
@@ -376,7 +396,6 @@ def test_depthProjector():
     ]
 
     depthProjector = DepthProjector()
-    #depthProjector.loadFromFiles("/home/swanner/Desktop/denseSampledTestScene/rendered5/low_res/depth")
     depthProjector.camerasFrom2Points(initial_position, final_position, number_of_sampling_points, focal_length, sensor_width, resolution, euler_rotation_xyz)
     m = 0
     for n in [0, 1, 230]:
@@ -645,80 +664,27 @@ def test_compute_linear_trail():
 
 if __name__ == "__main__":
 
-
+    color = np.random.randint(0, 255, 540 * 960 * 3).reshape((540, 960, 3))
     depthProjector = DepthProjector()
+
     depthProjector.addDepthMapFromFile("/home/swanner/Desktop/tmp/depth/0001.exr")
     depthProjector.addCamera(35.0, 32.0, [540, 960], np.array((4.9950, -4.1860, 3.9597)), np.array((1.1500, 0.0000, 0.8197)))
+    depthProjector.addColor(color)
+
     depthProjector.addDepthMapFromFile("/home/swanner/Desktop/tmp/depth/0002.exr")
     depthProjector.addCamera(35.0, 32.0, [540, 960], np.array((-3.2872, 4.5016, 5.4028)), np.array((0.8993, 0.0000, 3.7588)))
+    depthProjector.addColor(color)
+
     depthProjector.addDepthMapFromFile("/home/swanner/Desktop/tmp/depth/0003.exr")
     depthProjector.addCamera(35.0, 32.0, [540, 960], np.array((-3.3543, -5.7408, 4.9266)), np.array((1.0444, 0.0000, 5.7277)))
+    depthProjector.addColor(color)
+
     depthProjector(0.35)
     depthProjector.save("/home/swanner/Desktop/tmp/cloud.ply")
 
     print "finished, created cloud with", depthProjector.cloud.shape[0], "points in total!"
 
 
-    # depthProjector = DepthProjector()
-    #
-    # d = np.transpose(np.array(vigra.readImage("/home/swanner/Desktop/tmp/depth/0001.exr")[:, :, 0]))
-    # c = np.random.randint(0, 1000, d.shape[0]*d.shape[1]).reshape((d.shape[0], d.shape[1])).astype(np.float32)
-    # c /= 1000.0
-    # depth1 = np.zeros((d.shape[0], d.shape[1], 2))
-    # depth1[:, :, 0] = np.copy(d[:])
-    # depth1[:, :, 1] = np.copy(c[:])
-    # cam1 = Camera(35.0, 32.0, [540, 960])
-    # cam1.setPosition(np.array((4.9950, -4.1860, 3.9597)))
-    # cam1.setRotation(np.array((1.1500, 0.0000, 0.8197)))
-    # cam1.name = "Camera 1"
-    # print cam1
-    # depthProjector.depth_maps.append(depth1)
-    # depthProjector.cameras.append(cam1)
-    #
-    # d = np.transpose(np.array(vigra.readImage("/home/swanner/Desktop/tmp/depth/0002.exr")[:, :, 0]))
-    # c = np.random.randint(0, 1000, d.shape[0]*d.shape[1]).reshape((d.shape[0], d.shape[1])).astype(np.float32)
-    # c /= 1000.0
-    # depth2 = np.zeros((d.shape[0], d.shape[1], 2))
-    # depth2[:, :, 0] = np.copy(d[:])
-    # depth2[:, :, 1] = np.copy(c[:])
-    # cam2 = Camera(35.0, 32.0, [540, 960])
-    # cam2.setPosition(np.array((-3.2872, 4.5016, 5.4028)))
-    # cam2.setRotation(np.array((0.8993, 0.0000, 3.7588)))
-    # cam2.name = "Camera 2"
-    # print cam2
-    # depthProjector.depth_maps.append(depth2)
-    # depthProjector.cameras.append(cam2)
-    #
-    # d = np.transpose(np.array(vigra.readImage("/home/swanner/Desktop/tmp/depth/0003.exr")[:, :, 0]))
-    # c = np.random.randint(0, 1000, d.shape[0]*d.shape[1]).reshape((d.shape[0], d.shape[1])).astype(np.float32)
-    # c /= 1000.0
-    # depth3 = np.zeros((d.shape[0], d.shape[1], 2))
-    # depth3[:, :, 0] = d[:]
-    # depth3[:, :, 1] = c[:]
-    # cam3 = Camera(35.0, 32.0, [540, 960])
-    # cam3.setPosition(np.array((-3.3543, -5.7408, 4.9266)))
-    # cam3.setRotation(np.array((1.0444, 0.0000, 5.7277)))
-    # cam3.name = "Camera 3"
-    # print cam3
-    # depthProjector.depth_maps.append(depth3)
-    # depthProjector.cameras.append(cam3)
-    #
-    # d = np.transpose(np.array(vigra.readImage("/home/swanner/Desktop/tmp/depth/0004.exr")[:, :, 0]))
-    # c = np.random.randint(0, 1000, d.shape[0]*d.shape[1]).reshape((d.shape[0], d.shape[1])).astype(np.float32)
-    # c /= 1000.0
-    # depth4 = np.zeros((d.shape[0], d.shape[1], 2))
-    # depth4[:, :, 0] = d[:]
-    # depth4[:, :, 1] = c[:]
-    # cam4 = Camera(35.0, 32.0, [540, 960])
-    # cam4.setPosition(np.array((-5.5117, 5.0170, 3.9854)))
-    # cam4.setRotation(np.array((1.1575, 0.0000, 3.9534)))
-    # depthProjector.depth_maps.append(depth4)
-    # depthProjector.cameras.append(cam4)
-
-    # depthProjector(0.35)
-    # depthProjector.save("/home/swanner/Desktop/tmp/cloud.ply")
-    #
-    # print depthProjector.cloud.shape
 
 
 
