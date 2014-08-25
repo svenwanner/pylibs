@@ -72,7 +72,7 @@ class PlyWriter(object):
         if min_col < 0:
             self.color[:] -= min_col
         max_color = np.amax(self.color)
-        if max_color < 1.0:
+        if max_color <= 1.0:
             pass
         elif max_color > 1.0 and (max_color <= 10 or max_color > 255):
             self.color[:] /= max_color
@@ -126,6 +126,12 @@ class PlyWriter(object):
 ########################################################################################################################
 
 class DepthProjector(object):
+    """
+    This class reprojects multiple depth maps from corresponding
+    camera instances. The class need a list of depth maps and a list
+    of cameras. Calling the class or using reproject(...) computes a
+    cloud which can be saved using save(...) .
+    """
 
     def __init__(self):
         self.depth_maps = []
@@ -133,10 +139,19 @@ class DepthProjector(object):
         self.cloud = np.zeros((0, 4), dtype=np.float64)
 
     def __call__(self, min_reliability=0.0):
+        """
+        Calling the class calls reconstruct
+        :param min_reliability: <float> coherence threshold, points below are ignored
+        """
         assert isinstance(min_reliability, float)
         self.reconstruct(min_reliability)
 
     def loadFromFiles(self, path, ftype="exr"):
+        """
+        Loads a list of depth maps from file
+        :param path: <str> path to depth map files
+        :param ftype: <str> file type default: "exr"
+        """
         assert isinstance(path, str)
         assert isinstance(ftype, str)
         if not path.endswith(os.path.sep):
@@ -150,14 +165,73 @@ class DepthProjector(object):
         filenames.sort()
 
         for f in filenames:
-
             d = np.transpose(np.array(vigra.readImage(f))[:, :, 0]).astype(np.float64)
             depth = np.zeros((d.shape[0], d.shape[1], 2), dtype=np.float32)
             depth[:, :, 0] = d[:]
             depth[:, :, 1] = np.ones_like(d)
             self.depth_maps.append(depth)
 
+    def addDepthMapFromFile(self, filename):
+        """
+        Add a depth map. Ensure that number of cameras is the same as number of depth maps.
+        :param filename: <str>
+        """
+        assert isinstance(filename, str)
+        assert os.path.isfile(filename), "file does not exist!"
+        d = np.transpose(np.array(vigra.readImage(filename))[:, :, 0]).astype(np.float64)
+        depth = np.zeros((d.shape[0], d.shape[1], 2), dtype=np.float32)
+        depth[:, :, 0] = d[:]
+        depth[:, :, 1] = np.ones_like(d)
+        self.depth_maps.append(depth)
+
+    def addDepthMap(self, depth_map):
+        """
+        Add a depth map from ndarray, if depth_map has 2 channels the second is interpreted
+        as reliability. If not reliability is set to 1.
+        :param depth_map: <ndarray>
+        """
+        assert isinstance(depth_map, np.ndarray)
+        depth = np.zeros((depth_map.shape[0], depth_map.shape[1], 2), dtype=np.float32)
+        if len(depth_map.shape) > 2:
+            if depth_map.shape[2] == 2:
+                depth = depth_map
+            elif depth_map.shape[2] > 2:
+                depth[:, :, 0] = depth_map[:, :, 0]
+                depth[:, :, 1] = 1
+        else:
+            depth[:, :, 0] = depth_map[:, :]
+            depth[:, :, 1] = 1
+        self.depth_maps.append(depth)
+
+    def addCamera(self, focal_length_mm, sensor_size_mm, resolution, position, rotation, name="Camera"):
+        """
+        Add a camera. Ensure that number of cameras is the same as number of depth maps.
+        :param focal_length_mm: <float>
+        :param sensor_size_mm: <float>
+        :param resolution: <[]>
+        :param position: <[]>
+        :param rotation: <[]>
+        :param name: <str> camera name, default is "Camera"
+        """
+        cam = Camera(focal_length_mm, sensor_size_mm, resolution)
+        cam.setPosition(position)
+        cam.setRotation(rotation)
+        cam.name = name+"_%4.4i" % len(self.cameras)
+        self.cameras.append(cam)
+
     def camerasFrom2Points(self, cam_pos1, cam_pos2, num_of_sampling_points, focal_length_mm, sensor_width_mm, resolution, euler_rotation_xyz):
+        """
+        Computes camera objects for a linear trail automatically from a start and a
+        final camera position, the number of sampling points, and the euler rotation
+        of the cameras.
+        :param cam_pos1: <ndarray> camera start position
+        :param cam_pos2: <ndarray> camera final position
+        :param num_of_sampling_points: <int> number of cameras
+        :param focal_length_mm: <float>
+        :param sensor_width_mm: <float>
+        :param resolution:  <[]>
+        :param euler_rotation_xyz: <ndarray> rotational euler angles of the cameras
+        """
         assert isinstance(cam_pos1, np.ndarray)
         assert cam_pos1.shape[0] == 3
         assert isinstance(cam_pos2, np.ndarray)
@@ -177,6 +251,19 @@ class DepthProjector(object):
             self.cameras[n].setRotation(euler_rotation_xyz)
 
     def camerasFromPointAndDirection(self, cam_pos1, num_of_sampling_points, baseline, translation_vector, focal_length_mm, sensor_width_mm, resolution, euler_rotation_xyz):
+        """
+        Computes camera objects for a linear trail automatically from a start camera position,
+        the number of sampling points, the baseline  a translation vector and the euler rotation
+        of the cameras.
+        :param cam_pos1: <ndarray> camera start position
+        :param num_of_sampling_points: <int> number of cameras
+        :param baseline: <float> distance between 2 cameras
+        :param translation_vector: <ndarray> camera translation vector
+        :param focal_length_mm: <float>
+        :param sensor_width_mm: <float>
+        :param resolution:  <[]>
+        :param euler_rotation_xyz: <ndarray> rotational euler angles of the cameras
+        """
         assert isinstance(cam_pos1, np.ndarray)
         assert cam_pos1.shape[0] == 3
         assert isinstance(num_of_sampling_points, int)
@@ -194,45 +281,64 @@ class DepthProjector(object):
             self.cameras[n].setRotation(euler_rotation_xyz)
 
     def transform(self, point, cam_index):
-        #wm = np.mat(np.linalg.inv(np.mat(self.cameras[cam_index].world_matrix)), dtype=np.float64)
+        """
+        Transforms a point using the camera world matrix
+        :param point: <list> 4D point
+        :param cam_index: <int> index of camera list
+        :return: <list> transformed point
+        """
         wm = np.mat(self.cameras[cam_index].world_matrix, dtype=np.float64)
-        # print wm
-        # print wm * point
-        # print "\n"
         return wm * point
 
     def reconstruct(self, min_reliability=0.0):
+        """
+        Reconstructs a point cloud from depth maps and cameras. Number of both
+        has to be same. Result is saved in self.cloud which can be saved using save()
+        :param min_reliability: <float> coherence threshold, points below are ignored
+        """
         assert isinstance(min_reliability, float)
-        assert 0.0 <= min_reliability < 1.0
+        assert 0.0 <= min_reliability < 1.0, "invalid min reliability range!"
+        assert len(self.depth_maps) == len(self.cameras), "number of depth maps and cameras unequal!"
 
+        #loop over depth maps
         for cam_index, depth_grid in enumerate(self.depth_maps):
+            #get positions of valid depth values
             valid_coh = np.where(depth_grid[:, :, 1] > min_reliability)
+            #m is the number of points already in the cloud
             m = self.cloud.shape[0]
+            #resize the cloud array by the new number of points
             self.cloud.resize((self.cloud.shape[0]+valid_coh[0].shape[0], 4))
+            #loop over pixel domain
             for u in xrange(depth_grid.shape[0]):
                 for v in xrange(depth_grid.shape[1]):
+                    #check if coherence is valid
                     coh = depth_grid[u, v, 1]
                     if coh > min_reliability:
+                        #write coherence into 4th dimension of the cloud
                         self.cloud[m, 3] = depth_grid[u, v, 1]
+                        #get depth value
                         _z = -depth_grid[u, v, 0]
-                        if not np.isinf(_z):
+                        #ignore z=0 and z=inf
+                        if not np.isinf(_z) and _z != 0.0:
+                            #reproject to real coordinates
                             _y = (float(u) - depth_grid.shape[0]/2.0) * _z/self.cameras[cam_index].f_px
                             _x = -(float(v) - depth_grid.shape[1]/2.0) * _z/self.cameras[cam_index].f_px
                             point = np.mat([_x, _y, _z, 1], dtype=np.float64).T
-                            # print "point before:", point
+                            #if world_matrix exist, transform point from camera to world cs
                             if self.cameras[cam_index].world_matrix is not None:
                                 point = self.transform(point, cam_index)
-                            # print "point after:", point
-                            # print "\n"
                             self.cloud[m, 0] = point[0, 0]
                             self.cloud[m, 1] = point[1, 0]
                             self.cloud[m, 2] = point[2, 0]
-                            # self.cloud[m, 0] = point[0, 0]
-                            # self.cloud[m, 1] = point[0, 1]
-                            # self.cloud[m, 2] = point[0, 2]
                         m += 1
 
     def save(self, filename, cformat="EN"):
+        """
+        Saves the cloud to file. The format parameter controls the
+        type of number saving. "EN": using . 0.01, "DE": using , 0,01
+        :param filename: <str> filename to save cloud
+        :param cformat: <str> number coding
+        """
         writer = PlyWriter(filename, self.cloud, format=cformat)
         writer.setColor()
         writer.save()
@@ -541,49 +647,62 @@ if __name__ == "__main__":
 
 
     depthProjector = DepthProjector()
+    depthProjector.addDepthMapFromFile("/home/swanner/Desktop/tmp/depth/0001.exr")
+    depthProjector.addCamera(35.0, 32.0, [540, 960], np.array((4.9950, -4.1860, 3.9597)), np.array((1.1500, 0.0000, 0.8197)))
+    depthProjector.addDepthMapFromFile("/home/swanner/Desktop/tmp/depth/0002.exr")
+    depthProjector.addCamera(35.0, 32.0, [540, 960], np.array((-3.2872, 4.5016, 5.4028)), np.array((0.8993, 0.0000, 3.7588)))
+    depthProjector.addDepthMapFromFile("/home/swanner/Desktop/tmp/depth/0003.exr")
+    depthProjector.addCamera(35.0, 32.0, [540, 960], np.array((-3.3543, -5.7408, 4.9266)), np.array((1.0444, 0.0000, 5.7277)))
+    depthProjector(0.35)
+    depthProjector.save("/home/swanner/Desktop/tmp/cloud.ply")
 
-    d = np.transpose(np.array(vigra.readImage("/home/swanner/Desktop/tmp/depth/0001.exr")[:, :, 0]))
-    c = np.random.randint(0, 1000, d.shape[0]*d.shape[1]).reshape((d.shape[0], d.shape[1])).astype(np.float32)
-    c /= 1000.0
-    depth1 = np.zeros((d.shape[0], d.shape[1], 2))
-    depth1[:, :, 0] = np.copy(d[:])
-    depth1[:, :, 1] = np.copy(c[:])
-    cam1 = Camera(35.0, 32.0, [540, 960])
-    cam1.setPosition(np.array((4.9950, -4.1860, 3.9597)))
-    cam1.setRotation(np.array((1.1500, 0.0000, 0.8197)))
-    cam1.name = "Camera 1"
-    print cam1
-    depthProjector.depth_maps.append(depth1)
-    depthProjector.cameras.append(cam1)
+    print "finished, created cloud with", depthProjector.cloud.shape[0], "points in total!"
 
-    d = np.transpose(np.array(vigra.readImage("/home/swanner/Desktop/tmp/depth/0002.exr")[:, :, 0]))
-    c = np.random.randint(0, 1000, d.shape[0]*d.shape[1]).reshape((d.shape[0], d.shape[1])).astype(np.float32)
-    c /= 1000.0
-    depth2 = np.zeros((d.shape[0], d.shape[1], 2))
-    depth2[:, :, 0] = np.copy(d[:])
-    depth2[:, :, 1] = np.copy(c[:])
-    cam2 = Camera(35.0, 32.0, [540, 960])
-    cam2.setPosition(np.array((-3.2872, 4.5016, 5.4028)))
-    cam2.setRotation(np.array((0.8993, 0.0000, 3.7588)))
-    cam2.name = "Camera 2"
-    print cam2
-    depthProjector.depth_maps.append(depth2)
-    depthProjector.cameras.append(cam2)
 
-    d = np.transpose(np.array(vigra.readImage("/home/swanner/Desktop/tmp/depth/0003.exr")[:, :, 0]))
-    c = np.random.randint(0, 1000, d.shape[0]*d.shape[1]).reshape((d.shape[0], d.shape[1])).astype(np.float32)
-    c /= 1000.0
-    depth3 = np.zeros((d.shape[0], d.shape[1], 2))
-    depth3[:, :, 0] = d[:]
-    depth3[:, :, 1] = c[:]
-    cam3 = Camera(35.0, 32.0, [540, 960])
-    cam3.setPosition(np.array((-3.3543, -5.7408, 4.9266)))
-    cam3.setRotation(np.array((1.0444, 0.0000, 5.7277)))
-    cam3.name = "Camera 3"
-    print cam3
-    depthProjector.depth_maps.append(depth3)
-    depthProjector.cameras.append(cam3)
-
+    # depthProjector = DepthProjector()
+    #
+    # d = np.transpose(np.array(vigra.readImage("/home/swanner/Desktop/tmp/depth/0001.exr")[:, :, 0]))
+    # c = np.random.randint(0, 1000, d.shape[0]*d.shape[1]).reshape((d.shape[0], d.shape[1])).astype(np.float32)
+    # c /= 1000.0
+    # depth1 = np.zeros((d.shape[0], d.shape[1], 2))
+    # depth1[:, :, 0] = np.copy(d[:])
+    # depth1[:, :, 1] = np.copy(c[:])
+    # cam1 = Camera(35.0, 32.0, [540, 960])
+    # cam1.setPosition(np.array((4.9950, -4.1860, 3.9597)))
+    # cam1.setRotation(np.array((1.1500, 0.0000, 0.8197)))
+    # cam1.name = "Camera 1"
+    # print cam1
+    # depthProjector.depth_maps.append(depth1)
+    # depthProjector.cameras.append(cam1)
+    #
+    # d = np.transpose(np.array(vigra.readImage("/home/swanner/Desktop/tmp/depth/0002.exr")[:, :, 0]))
+    # c = np.random.randint(0, 1000, d.shape[0]*d.shape[1]).reshape((d.shape[0], d.shape[1])).astype(np.float32)
+    # c /= 1000.0
+    # depth2 = np.zeros((d.shape[0], d.shape[1], 2))
+    # depth2[:, :, 0] = np.copy(d[:])
+    # depth2[:, :, 1] = np.copy(c[:])
+    # cam2 = Camera(35.0, 32.0, [540, 960])
+    # cam2.setPosition(np.array((-3.2872, 4.5016, 5.4028)))
+    # cam2.setRotation(np.array((0.8993, 0.0000, 3.7588)))
+    # cam2.name = "Camera 2"
+    # print cam2
+    # depthProjector.depth_maps.append(depth2)
+    # depthProjector.cameras.append(cam2)
+    #
+    # d = np.transpose(np.array(vigra.readImage("/home/swanner/Desktop/tmp/depth/0003.exr")[:, :, 0]))
+    # c = np.random.randint(0, 1000, d.shape[0]*d.shape[1]).reshape((d.shape[0], d.shape[1])).astype(np.float32)
+    # c /= 1000.0
+    # depth3 = np.zeros((d.shape[0], d.shape[1], 2))
+    # depth3[:, :, 0] = d[:]
+    # depth3[:, :, 1] = c[:]
+    # cam3 = Camera(35.0, 32.0, [540, 960])
+    # cam3.setPosition(np.array((-3.3543, -5.7408, 4.9266)))
+    # cam3.setRotation(np.array((1.0444, 0.0000, 5.7277)))
+    # cam3.name = "Camera 3"
+    # print cam3
+    # depthProjector.depth_maps.append(depth3)
+    # depthProjector.cameras.append(cam3)
+    #
     # d = np.transpose(np.array(vigra.readImage("/home/swanner/Desktop/tmp/depth/0004.exr")[:, :, 0]))
     # c = np.random.randint(0, 1000, d.shape[0]*d.shape[1]).reshape((d.shape[0], d.shape[1])).astype(np.float32)
     # c /= 1000.0
@@ -596,10 +715,10 @@ if __name__ == "__main__":
     # depthProjector.depth_maps.append(depth4)
     # depthProjector.cameras.append(cam4)
 
-    depthProjector(0.35)
-    depthProjector.save("/home/swanner/Desktop/tmp/cloud.ply")
-
-    print depthProjector.cloud.shape
+    # depthProjector(0.35)
+    # depthProjector.save("/home/swanner/Desktop/tmp/cloud.ply")
+    #
+    # print depthProjector.cloud.shape
 
 
 
