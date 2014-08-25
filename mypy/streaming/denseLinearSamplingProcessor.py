@@ -97,7 +97,7 @@ class PlyWriter(object):
     def write_points(self):
         string = ""
         for n in range(self.cloud.shape[0]):
-            if self.cloud[n][2] > 0:
+            if self.cloud[n][2] != 0:
                 line = ""
                 line += "{0} {1} {2}".format(self.cloud[n, 0], self.cloud[n, 1], self.cloud[n, 2])
                 if self.color is not None:
@@ -150,7 +150,11 @@ class DepthProjector(object):
         filenames.sort()
 
         for f in filenames:
-            depth = np.transpose(np.array(vigra.readImage(f))[:, :, 0]).astype(np.float64)
+
+            d = np.transpose(np.array(vigra.readImage(f))[:, :, 0]).astype(np.float64)
+            depth = np.zeros((d.shape[0], d.shape[1], 2), dtype=np.float32)
+            depth[:, :, 0] = d[:]
+            depth[:, :, 1] = np.ones_like(d)
             self.depth_maps.append(depth)
 
     def camerasFrom2Points(self, cam_pos1, cam_pos2, num_of_sampling_points, focal_length_mm, sensor_width_mm, resolution, euler_rotation_xyz):
@@ -190,8 +194,11 @@ class DepthProjector(object):
             self.cameras[n].setRotation(euler_rotation_xyz)
 
     def transform(self, point, cam_index):
-        #wm = np.linalg.inv(np.mat(self.cameras[n].world_matrix))
+        #wm = np.mat(np.linalg.inv(np.mat(self.cameras[cam_index].world_matrix)), dtype=np.float64)
         wm = np.mat(self.cameras[cam_index].world_matrix, dtype=np.float64)
+        # print wm
+        # print wm * point
+        # print "\n"
         return wm * point
 
     def reconstruct(self, min_reliability=0.0):
@@ -202,26 +209,32 @@ class DepthProjector(object):
             valid_coh = np.where(depth_grid[:, :, 1] > min_reliability)
             m = self.cloud.shape[0]
             self.cloud.resize((self.cloud.shape[0]+valid_coh[0].shape[0], 4))
-            for y in xrange(depth_grid.shape[0]):
-                for x in xrange(depth_grid.shape[1]):
-                    coh = depth_grid[y, x, 1]
+            for u in xrange(depth_grid.shape[0]):
+                for v in xrange(depth_grid.shape[1]):
+                    coh = depth_grid[u, v, 1]
                     if coh > min_reliability:
-                        self.cloud[m, 3] = depth_grid[y, x, 1]
-                        _z = -depth_grid[y, x, 0]
+                        self.cloud[m, 3] = depth_grid[u, v, 1]
+                        _z = -depth_grid[u, v, 0]
                         if not np.isinf(_z):
-                            _y = (float(y) - depth_grid.shape[0]/2.0) * _z/self.cameras[cam_index].f_px
-                            _x = (float(x) - depth_grid.shape[1]/2.0) * _z/self.cameras[cam_index].f_px
+                            _y = (float(u) - depth_grid.shape[0]/2.0) * _z/self.cameras[cam_index].f_px
+                            _x = -(float(v) - depth_grid.shape[1]/2.0) * _z/self.cameras[cam_index].f_px
                             point = np.mat([_x, _y, _z, 1], dtype=np.float64).T
+                            # print "point before:", point
                             if self.cameras[cam_index].world_matrix is not None:
                                 point = self.transform(point, cam_index)
+                            # print "point after:", point
+                            # print "\n"
                             self.cloud[m, 0] = point[0, 0]
                             self.cloud[m, 1] = point[1, 0]
                             self.cloud[m, 2] = point[2, 0]
+                            # self.cloud[m, 0] = point[0, 0]
+                            # self.cloud[m, 1] = point[0, 1]
+                            # self.cloud[m, 2] = point[0, 2]
                         m += 1
 
     def save(self, filename, cformat="EN"):
         writer = PlyWriter(filename, self.cloud, format=cformat)
-        writer.setColor(color=np.random.randint(0, 255, self.cloud.shape[0]*3).reshape((self.cloud.shape[0], 3)))
+        writer.setColor()
         writer.save()
 
 
@@ -583,7 +596,7 @@ if __name__ == "__main__":
     # depthProjector.depth_maps.append(depth4)
     # depthProjector.cameras.append(cam4)
 
-    depthProjector(0.5)
+    depthProjector(0.35)
     depthProjector.save("/home/swanner/Desktop/tmp/cloud.ply")
 
     print depthProjector.cloud.shape
