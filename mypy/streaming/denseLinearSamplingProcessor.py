@@ -1,31 +1,73 @@
 # -*- coding: utf-8 -*-
 
 import os
+import time
 import vigra
-from glob import glob
-from scipy.misc import imread
-import threading
 import numpy as np
+from glob import glob
+from scipy.misc import imread, imsave
+import pylab as plt
 from mypy.streaming.depthProjector import DepthProjector
 
 
-class Engine(object):
 
-     def __init__(self):
-         self.running = False
+class Processor(object):
 
-     def run(self):
+    def __init__(self):
+        pass
 
+class StructureTensorProcessor(Processor):
+    def __init__(self):
+        Processor.__init__(self)
+
+
+class Engine():
+
+    def __init__(self):
+        self.running = False
+        self.fileReader = None
+        self.processor = None
+
+
+    def setData(self, file_path, stack_size=11):
+        self.fileReader = FileReader(file_path, stack_size)
+
+    def setProcessor(self, processor):
+        self.processor = processor
+
+    def start(self):
+        assert self.fileReader is not None, "No FileReader instance initialized!"
+        assert self.processor is not None, "No Processor set!"
+        
         self.running = True
+        self.fileReader.start() #load first sub light field
+
+        tmp = 0
         while self.running:
-            self.running = False
+            if self.fileReader.bufferReady():
+                print "counter bevore:", self.fileReader.counter
+                print "current file bevore:", self.fileReader.current_file
+                lf = self.fileReader.getStack()
+
+                imsave("/home/swanner/Desktop/tmp_imgs/eng_%4.4i.png"%tmp, lf[0, :, :])
+                tmp += 1
+                print "counter:", self.fileReader.counter
+                print "current file:", self.fileReader.current_file
+                time.sleep(1)
+
+                self.fileReader.start() #load next sub light field
+
+            #if file reader finished break loop
+            if self.fileReader.finished:
+                self.running = False
 
 
-class FileReader(threading.Thread):
+class FileReader():
 
     def __init__(self, input_path, stack_size=11):
         assert isinstance(input_path, str)
         assert os.path.isdir(input_path), "input path does not exist!"
+
         if not input_path.endswith(os.sep):
             input_path += os.sep
 
@@ -44,59 +86,79 @@ class FileReader(threading.Thread):
         self.num_of_files = len(self.filenames)
         self.current_file = 0
         self.counter = 0
+        self.ready = False
+        self.finished = False
 
         tmp = self.loadImage(self.filenames[0])
         tmp = self.channelConverter(tmp)
-        self.shape = (self.num_of_files, tmp[0], tmp[1])
+        self.shape = (self.stack_size, tmp.shape[0], tmp.shape[1])
         self.stack = np.zeros(self.shape, dtype=np.float32)
 
-
     def loadImage(self, fname):
+        print "loading image..."
         assert isinstance(fname, str)
         if fname.endswith("exr"):
             return np.transpose(np.array(vigra.readImage(fname))[:, :, 0]).astype(np.float32)
         else:
             return imread(fname)
 
-
-    def channelConverter(self, img):
+    def channelConverter(self, img, ctype="exp_stretch"):
+        print "converting image..."
+        img = img.astype(np.float32)
+        amax = np.amax(img)
+        if amax > 1.0:
+            img[:] /= 255.0
         if len(img.shape) == 2:
             return img
         out = np.zeros((img.shape[0], img.shape[1]), dtype=np.float32)
-        for c in range(img.shape[2]):
-            out[:, :] += img[:, :, c]**(c+1)
+        if ctype == "gray":
+            out[:] = 0.3*img[:, :, 0]+0.59*img[:, :, 1]+0.11*img[:, :, 2]
+        if ctype == "stretch":
+            for c in range(img.shape[2]):
+                out[:, :] += img[:, :, c]+c
+        if ctype == "exp_stretch":
+            for c in range(img.shape[2]):
+                out[:, :] += (img[:, :, c])**(c+1)
+        amax = np.amax(out)
+        out[:] /= amax
         return out
 
-
     def bufferReady(self):
-        if self.counter == self.stack_size-1:
-            return True
-        else: return False
-
+        return self.ready
 
     def getStack(self):
-        if self.counter == self.stack_size-1:
+        if self.bufferReady():
             self.counter = 0
-            return self.stack
-        else: return None
+            self.ready = False
+            return np.copy(self.stack)
 
-
-    def run(self):
-        while self.current_file < self.num_of_files:
+    def start(self):
+        while self.counter < self.stack_size-1 and not self.finished:
+            self.ready = False
             if self.counter == 0:
-                self.stack = 0.0
-            if self.counter < self.stack_size:
-                tmp = self.loadImage(self.filenames[self.current_file])
-                tmp = self.channelConverter(tmp)
-                self.stack[self.current_file, :, :] = tmp[:]
-                self.current_file += 1
+                self.stack[:] = 0.0
+            tmp = self.loadImage(self.filenames[self.current_file])
+            tmp = self.channelConverter(tmp)
+            self.stack[self.counter, :, :] = tmp[:]
+            self.current_file += 1
+            self.counter += 1
+            if self.current_file == self.num_of_files-1:
+                self.finished = True
+                break
+        self.ready = True
 
 
 
 if __name__ == "__main__":
 
+    data_path = "/home/swanner/Desktop/denseSampledTestScene/rendered_LR"
+    processor = StructureTensorProcessor()
+
     engine = Engine()
-    engine.run()
+    engine.setData(data_path)
+    engine.setProcessor(processor)
+
+    engine.start()
 
     # #color = np.random.randint(0, 255, 540 * 960 * 3).reshape((540, 960, 3))
     # depthProjector = DepthProjector()
