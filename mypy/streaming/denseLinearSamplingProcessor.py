@@ -7,10 +7,23 @@ import numpy as np
 from glob import glob
 from multiprocessing import Pool
 from scipy.misc import imread, imsave
+from scipy.ndimage import shift
 import pylab as plt
 from mypy.streaming.depthProjector import DepthProjector
 
 from joblib import Parallel, delayed
+
+
+def refocus(epi, focus):
+    assert isinstance(epi, np.ndarray)
+    assert isinstance(focus, float)
+
+    tmp = np.zeros_like(epi)
+    for h in range(epi.shape[0]):
+        tmp[h, :] = shift(epi[h, :], (h-epi.shape[0]/2)*focus)
+    return tmp
+
+
 
 ########################################################################################################################
 ########################################################################################################################
@@ -31,8 +44,9 @@ def process(input):
     :return: <ndarray> result
     """
     assert isinstance(input, type([]))
-    out = np.zeros((input[0].shape[0], input[0].shape[1], input[1]["channels"]), dtype=np.float32)
-    tensor = vigra.filters.structureTensor(input[0], input[1]["inner_scale"], input[1]["inner_scale"])
+    out = np.zeros((input[0].shape[0], input[0].shape[1], 2), dtype=np.float32)
+    epi = input[0]
+    tensor = vigra.filters.structureTensor(epi, input[1]["inner_scale"], input[1]["inner_scale"])
 
     ### compute coherence value ###
     up = np.sqrt((tensor[:, :, 2]-tensor[:, :, 0])**2 + 4*tensor[:, :, 1]**2)
@@ -81,7 +95,6 @@ class EpiProcessor(object):
         self.data = None
         self.result = None
         self.parameter = None
-        self.result_channels = 1
 
     def setParameter(self, parameter):
         """
@@ -91,8 +104,6 @@ class EpiProcessor(object):
         """
         assert isinstance(parameter, type({}))
         self.parameter = parameter
-        assert parameter.has_key("channels"), "Parameter object need a key called channel defining number of result channels!"
-        self.result_channels = parameter["channels"]
 
     def setData(self, data):
         """
@@ -111,24 +122,31 @@ class EpiProcessor(object):
 
     def start(self):
         """
-        this is the main routine of the class calling process
+        this is the main routine of the class calling process()
         on each epi in parallel.
         """
         assert self.data is not None, "Need data before process can be started!"
 
-        self.result = np.zeros((self.data.shape[0], self.data.shape[1], self.data.shape[2], self.result_channels), dtype=np.float32)
+        self.result = np.zeros((self.data.shape[1], self.data.shape[2], 2), dtype=np.float32)
 
         assert self.result is not None, "No result array is defined!"
         assert self.parameter is not None, "No parameter object is defined!"
 
-        inputs = []
-        for n in range(self.data.shape[1]):
-            inputs.append([self.data[:, n, :], self.parameter])
 
-        result = Parallel(n_jobs=4)(delayed(process)(inputs[i]) for i in range(len(inputs)))
-        for m, res in enumerate(result):
-            for c in range(self.result_channels):
-                self.result[:, m, :, c] = res[:, :, c]
+        for f in self.parameter["focuses"]:
+            inputs = []
+            for n in range(self.data.shape[1]):
+                epi = refocus(self.data[:, n, :], f)
+                inputs.append([epi, self.parameter])
+
+            result = Parallel(n_jobs=4)(delayed(process)(inputs[i]) for i in range(len(inputs)))
+            for m, res in enumerate(result):
+
+                winner = np.where(res[self.data.shape[0]/2, :, 1] > self.result[m, :, 1])
+                self.result[m, winner, 0] = res[self.data.shape[0]/2, winner, 0]
+                self.result[m, winner, 1] = self.result[m, winner, 1]
+
+        np.place(self.result[:, :, 0], self.result[:, :, 1] == 0, 0)
 
 
 
@@ -313,7 +331,7 @@ if __name__ == "__main__":
 
     data_path = "/home/swanner/Desktop/denseSampledTestScene/rendered_LR"
     processor = EpiProcessor()
-    processor.setParameter({"channels": 2, "inner_scale": 0.6, "outer_scale": 1.3, "min_coherence": 0.95})
+    processor.setParameter({"inner_scale": 0.6, "outer_scale": 1.3, "min_coherence": 0.95, "focuses": [0.0, 1.0]})
 
     engine = Engine()
     engine.setData(data_path)
