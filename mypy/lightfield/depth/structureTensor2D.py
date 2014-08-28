@@ -130,6 +130,63 @@ class StructureTensorClassic(StructureTensor):
 
         return vigra.filters.structureTensor(epi, params["inner_scale"], params["outer_scale"])
 
+class StructureTensorClassic(StructureTensor):
+
+    def __init__(self):
+        StructureTensor.__init__(self)
+
+    def derivations(self, epi, params):
+        assert isinstance(epi, np.ndarray)
+        assert params.has_key("inner_scale")
+        assert params.has_key("outer_scale")
+
+        gaussianInner = vigra.filters.gaussianKernel(params["inner_scale"])
+        gaussianOuter = vigra.filters.gaussianKernel(params["outer_scale"])
+
+        grad = np.zeros((epi.shape[0], epi.shape[1], 2), dtype=np.float32)
+
+        GD = vigra.filters.Kernel1D()
+        GD.initGaussianDerivative(params["inner_scale"], 1)
+        #Border Treatments:
+        ##BORDER_TREATMENT_AVOID, BORDER_TREATMENT_REPEAT, BORDER_TREATMENT_REFLECT, BORDER_TREATMENT_ZEROPAD, BORDER_TREATMENT_WARP
+        GD.setBorderTreatment(vigra.filters.BorderTreatmentMode.BORDER_TREATMENT_AVOID)
+
+        ### Inner gaussian filter ###
+        # print("apply gaussian filter along 3rd dimension")
+        epi = vigra.filters.convolveOneDimension(epi, 1, gaussianInner)
+        # print("apply gaussian filter along 1rd dimension")
+        epi = vigra.filters.convolveOneDimension(epi, 0, gaussianInner)
+
+
+        ### Derivative computation ###
+        # print("apply scharr filter along 1st dimension")
+        grad[:, :, 0] = vigra.filters.convolveOneDimension(epi, 0, GD)
+        grad[:, :, 0] = vigra.filters.convolveOneDimension(grad[:, :, 0], 1, gaussianInner)
+        # print("apply scharr filter along 3rd dimension")
+        grad[:, :, 1] = vigra.filters.convolveOneDimension(epi, 1, GD)
+        grad[:, :, 1] = vigra.filters.convolveOneDimension(grad[:, :, 1], 0, gaussianInner)
+
+        tensor = vigra.filters.vectorToTensor(grad)
+
+        # print("apply gaussian filter along 3rd dimension")
+        tensor[:, :, 0] = vigra.filters.convolveOneDimension(tensor[:, :, 0], 1, gaussianOuter)
+        tensor[:, :, 1] = vigra.filters.convolveOneDimension(tensor[:, :, 1], 1, gaussianOuter)
+        tensor[:, :, 2] = vigra.filters.convolveOneDimension(tensor[:, :, 2], 1, gaussianOuter)
+
+        # print("apply gaussian filter along 1rd dimension")
+        tensor[:, :, 0] = vigra.filters.convolveOneDimension(tensor[:, :, 0], 0, gaussianOuter)
+        tensor[:, :, 1] = vigra.filters.convolveOneDimension(tensor[:, :, 1], 0, gaussianOuter)
+        tensor[:, :, 2] = vigra.filters.convolveOneDimension(tensor[:, :, 2], 0, gaussianOuter)
+
+        # tensor = vigra.filters.hourGlassFilter2D(tensor, params["outer_scale"], 0.4)
+        # tensor = vigra.filters.hourGlassFilter2D(tensor, params["hour-glass"], 0.4)
+
+        return tensor
+
+
+
+
+
 
 class StructureTensorHourGlass(StructureTensor):
 
@@ -155,53 +212,60 @@ class StructureTensorScharr(StructureTensor):
         assert isinstance(epi, np.ndarray)
         assert params.has_key("inner_scale")
         assert params.has_key("outer_scale")
+        assert params.has_key("Scharr_Prefilter")
+
+        gaussianInner = vigra.filters.gaussianKernel(params["inner_scale"])
+        gaussianOuter = vigra.filters.gaussianKernel(params["outer_scale"])
+
+        grad = np.zeros((epi.shape[0], epi.shape[1], 2), dtype=np.float32)
 
         K = np.array([-1, 0, 1]) / 2.0
         scharr1dim = vigra.filters.Kernel1D()
         scharr1dim.initExplicitly(-1, 1, K)
+        #Border Treatments:
+        ##BORDER_TREATMENT_AVOID, BORDER_TREATMENT_REPEAT, BORDER_TREATMENT_REFLECT, BORDER_TREATMENT_ZEROPAD, BORDER_TREATMENT_WARP
+        scharr1dim.setBorderTreatment(vigra.filters.BorderTreatmentMode.BORDER_TREATMENT_AVOID)
 
         K = np.array([3, 10, 3]) / 16.0
         scharr2dim = vigra.filters.Kernel1D()
         scharr2dim.initExplicitly(-1, 1, K)
+        #Border Treatments:
+        #BORDER_TREATMENT_AVOID, BORDER_TREATMENT_REPEAT, BORDER_TREATMENT_REFLECT, BORDER_TREATMENT_ZEROPAD, BORDER_TREATMENT_WARP
+        scharr2dim.setBorderTreatment(vigra.filters.BorderTreatmentMode.BORDER_TREATMENT_AVOID)
 
-        epi = vigra.filters.gaussianSmoothing(epi, sigma=params["inner_scale"])
 
-        # print("apply scharr pre-filter along 2rd dimension")
-        epi = vigra.filters.convolveOneDimension(epi, 1, scharr1dim)
-        epi = vigra.filters.convolveOneDimension(epi, 0, scharr2dim)
+        ### Inner gaussian filter ###
+        # print("apply gaussian filter along 3rd dimension")
+        epi = vigra.filters.convolveOneDimension(epi, 1, gaussianInner)
+        # print("apply gaussian filter along 1rd dimension")
+        epi = vigra.filters.convolveOneDimension(epi, 0, gaussianInner)
 
-        grad = np.zeros((epi.shape[0], epi.shape[1], 2), dtype = np.float32)
+### EPI prefilter ###
+        if params["Scharr_Prefilter"]:
+
+            # print("apply scharr pre-filter along 3rd dimension")
+            epi = vigra.filters.convolveOneDimension(epi, 1, scharr1dim)
+            epi = vigra.filters.convolveOneDimension(epi, 0, scharr2dim)
+
         ### Derivative computation ###
         # print("apply scharr filter along 1st dimension")
         grad[:, :, 0] = vigra.filters.convolveOneDimension(epi, 0, scharr1dim)
         grad[:, :, 0] = vigra.filters.convolveOneDimension(grad[:, :, 0], 1, scharr2dim)
-        # print("apply scharr filter along 2rd dimension")
+        # print("apply scharr filter along 3rd dimension")
         grad[:, :, 1] = vigra.filters.convolveOneDimension(epi, 1, scharr1dim)
         grad[:, :, 1] = vigra.filters.convolveOneDimension(grad[:, :, 1], 0, scharr2dim)
 
-        # Kernel_H = np.array([[-3, 0, 3], [-10, 0, 10], [-3, 0, 3]]) / 32.0
-        # scharrh = vigra.filters.Kernel2D()
-        # scharrh.initExplicitly((-1, -1), (1, 1), Kernel_H)
-        #
-        # Kernel_V = np.array([[-3, -10, -3], [0, 0, 0], [3, 10, 3]]) / 32.0
-        # scharrv = vigra.filters.Kernel2D()
-        # scharrv.initExplicitly((-1, -1), (1, 1), Kernel_V)
-        #
-        # epi = vigra.filters.gaussianSmoothing(epi, sigma=params["inner_scale"])
-        #
-        # epi = vigra.filters.convolve(epi, scharrh)
-        # d_2dim = vigra.filters.convolve(epi, scharrh)
-        # d_1dim = vigra.filters.convolve(epi, scharrv)
-        #
-        # grad = np.zeros((d_1dim.shape[0], d_1dim.shape[1], 2), dtype = np.float32)
-        # grad[:, :, 0] = d_1dim[:, :]
-        # grad[:, :, 1] = d_2dim[:, :]
-
         tensor = vigra.filters.vectorToTensor(grad)
 
-        tensor[:, :, 0] = vigra.filters.gaussianSmoothing(tensor[:, :, 0], sigma=params["outer_scale"])
-        tensor[:, :, 1] = vigra.filters.gaussianSmoothing(tensor[:, :, 1], sigma=params["outer_scale"])
-        tensor[:, :, 2] = vigra.filters.gaussianSmoothing(tensor[:, :, 2], sigma=params["outer_scale"])
+        # print("apply gaussian filter along 3rd dimension")
+        tensor[:, :, 0] = vigra.filters.convolveOneDimension(tensor[:, :, 0], 1, gaussianOuter)
+        tensor[:, :, 1] = vigra.filters.convolveOneDimension(tensor[:, :, 1], 1, gaussianOuter)
+        tensor[:, :, 2] = vigra.filters.convolveOneDimension(tensor[:, :, 2], 1, gaussianOuter)
+
+        # print("apply gaussian filter along 1rd dimension")
+        tensor[:, :, 0] = vigra.filters.convolveOneDimension(tensor[:, :, 0], 0, gaussianOuter)
+        tensor[:, :, 1] = vigra.filters.convolveOneDimension(tensor[:, :, 1], 0, gaussianOuter)
+        tensor[:, :, 2] = vigra.filters.convolveOneDimension(tensor[:, :, 2], 0, gaussianOuter)
 
         # tensor = vigra.filters.hourGlassFilter2D(tensor, params["outer_scale"], 0.4)
         # tensor = vigra.filters.hourGlassFilter2D(tensor, params["hour-glass"], 0.4)
@@ -337,3 +401,30 @@ def mergeOrientations_wta(orientation1, coherence1, orientation2, coherence2):
     # coherence1[winner] =  coherence1[winner] * 1.05
 
     return orientation1, coherence1
+
+
+
+
+#############################################################################################################
+############# Obsolete Code Fragments
+#############################################################################################################
+
+
+###Old part Scharr Filter 2D
+        # Kernel_H = np.array([[-3, 0, 3], [-10, 0, 10], [-3, 0, 3]]) / 32.0
+        # scharrh = vigra.filters.Kernel2D()
+        # scharrh.initExplicitly((-1, -1), (1, 1), Kernel_H)
+        #
+        # Kernel_V = np.array([[-3, -10, -3], [0, 0, 0], [3, 10, 3]]) / 32.0
+        # scharrv = vigra.filters.Kernel2D()
+        # scharrv.initExplicitly((-1, -1), (1, 1), Kernel_V)
+        #
+        # epi = vigra.filters.gaussianSmoothing(epi, sigma=params["inner_scale"])
+        #
+        # epi = vigra.filters.convolve(epi, scharrh)
+        # d_2dim = vigra.filters.convolve(epi, scharrh)
+        # d_1dim = vigra.filters.convolve(epi, scharrv)
+        #
+        # grad = np.zeros((d_1dim.shape[0], d_1dim.shape[1], 2), dtype = np.float32)
+        # grad[:, :, 0] = d_1dim[:, :]
+        # grad[:, :, 1] = d_2dim[:, :]

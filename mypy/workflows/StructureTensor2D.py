@@ -252,9 +252,6 @@ def structureTensor2D(config):
                 plt.imsave(config.result_path+config.result_label+"coherence_merged_shift_{0}.png".format(shift), coherence[lf_shape[0]/2, :, :], cmap=plt.cm.jet)
 
 
-
-
-
     orientation = orientation[lf_shape[0]/2, :, :]
     depth = dtc.disparity_to_depth(orientation, config.base_line, config.focal_length, config.min_depth, config.max_depth)
     mask = np.copy(coherence[lf_shape[0]/2, :, :])
@@ -268,9 +265,6 @@ def structureTensor2D(config):
     plt.imsave(config.result_path+config.result_label+"Mask.png", regionFillMask, cmap=plt.cm.jet)
 
     print("fill regions with no ")
-
-
-
 
     if isinstance(config.median, int) and config.median > 0:
         print "apply median filter ..."

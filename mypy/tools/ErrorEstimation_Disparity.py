@@ -15,6 +15,9 @@ def compute_MSE(depth, gt):
 
     mse = (depth[:] - gt[:])*(depth[:] - gt[:])
     mask = np.where(gt > 0)
+    np.place(mse, gt == 0 , 0)
+    # Comment out for digital data having negative disparities , otherwise not.
+    # mask = np.where(depth > 0)
     mse_no = np.mean(mse[mask])
 
     return mse, mse_no
@@ -31,6 +34,9 @@ def compute_MAE(depth, gt):
 
     mae = abs(depth[:] - gt[:])
     mask = np.where(gt > 0)
+    np.place(mae, gt == 0 , 0)
+    # Comment out for digital data having negative disparities , otherwise not.
+    # mask = np.where(depth > 0)
     mae_no = np.mean(mae[mask])
 
     return mae, mae_no
@@ -46,6 +52,8 @@ def compute_MRE(depth, gt):
     mre = (depth[:] - gt[:])*(depth[:] - gt[:]) / abs(gt[:])
     mask = np.where(gt > 0)
     np.place(mre, gt == 0 , 0)
+    # Comment out for digital data having negative disparities , otherwise not.
+    # mask = np.where(depth > 0)
     mre_no = np.mean(mre[mask])
     mre_pc = mre_no *100
 
@@ -137,22 +145,13 @@ if __name__ == "__main__":
             maxError = float(sys.argv[6])
             save = str2bool(sys.argv[7])
             plotFIG = str2bool(sys.argv[8])
-        elif name.endswith('png'):
-            data = vigra.readImage(sys.argv[2])
-            print(data.shape)
-            GT = np.copy(data[:, :, 0])
-            minDepth = float(sys.argv[3])
-            maxDepth = float(sys.argv[4])
-            minError = float(sys.argv[5])
-            maxError = float(sys.argv[6])
-            save = str2bool(sys.argv[7])
-            plotFIG = str2bool(sys.argv[8])
         else:
             pass
 
-        ### Exr files are 4dimensional extract layer with depth information ###
+        ### Exr files are 4dimensional extract layer with depth information and cut border with bad estimation values ###
 
         disparity = np.copy(depth_img[:, :, 0].T)
+        # disparity = disparity[15:disparity.shape[0]-15, 15:disparity.shape[1]-15]
 
         ### check if size of both arrays is the same, if not reduce the ground truth ###
 

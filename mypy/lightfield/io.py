@@ -67,6 +67,9 @@ def load_3d(path, rgb=True, roi=None, switchOrder=False):
         for f in glob(path + "*.jpg"):
             fnames.append(f)
     if len(fnames) == 0:
+        for f in glob(path + "*.JPG"):
+            fnames.append(f)
+    if len(fnames) == 0:
         for f in glob(path + "*.tif"):
             fnames.append(f)
     if len(fnames) == 0:

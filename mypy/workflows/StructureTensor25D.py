@@ -8,7 +8,7 @@ import mypy.lightfield.depth.prefilter as prefilter
 from mypy.lightfield import io as lfio
 from scipy.ndimage import median_filter
 
-import mypy.lightfield.depthToCloud as dtc
+import mypy.pointclouds.depthToCloud as dtc
 from mypy.lightfield import helpers as lfhelpers
 
 
@@ -70,10 +70,16 @@ def compute_horizontal(lf3dh, shift, config):
         K = np.array([-1, 0, 1]) / 2.0
         scharr1dim = vigra.filters.Kernel1D()
         scharr1dim.initExplicitly(-1, 1, K)
+        #Border Treatments:
+        #BORDER_TREATMENT_AVOID, BORDER_TREATMENT_REPEAT, BORDER_TREATMENT_REFLECT, BORDER_TREATMENT_ZEROPAD, BORDER_TREATMENT_WARP
+        scharr1dim.setBorderTreatment(vigra.filters.BorderTreatmentMode.BORDER_TREATMENT_AVOID)
 
         K = np.array([3, 10, 3]) / 16.0
         scharr2dim = vigra.filters.Kernel1D()
         scharr2dim.initExplicitly(-1, 1, K)
+        #Border Treatments:
+        #BORDER_TREATMENT_AVOID, BORDER_TREATMENT_REPEAT, BORDER_TREATMENT_REFLECT, BORDER_TREATMENT_ZEROPAD, BORDER_TREATMENT_WARP
+        scharr1dim.setBorderTreatment(vigra.filters.BorderTreatmentMode.BORDER_TREATMENT_AVOID)
 
         grad = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], 2), dtype=np.float32)
         tensor = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], 3), dtype=np.float32)
@@ -200,14 +206,19 @@ def compute_vertical(lf3dv, shift, config):
         gaussianOuter2 = vigra.filters.gaussianKernel(config.outer_scale[1])
         gaussianOuter3 = vigra.filters.gaussianKernel(config.outer_scale[2])
 
-
         K = np.array([-1, 0, 1]) / 2.0
         scharr1dim = vigra.filters.Kernel1D()
         scharr1dim.initExplicitly(-1, 1, K)
+        #Border Treatments:
+        #BORDER_TREATMENT_AVOID, BORDER_TREATMENT_REPEAT, BORDER_TREATMENT_REFLECT, BORDER_TREATMENT_ZEROPAD, BORDER_TREATMENT_WARP
+        scharr1dim.setBorderTreatment(vigra.filters.BorderTreatmentMode.BORDER_TREATMENT_AVOID)
 
         K = np.array([3, 10, 3]) / 16.0
         scharr2dim = vigra.filters.Kernel1D()
         scharr2dim.initExplicitly(-1, 1, K)
+        #Border Treatments:
+        #BORDER_TREATMENT_AVOID, BORDER_TREATMENT_REPEAT, BORDER_TREATMENT_REFLECT, BORDER_TREATMENT_ZEROPAD, BORDER_TREATMENT_WARP
+        scharr1dim.setBorderTreatment(vigra.filters.BorderTreatmentMode.BORDER_TREATMENT_AVOID)
 
         grad = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], 2), dtype=np.float32)
         tensor = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], 3), dtype=np.float32)
@@ -423,7 +434,7 @@ def structureTensor25D(config):
         gauss = vigra.filters.Kernel2D()
         vigra.filters.Kernel2D.initGaussian(gauss, config.selective_gaussian)
         gauss.setBorderTreatment(vigra.filters.BorderTreatmentMode.BORDER_TREATMENT_CLIP)
-        orientationTrad = vigra.filters.normalizedConvolveImage(orientation, mask, gauss)
+        orientation = vigra.filters.normalizedConvolveImage(orientation, mask, gauss)
 
 
     if config.output_level >= 1:

@@ -11,7 +11,7 @@ import skimage.color as color
 
 
 COLORSPACE = enum(RGB=0, LAB=1, LUV=2, GRAY=3, HSV=4, SGRAY=5)
-
+PREFILTER = enum(NO=0, IMGD=1, EPID=2, IMGD2=3, EPID2=4, SCHARR=5, DOG=6)
 
 
 def changeColorSpace(lf3d, cspace=COLORSPACE.RGB):
@@ -65,7 +65,6 @@ def changeColorSpace(lf3d, cspace=COLORSPACE.RGB):
 #============================================================================================================
 #==========================                     prefiltering methods (derivatives)             ===========================
 #============================================================================================================
-PREFILTER = enum(NO=0, IMGD=1, EPID=2, IMGD2=3, EPID2=4, SCHARR=5, DOG=6)
 
 def preImgDerivation(lf3d, scale=0.1, direction='h'):
     assert isinstance(lf3d, np.ndarray)
