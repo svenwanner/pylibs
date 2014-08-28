@@ -124,23 +124,25 @@ def structureTensor2D(config):
     try:
         if not config.path_horizontal.endswith("/"):
             config.path_horizontal += "/"
-        lf3dh = lfio.load_3d(config.path_horizontal, rgb=config.rgb, roi=config.roi)
+        tmp = lfio.load_3d(config.path_horizontal, rgb=config.rgb, roi=config.roi)
         print "ok"
         compute_h = True
-        lf_shape = lf3dh.shape
+        lf_shape = tmp.shape
         if config.output_level > 3:
-            print('Image shape of horizontal images: ' + str(lf3dh.shape))
+            print('Image shape of horizontal images: ' + str(tmp.shape))
 
         if config.color_space:
-            lf3dh = prefilter.changeColorSpace(lf3dh, config.color_space)
+            lf3dh = prefilter.changeColorSpace(tmp, config.color_space)
+        else:
+            lf3dh = tmp
 
         if config.prefilter > 0:
             if config.prefilter == PREFILTER.IMGD:
-                lf3dh = prefilter.preImgDerivation(lf3dh, scale=config.prefilter_scale, direction='v')
+                lf3dh = prefilter.preImgDerivation(lf3dh, scale=config.prefilter_scale, direction='h')
             if config.prefilter == PREFILTER.IMGD2:
                 lf3dh = prefilter.preImgLaplace(lf3dh, scale=config.prefilter_scale)
             if config.prefilter == PREFILTER.SCHARR:
-                lf3dh = prefilter.preImgScharr(lf3dh, config, direction='v')
+                lf3dh = prefilter.preImgScharr(lf3dh, config, direction='h')
             if config.prefilter == PREFILTER.DOG:
                 lf3dh = prefilter.preDoG(lf3dh, config)
 
@@ -151,16 +153,18 @@ def structureTensor2D(config):
     try:
         if not config.path_vertical.endswith("/"):
             config.path_vertical += "/"
-        lf3dv = lfio.load_3d(config.path_vertical, rgb=config.rgb, roi=config.roi)
+        tmp = lfio.load_3d(config.path_vertical, rgb=config.rgb, roi=config.roi)
         print "ok"
         compute_v = True
         if lf_shape is None:
-            lf_shape = lf3dv.shape
+            lf_shape = tmp.shape
         if config.output_level > 3:
-            print('Image shape of vertical images: ' + str(lf3dv.shape))
+            print('Image shape of vertical images: ' + str(tmp.shape))
 
         if config.color_space:
-            lf3dv = prefilter.changeColorSpace(lf3dv, config.color_space)
+            lf3dv = prefilter.changeColorSpace(tmp, config.color_space)
+        else:
+            lf3dv = tmp
 
         if config.prefilter > 0:
             if config.prefilter == PREFILTER.IMGD:
@@ -248,9 +252,6 @@ def structureTensor2D(config):
                 plt.imsave(config.result_path+config.result_label+"coherence_merged_shift_{0}.png".format(shift), coherence[lf_shape[0]/2, :, :], cmap=plt.cm.jet)
 
 
-
-
-
     orientation = orientation[lf_shape[0]/2, :, :]
     depth = dtc.disparity_to_depth(orientation, config.base_line, config.focal_length, config.min_depth, config.max_depth)
     mask = np.copy(coherence[lf_shape[0]/2, :, :])
@@ -264,9 +265,6 @@ def structureTensor2D(config):
     plt.imsave(config.result_path+config.result_label+"Mask.png", regionFillMask, cmap=plt.cm.jet)
 
     print("fill regions with no ")
-
-
-
 
     if isinstance(config.median, int) and config.median > 0:
         print "apply median filter ..."

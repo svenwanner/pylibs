@@ -4,22 +4,58 @@ from mypy.lightfield.helpers import enum
 import logging
 import pylab as plt
 from scipy.misc import imsave
+import skimage.color as color
 #============================================================================================================
 #==========================                     prefiltering methods (color space)              ===========================
 #============================================================================================================
 
 
-COLORSPACE = enum(RGB=0, LAB=1, LUV=2)
+COLORSPACE = enum(RGB=0, LAB=1, LUV=2, GRAY=3, HSV=4, SGRAY=5)
+PREFILTER = enum(NO=0, IMGD=1, EPID=2, IMGD2=3, EPID2=4, SCHARR=5, DOG=6)
 
 
+def changeColorSpace(lf3d, cspace=COLORSPACE.RGB):
 
-def changeColorSpace(lf3d, cspace=0):
-    if lf3d.shape[3] == 3 and cspace > 0:
-        for n in range(lf3d.shape[0]):
-            if cspace == 1:
-                lf3d[n, :, :, :] = vigra.colors.transform_RGB2Lab(lf3d[n, :, :, :])
-            if cspace == 2:
-                lf3d[n, :, :, :] = vigra.colors.transform_RGB2Luv(lf3d[n, :, :, :])
+    if lf3d.shape[3] == 3:
+        if lf3d.dtype == np.uint8:
+            lf3d = lf3d.astype(np.float32)
+        if np.amax(lf3d) > 1.0:
+            lf3d[:] /= 255.0
+
+        if cspace == COLORSPACE.HSV:
+            print("Change to HSV")
+            for i in range(lf3d.shape[0]):
+                lf3d[i, :, :, :] = color.rgb2hsv(lf3d[i, :, :, :])
+            return lf3d
+
+        elif cspace == COLORSPACE.LUV:
+            print("Change to LUV")
+            for i in range(lf3d.shape[0]):
+                #lf3d[i, :, :, :] = color.rgb2luv(lf3d[i, :, :, :])
+                lf3d[i, :, :, :] = vigra.colors.transform_RGB2Luv(lf3d[i, :, :, :])
+            return lf3d
+
+        elif cspace == COLORSPACE.LAB:
+            print("Change to LAB")
+            for i in range(lf3d.shape[0]):
+                #lf3d[i, :, :, :] = color.rgb2lab(lf3d[i, :, :, :])
+                lf3d[i, :, :, :] = vigra.colors.transform_RGB2Lab(lf3d[i, :, :, :])
+            return lf3d
+
+        elif cspace == COLORSPACE.GRAY:
+            print("Change to GRAY")
+            tmp = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], 1), dtype=np.float32)
+            weight = [0.298, 0.5870, 0.1140]#RGB convertion like in Matlab
+            tmp[:,:,:,0] = weight[0]*lf3d[:, :, :, 0]+weight[1]*lf3d[:, :, :, 1]+weight[2]*lf3d[:, :, :, 2]
+            return tmp
+
+        elif cspace == COLORSPACE.SGRAY:
+            print("Change to SPECIAL GRAY")
+            tmp = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], 1), dtype=np.float32)
+            weight = [0, 256, 59536] #TODO: look which weighting order is better
+            tmp[:,:,:,0] = weight[0]*lf3d[:, :, :, 0]+weight[1]*lf3d[:, :, :, 1]+weight[2]*lf3d[:, :, :, 2]
+            return tmp
+
     return lf3d
 
 
@@ -29,7 +65,6 @@ def changeColorSpace(lf3d, cspace=0):
 #============================================================================================================
 #==========================                     prefiltering methods (derivatives)             ===========================
 #============================================================================================================
-PREFILTER = enum(NO=0, IMGD=1, EPID=2, IMGD2=3, EPID2=4, SCHARR=5, DOG=6)
 
 def preImgDerivation(lf3d, scale=0.1, direction='h'):
     assert isinstance(lf3d, np.ndarray)

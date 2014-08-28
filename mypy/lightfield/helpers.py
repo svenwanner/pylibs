@@ -1,48 +1,9 @@
-import vigra
 import sys, os
 import logging
 import numpy as np
 from glob import glob
 from scipy.ndimage import shift
 from scipy.misc import imread
-
-import skimage.color as color
-
-image_types = ["png", "jpg", "jpeg", "tif", "bmp", "ppm", "TIF", "JPG", "JPEG", "PNG"]
-
-def getFilenameList(fpath, switchOrder=False):
-    if not fpath.endswith(os.path.sep):
-        fpath += os.path.sep
-    fnames = []
-    for ftype in image_types:
-        for f in glob(fpath+"*."+ftype):
-            fnames.append(f)
-    fnames.sort()
-
-    if switchOrder:
-        fnames.reverse()
-    return fnames
-
-
-def changeColorspace(lf3d, cspace="luv"):
-    if lf3d.shape[3] == 3:
-        if lf3d.dtype == np.uint8:
-            lf3d = lf3d.astype(np.float32)
-        if np.amax(lf3d) > 1.0:
-            lf3d[:] /= 255.0
-
-        if cspace == "hsv":
-            for i in range(lf3d.shape[0]):
-                lf3d[i, :, :, :] = color.rgb2hsv(lf3d[i, :, :, :])
-        elif cspace == "luv":
-            for i in range(lf3d.shape[0]):
-                #lf3d[i, :, :, :] = color.rgb2luv(lf3d[i, :, :, :])
-                lf3d[i, :, :, :] = vigra.colors.transform_RGB2Luv(lf3d[i, :, :, :])
-        elif cspace == "lab":
-            for i in range(lf3d.shape[0]):
-                #lf3d[i, :, :, :] = color.rgb2lab(lf3d[i, :, :, :])
-                lf3d[i, :, :, :] = vigra.colors.transform_RGB2Lab(lf3d[i, :, :, :])
-    return lf3d
 
 
 def getFilenames(fpath, index=0, amount=-1, ftype="png", switchOrder=False):

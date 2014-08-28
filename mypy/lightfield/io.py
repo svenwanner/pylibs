@@ -3,6 +3,7 @@ import numpy as np
 import pylab as plt
 from glob import glob
 import scipy.misc as misc
+import vigra
 
 from mypy.image.io import loadEXR
 from mypy.visualization.imshow import imshow
@@ -60,25 +61,37 @@ def load_3d(path, rgb=True, roi=None, switchOrder=False):
         assert isinstance(roi, dict)
 
     fnames = []
-    if isinstance(path, str):
-        for f in glob(path + "*.png"):
-            fnames.append(f)
+    assert isinstance(path, str)
+
+
+    for f in glob(path + "*.png"):
+        fnames.append(f)
+    if len(fnames) == 0:
         for f in glob(path + "*.jpg"):
             fnames.append(f)
+    if len(fnames) == 0:
+        for f in glob(path + "*.JPG"):
+            fnames.append(f)
+    if len(fnames) == 0:
         for f in glob(path + "*.tif"):
             fnames.append(f)
+    if len(fnames) == 0:
+        for f in glob(path + "*.exr"):
+            fnames.append(f)
+    if len(fnames) == 0:
         for f in glob(path + "*.ppm"):
             fnames.append(f)
+    if len(fnames) == 0:
         for f in glob(path + "*.bmp"):
             fnames.append(f)
+    if len(fnames) == 0:
         for f in glob(path + "*.TIF"):
             fnames.append(f)
-        fnames.sort()
-    elif isinstance(path, type([])):
-        fnames = path
-    else:
-        print "Wrong input type for path paramater, need a string or a list of filenames!"
-        sys.exit()
+
+    fnames.sort()
+
+    for i in fnames:
+        print(i)
 
     if switchOrder:
         fnames.reverse()
@@ -88,7 +101,8 @@ def load_3d(path, rgb=True, roi=None, switchOrder=False):
     sposy = 0
     eposy = 0
 
-    im = misc.imread(fnames[0])
+    im = vigra.readImage(fnames[0],order='C')
+    # im = misc.imread(fnames[0])
     if len(im.shape) == 2:
         rgb = False
 
@@ -135,7 +149,8 @@ def load_3d(path, rgb=True, roi=None, switchOrder=False):
                 lf[0, :, :, 0] = im[sposx:eposx, sposy:eposy]
 
     for n in range(1, len(fnames)):
-        im = misc.imread(fnames[n])
+        # im = misc.imread(fnames[n])
+        im = vigra.readImage(fnames[n], order='C')
         if rgb:
             if roi is None:
                 if len(im.shape) == 3:

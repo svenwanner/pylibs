@@ -7,7 +7,6 @@ import vigra
 import mypy.pointclouds.depthToCloud as dtc
 
 
-
 if __name__ == "__main__":
 
     if len(sys.argv) >= 4 and len(sys.argv) <= 5:

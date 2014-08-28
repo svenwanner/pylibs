@@ -101,6 +101,10 @@ def compute_horizontal(lf3dh, shift, config):
         lf3d = prefilter.preEpiDerivation(lf3d, scale=config.prefilter_scale, direction='h')
     if config.prefilter == PREFILTER.EPID2:
         lf3d = prefilter.preEpiLaplace(lf3d, scale=config.prefilter_scale, direction='h')
+    excecute = False
+    if config.prefilter == PREFILTER.SCHARR:
+        print("Apply Scharr Prefilter")
+        excecute = True
 
     ### compute structure tensor ###
     structureTensor = None
@@ -114,7 +118,7 @@ def compute_horizontal(lf3dh, shift, config):
         print "use scharr structure tensor..."
         structureTensor = st2d.StructureTensorScharr()
 
-    params = {"direction": 'h', "inner_scale": config.inner_scale, "outer_scale": config.outer_scale, "hour-glass": config.hourglass_scale}
+    params = {"direction": 'h', "inner_scale": config.inner_scale, "outer_scale": config.outer_scale, "hour-glass": config.hourglass_scale, "Scharr_Prefilter": excecute}
     structureTensor.compute(lf3d, params)
     st3d = structureTensor.get_result()
 
@@ -140,11 +144,14 @@ def compute_vertical(lf3dv, shift, config):
     print "compute vertical shift {0}".format(shift), "...",
     lf3d = lfhelpers.refocus_3d(lf3dv, shift, 'v')
 
-    if config.prefilter > 0:
-        if config.prefilter == PREFILTER.EPID:
-            lf3d = prefilter.preEpiDerivation(lf3d, scale=config.prefilter_scale, direction='v')
-        if config.prefilter == PREFILTER.EPID2:
-            lf3d = prefilter.preEpiLaplace(lf3d, scale=config.prefilter_scale, direction='v')
+    if config.prefilter == PREFILTER.EPID:
+        lf3d = prefilter.preEpiDerivation(lf3d, scale=config.prefilter_scale, direction='v')
+    if config.prefilter == PREFILTER.EPID2:
+        lf3d = prefilter.preEpiLaplace(lf3d, scale=config.prefilter_scale, direction='v')
+    excecute = False
+    if config.prefilter == PREFILTER.SCHARR:
+        print("Apply Scharr Prefilter")
+        excecute = True
 
     structureTensor = None
     if config.structure_tensor_type == "classic":
@@ -157,7 +164,7 @@ def compute_vertical(lf3dv, shift, config):
         print "use scharr structure tensor..."
         structureTensor = st2d.StructureTensorScharr()
 
-    params = {"direction": 'v', "inner_scale": config.inner_scale, "outer_scale": config.outer_scale, "hour-glass": config.hourglass_scale}
+    params = {"direction": 'v', "inner_scale": config.inner_scale, "outer_scale": config.outer_scale, "hour-glass": config.hourglass_scale, "Scharr_Prefilter": excecute}
     structureTensor.compute(lf3d, params)
     st3d = structureTensor.get_result()
 

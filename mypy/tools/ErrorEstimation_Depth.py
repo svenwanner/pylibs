@@ -45,6 +45,7 @@ def compute_MRE(depth, gt):
     """
     mre = (depth[:] - gt[:])*(depth[:] - gt[:]) / gt[:]
     mask = np.where(gt > 0)
+    np.place(mre, gt == 0 , 0)
     mre_no = np.mean(mre[mask])
     mre_pc = mre_no *100
 
@@ -54,7 +55,7 @@ def compute_MRE(depth, gt):
 def plot(figure_no, data, min, max, title, bartitle, save=False):
 
     array = np.copy(data)
-    print("Original Range: " + str(array.min()) + " - " + str(array.max()))
+    print(title + " Range: " + str(array.min()) + " - " + str(array.max()))
 
     np.place(array, array > max, max)
     np.place(array, array < min, min)
@@ -102,10 +103,12 @@ def plot(figure_no, data, min, max, title, bartitle, save=False):
     if save == True:
         plt.savefig(title + '.png', bbox_inches='tight')
 
+def str2bool(v):
+  return v.lower() in ("yes", "true", "t", "1")
 
 if __name__ == "__main__":
 
-    if 5 <= len(sys.argv) <= 7:
+    if 8 <= len(sys.argv) <= 8:
 
         #### Load depth estimation and ground truth data ###
 
@@ -120,13 +123,20 @@ if __name__ == "__main__":
             maxDepth = float(sys.argv[4])
             minError = float(sys.argv[5])
             maxError = float(sys.argv[6])
+            save = str2bool(sys.argv[7])
+            plotFIG = str2bool(sys.argv[8])
+        elif name.endswith('tif'):
+            data = vigra.readImage(sys.argv[2])
+            print(data.shape)
+            GT = np.copy(data[:, :, 0])
+            minDepth = float(sys.argv[3])
+            maxDepth = float(sys.argv[4])
+            minError = float(sys.argv[5])
+            maxError = float(sys.argv[6])
+            save = str2bool(sys.argv[7])
+            plotFIG = str2bool(sys.argv[8])
         else:
-            GT = np.copy(depth_img[:, :, 3])
-            minDepth = float(sys.argv[2])
-            maxDepth = float(sys.argv[3])
-            minError = float(sys.argv[4])
-            maxError = float(sys.argv[5])
-
+            pass
 
         ### Exr files are 4dimensional extract layer with depth information ###
 
@@ -156,17 +166,17 @@ if __name__ == "__main__":
         print("\033[92m")
 
         #### Display MAE,MSE MRE ###
-        save = False
 
-        plot(3, mae, minError, maxError, "Mean Absolute Error: "+ "{0:.5f}".format(mae_no), "MAE [px]",save)
-        plot(4, mse, minError, maxError, "Mean Squared Error: "+ "{0:.5f}".format(mse_no), "MSE [px]",save)
-        plot(5, mre, minError, maxError, "Mean Relative Error: "+ "{0:.2f}".format(mre_pc) + "%", "MRE [px]",save)
+        plot(3, mae, minError, maxError, "Mean Absolute Error: "+ "{0:.5f}".format(mae_no), "MAE [m]",save)
+        plot(4, mse, minError, maxError, "Mean Squared Error: "+ "{0:.5f}".format(mse_no), "MSE [m]",save)
+        plot(5, mre, minError, maxError, "Mean Relative Error: "+ "{0:.2f}".format(mre_pc) , "MRE [%]",save)
 
         print("\033[0m")
         plot(1, depth, minDepth, maxDepth, "Depth Estimation", "Depth [m]", save)
         plot(2, GT_img, minDepth, maxDepth, "Ground Truth", "Depth [m]", save)
 
-        plt.show()
+        if (plotFIG == 'True'):
+            plt.show()
 
 
     else:
@@ -177,6 +187,9 @@ if __name__ == "__main__":
         print("arg4: max Border Depth")
         print("arg5: min Border Comparison")
         print("arg6: max Border Comparison")
+        print("arg7: save result (True/False)")
+        print("arg8: display result (True/False)")
+        print"eg. python ErrorEstimation_Depth.py 0 5 0 1 True False"
 
 
 
