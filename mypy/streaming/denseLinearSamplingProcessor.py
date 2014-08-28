@@ -95,6 +95,7 @@ class EpiProcessor(object):
         self.data = None
         self.result = None
         self.parameter = None
+        self.tmp_counter = 0
 
     def setParameter(self, parameter):
         """
@@ -141,12 +142,15 @@ class EpiProcessor(object):
 
             result = Parallel(n_jobs=4)(delayed(process)(inputs[i]) for i in range(len(inputs)))
             for m, res in enumerate(result):
-
                 winner = np.where(res[self.data.shape[0]/2, :, 1] > self.result[m, :, 1])
-                self.result[m, winner, 0] = res[self.data.shape[0]/2, winner, 0]
-                self.result[m, winner, 1] = self.result[m, winner, 1]
+                self.result[m, winner, 0] = res[self.data.shape[0]/2, winner, 0]+f
+                self.result[m, winner, 1] = res[self.data.shape[0]/2, winner, 1]
+            imsave("/home/swanner/Desktop/tmp_imgs/merged_%i_%4.4i.png" % (f, self.tmp_counter), self.result[:, :, 0])
 
-        np.place(self.result[:, :, 0], self.result[:, :, 1] == 0, 0)
+        np.place(self.result[:, :, 0], self.result[:, :, 1] < 0.01, 0.0)
+        imsave("/home/swanner/Desktop/tmp_imgs/final_%4.4i.png" % self.tmp_counter, self.result[:, :, 0])
+        self.tmp_counter += 1
+
 
 
 
@@ -192,13 +196,13 @@ class Engine():
         assert self.processor is not None, "No Processor set!"
 
         self.running = True
-        self.fileReader.start()
+        self.fileReader.read()
         while self.running:
             if self.fileReader.bufferReady():
                 print "processing stack..."
                 self.processor.setData(self.fileReader.getStack())
                 self.processor.start()
-                self.fileReader.start()
+                self.fileReader.read()
 
 
                 print "done!"
@@ -307,7 +311,7 @@ class FileReader():
             self.ready = False
             return np.copy(self.stack)
 
-    def start(self):
+    def read(self):
         """
         runs the buffer filling process
         """
