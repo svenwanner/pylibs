@@ -46,30 +46,58 @@ def process(input):
     assert isinstance(input, type([]))
     out = np.zeros((input[0].shape[0], input[0].shape[1], 2), dtype=np.float32)
     epi = input[0]
-    tensor = vigra.filters.structureTensor(epi, input[1]["inner_scale"], input[1]["inner_scale"])
+    gaussianInner = vigra.filters.gaussianKernel(input[1]["inner_scale"])
+    gaussianOuter = vigra.filters.gaussianKernel(input[1]["outer_scale"])
 
-    ### compute coherence value ###
+    grad = np.zeros((epi.shape[0], epi.shape[1], 2), dtype=np.float32)
+
+    GD = vigra.filters.Kernel1D()
+    GD.initGaussianDerivative(input[1]["inner_scale"], 1)
+    #set border Treatment
+    GD.setBorderTreatment(vigra.filters.BorderTreatmentMode.BORDER_TREATMENT_AVOID)
+
+    #inner gaussian filter
+    epi = vigra.filters.convolveOneDimension(epi, 1, gaussianInner)
+    epi = vigra.filters.convolveOneDimension(epi, 0, gaussianInner)
+
+
+    #derivative computation
+    grad[:, :, 0] = vigra.filters.convolveOneDimension(epi, 0, GD)
+    grad[:, :, 0] = vigra.filters.convolveOneDimension(grad[:, :, 0], 1, gaussianInner)
+    grad[:, :, 1] = vigra.filters.convolveOneDimension(epi, 1, GD)
+    grad[:, :, 1] = vigra.filters.convolveOneDimension(grad[:, :, 1], 0, gaussianInner)
+
+    tensor = vigra.filters.vectorToTensor(grad)
+    tensor[:, :, 0] = vigra.filters.convolveOneDimension(tensor[:, :, 0], 1, gaussianOuter)
+    tensor[:, :, 1] = vigra.filters.convolveOneDimension(tensor[:, :, 1], 1, gaussianOuter)
+    tensor[:, :, 2] = vigra.filters.convolveOneDimension(tensor[:, :, 2], 1, gaussianOuter)
+
+    tensor[:, :, 0] = vigra.filters.convolveOneDimension(tensor[:, :, 0], 0, gaussianOuter)
+    tensor[:, :, 1] = vigra.filters.convolveOneDimension(tensor[:, :, 1], 0, gaussianOuter)
+    tensor[:, :, 2] = vigra.filters.convolveOneDimension(tensor[:, :, 2], 0, gaussianOuter)
+
+    #compute coherence value
     up = np.sqrt((tensor[:, :, 2]-tensor[:, :, 0])**2 + 4*tensor[:, :, 1]**2)
     down = (tensor[:, :, 2]+tensor[:, :, 0] + 1e-25)
     coherence = up / down
 
-    ### compute disparity value ###
+    #compute disparity value
     orientation = vigra.numpy.arctan2(2*tensor[:, :, 1], tensor[:, :, 2]-tensor[:, :, 0]) / 2.0
     orientation = vigra.numpy.tan(orientation[:])
 
-    ### mark out of boundary orientation estimation ###
+    #mask out of boundary orientation estimation
     invalid_ubounds = np.where(orientation > 1.1)
     invalid_lbounds = np.where(orientation < -1.1)
     if not input[1].has_key("min_coherence"):
         input[1]["min_coherence"] = 0.5
     invalid_coh = np.where(coherence < input[1]["min_coherence"])
 
-    ### set coherence of invalid values to zero ###
+    #set coherence of invalid values to zero
     coherence[invalid_ubounds] = 0
     coherence[invalid_lbounds] = 0
     coherence[invalid_coh] = 0
 
-    ### set orientation of invalid values to related maximum/minimum value
+    #set orientation of invalid values to related maximum/minimum value
     orientation[invalid_ubounds] = -1.5
     orientation[invalid_lbounds] = -1.5
     orientation[invalid_coh] = -1.5
@@ -133,7 +161,6 @@ class EpiProcessor(object):
         assert self.result is not None, "No result array is defined!"
         assert self.parameter is not None, "No parameter object is defined!"
 
-
         for f in self.parameter["focuses"]:
             inputs = []
             for n in range(self.data.shape[1]):
@@ -141,6 +168,10 @@ class EpiProcessor(object):
                 inputs.append([epi, self.parameter])
 
             result = Parallel(n_jobs=4)(delayed(process)(inputs[i]) for i in range(len(inputs)))
+            tmp = np.zeros((self.result.shape[0],self.result.shape[1]), dtype=np.float32)
+            for m, res in enumerate(result):
+                tmp[m, :] = res[self.data.shape[0]/2, :, 0]+f
+            imsave("/home/swanner/Desktop/tmp_imgs/before_%i_%4.4i.png" % (f, self.tmp_counter), tmp)
             for m, res in enumerate(result):
                 winner = np.where(res[self.data.shape[0]/2, :, 1] > self.result[m, :, 1])
                 self.result[m, winner, 0] = res[self.data.shape[0]/2, winner, 0]+f
@@ -333,9 +364,9 @@ class FileReader():
 
 if __name__ == "__main__":
 
-    data_path = "/home/swanner/Desktop/denseSampledTestScene/rendered_LR"
+    data_path = "/home/swanner/Desktop/denseSampledTestScene/rendered/fullRes"
     processor = EpiProcessor()
-    processor.setParameter({"inner_scale": 0.6, "outer_scale": 1.3, "min_coherence": 0.95, "focuses": [0.0, 1.0]})
+    processor.setParameter({"inner_scale": 0.6, "outer_scale": 1.3, "min_coherence": 0.95, "focuses": [1.0, 2.0]})
 
     engine = Engine()
     engine.setData(data_path)
