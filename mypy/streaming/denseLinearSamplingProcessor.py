@@ -44,8 +44,17 @@ def process(input):
     :return: <ndarray> result
     """
     assert isinstance(input, type([]))
+    assert isinstance(input[0], np.ndarray)
+    assert isinstance(input[1], type({}))
     out = np.zeros((input[0].shape[0], input[0].shape[1], 2), dtype=np.float32)
     epi = input[0]
+
+    if not input[1].has_key("prefilter"):
+        input[1]["prefilter"] = True
+
+    if input[1]["prefilter"]:
+        epi = vigra.filters.gaussianGradient(epi, 0.4)[:, :, 1]
+
     gaussianInner = vigra.filters.gaussianKernel(input[1]["inner_scale"])
     gaussianOuter = vigra.filters.gaussianKernel(input[1]["outer_scale"])
 
@@ -171,21 +180,35 @@ class EpiProcessor(object):
             tmp = np.zeros((self.result.shape[0],self.result.shape[1]), dtype=np.float32)
             for m, res in enumerate(result):
                 tmp[m, :] = res[self.data.shape[0]/2, :, 0]+f
-            imsave("/home/swanner/Desktop/tmp_imgs/before_%i_%4.4i.png" % (f, self.tmp_counter), tmp)
+            #imsave("/home/swanner/Desktop/tmp_imgs/before_%i_%4.4i.png" % (f, self.tmp_counter), tmp)
             for m, res in enumerate(result):
                 winner = np.where(res[self.data.shape[0]/2, :, 1] > self.result[m, :, 1])
                 self.result[m, winner, 0] = res[self.data.shape[0]/2, winner, 0]+f
                 self.result[m, winner, 1] = res[self.data.shape[0]/2, winner, 1]
-            imsave("/home/swanner/Desktop/tmp_imgs/merged_%i_%4.4i.png" % (f, self.tmp_counter), self.result[:, :, 0])
+            #imsave("/home/swanner/Desktop/tmp_imgs/merged_%i_%4.4i.png" % (f, self.tmp_counter), self.result[:, :, 0])
 
-        np.place(self.result[:, :, 0], self.result[:, :, 1] < 0.01, 0.0)
+        #np.place(self.result[:, :, 0], self.result[:, :, 1] < 0.01, 0.0)
         imsave("/home/swanner/Desktop/tmp_imgs/final_%4.4i.png" % self.tmp_counter, self.result[:, :, 0])
         self.tmp_counter += 1
 
 
 
 
+class DepthAccumulator(object):
+    def __init__(self, parameter=None):
+        self.parameter = parameter
 
+    def initWorldGrid(self):
+        pass
+
+    def setParameter(self, parameter):
+        self.parameter = parameter
+
+    def addDisparity(self, disparity, reliability):
+        pass
+
+    def mergeDepths(self):
+        pass
 
 
 class Engine():
@@ -233,6 +256,7 @@ class Engine():
                 print "processing stack..."
                 self.processor.setData(self.fileReader.getStack())
                 self.processor.start()
+                orientation = self.processor.getResults()
                 self.fileReader.read()
 
 
@@ -366,7 +390,7 @@ if __name__ == "__main__":
 
     data_path = "/home/swanner/Desktop/denseSampledTestScene/rendered/fullRes"
     processor = EpiProcessor()
-    processor.setParameter({"inner_scale": 0.6, "outer_scale": 1.3, "min_coherence": 0.95, "focuses": [1.0, 2.0]})
+    processor.setParameter({"inner_scale": 0.6, "outer_scale": 1.3, "min_coherence": 0.95, "focuses": [1.0, 2.0], "prefilter":True})
 
     engine = Engine()
     engine.setData(data_path)
