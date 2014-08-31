@@ -28,6 +28,7 @@ class Parameter(ConfigParser):
         # scene properties
         self.baseline_m = None
         self.horopter_m = None
+        self.stack_size = None
         self.max_baseline_mm = None
         self.number_of_sampling_points = None
 
@@ -37,6 +38,8 @@ class Parameter(ConfigParser):
         self.min_coherence = None
         self.world_accuracy_m = None
         self.visible_world_area_m = None
+        self.prefilter = 0
+        self.focuses = None
 
         self.load(filepath)
 
@@ -59,12 +62,15 @@ class Parameter(ConfigParser):
         str_out += "baseline_m : " + str(self.baseline_m) + "\n"
         str_out += "max_baseline_mm : " + str(self.max_baseline_mm) + "\n"
         str_out += "horopter : " + str(self.horopter_m) + "\n"
+        str_out += "stack_size : " + str(self.stack_size) + "\n"
         str_out += "### computation ###\n"
         str_out += "inner_scale : " + str(self.inner_scale) + "\n"
         str_out += "outer_scale : " + str(self.outer_scale) + "\n"
         str_out += "min_coherence : " + str(self.min_coherence) + "\n"
         str_out += "world_accuracy_m : " + str(self.world_accuracy_m) + "\n"
         str_out += "visible_world_area_m : " + str(self.visible_world_area_m) + "\n"
+        str_out += "prefilter : " + str(bool(self.prefilter)) + "\n"
+        str_out += "focuses : " + str(self.focuses) + "\n"
 
         return str_out
 
@@ -98,7 +104,7 @@ class Parameter(ConfigParser):
             if not self.image_files_location.startswith(os.sep):
                 self.image_files_location = os.sep + self.image_files_location
             self.image_files_location = os.path.dirname(self.inifile_loc) + self.image_files_location
-            
+
         self.focal_length_mm = float(self.get('camera', 'focal_length_mm'))
         self.sensor_width_mm = float(self.get('camera', 'sensor_width_mm'))
         self.resolution_yx = np.array([int(self.get('camera', 'resolution_y')),
@@ -116,10 +122,14 @@ class Parameter(ConfigParser):
         self.number_of_sampling_points = int(self.get('scene', 'number_of_sampling_points'))
         self.baseline_mm = float(self.get('scene', 'baseline_mm'))
         self.horopter_m = float(self.get('scene', 'horopter_m'))
+        self.stack_size = int(self.get('scene', 'stack_size'))
 
         self.inner_scale = float(self.get('computation', 'inner_scale'))
         self.outer_scale = float(self.get('computation', 'outer_scale'))
         self.min_coherence = float(self.get('computation', 'min_coherence'))
+        self.prefilter = bool(int(self.get('computation', 'prefilter')))
+        self.focuses = np.arange(float(self.get('computation', 'focus_start')),
+                             float(self.get('computation', 'focus_start'))+float(self.get('computation', 'focus_steps'))).astype(np.float32)
 
 
         # compute the field of view of the camera

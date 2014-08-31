@@ -1,17 +1,12 @@
 # -*- coding: utf-8 -*-
 
 import os
-import time
 import vigra
-import copy
 import numpy as np
 from glob import glob
-from multiprocessing import Pool
-from scipy.misc import imread, imsave
+from scipy.misc import imsave
 from scipy.ndimage import shift
 
-import pylab as plt
-from mypy.streaming.camera import Camera
 from mypy.streaming.INIReader import Parameter
 from mypy.streaming.fileReader import FileReader
 from mypy.streaming.depthProjector import DepthProjector
@@ -21,7 +16,7 @@ from joblib import Parallel, delayed
 
 def refocus(epi, focus):
     assert isinstance(epi, np.ndarray)
-    assert isinstance(focus, float)
+    assert isinstance(focus, np.float32)
 
     tmp = np.zeros_like(epi)
     for h in range(epi.shape[0]):
@@ -34,8 +29,6 @@ def refocus(epi, focus):
 #
 #                                               D E S C R I P T I O N
 #
-# The reconstruction plane in the world coordinate system is defined via the initial cam position distance to it's
-# coordinate system origin and the cameras rotation.
 #
 #???????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
 #???????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
@@ -150,15 +143,13 @@ class EpiProcessor(object):
         self.result = None
         self.parameter = None
         self.tmp_counter = 0
+        self.inner_scale = None
+        self.outer_scale = None
+        self.min_coherence = None
+        self.focuses = None
+        self.prefilter = None
 
-    def setParameter(self, parameter):
-        """
-        sets the parameter object. A key channel is obligatory defining
-        the number of output channels.
-        :param parameter: <{}> dictionary keeping the parameters needed by process()
-        """
-        assert isinstance(parameter, type({}))
-        self.parameter = parameter
+        self.parameter = None
 
     def setData(self, data):
         """
@@ -181,6 +172,12 @@ class EpiProcessor(object):
         on each epi in parallel.
         """
         assert self.data is not None, "Need data before process can be started!"
+        if self.parameter is None:
+            self.parameter = {"inner_scale" : self.inner_scale,
+                          "outer_scale" : self.outer_scale,
+                          "min_coherence" : self.min_coherence,
+                          "focuses" : self.focuses,
+                          "prefilter" : self.prefilter}
 
         self.result = np.zeros((self.data.shape[1], self.data.shape[2], 2), dtype=np.float32)
 
@@ -214,8 +211,7 @@ class EpiProcessor(object):
 class DepthAccumulator(object):
     def __init__(self, ini_file_path=None):
         self.parameter = Parameter()
-        if ini_file_path is not None:
-            self.setParameter(ini_file_path)
+        self.setParameter(ini_file_path)
         self.depthProjector = DepthProjector()
 
     def initWorldGrid(self):
@@ -224,8 +220,9 @@ class DepthAccumulator(object):
     def setParameter(self, ini_file_path):
         assert isinstance(ini_file_path, str)
         self.parameter.load(ini_file_path)
+        print self.parameter
         self.cameras = []
-        # compute all camera objects for camera trail
+        # let the depthProjector compute all camera objects for camera trail
         self.depthProjector.camerasFromPointAndDirection(self.parameter.initial_camera_pos_m_xyz,
                                                          self.parameter.number_of_sampling_points,
                                                          self.parameter.baseline_mm,
@@ -252,21 +249,39 @@ class Engine():
     processes like reading the image files, passing the loaded sub-
     lightfields to the processor and so on...
     """
-    def __init__(self):
+    def __init__(self, project_path=None):
+        assert isinstance(project_path, str)
+        self.ini_files = None
+        self.setProjectPath(project_path)
         self.running = False
         self.fileReader = None
         self.processor = None
 
 
-    def setData(self, file_path, stack_size=11):
-        """
-        set the data path and the image volume stack size by
-        instantiating a FileReader object. Calling this function
-        is obligatory for running the engine.
-        :param file_path: <str> path to directory containing image files
-        :param stack_size: <int> number of images in a single stack
-        """
-        self.fileReader = FileReader(file_path, stack_size)
+    def setProjectPath(self, project_path):
+        if project_path is not None:
+            assert isinstance(project_path, str)
+            assert os.path.isdir(project_path)
+            self.project_path = project_path
+            if not self.project_path.endswith(os.sep):
+                self.project_path += os.sep
+            self.ini_files = []
+
+            for p in glob(self.project_path + "*.ini"):
+                self.ini_files.append(p)
+            self.ini_files.sort()
+
+
+
+    # def setData(self, file_path, stack_size=11):
+    #     """
+    #     set the data path and the image volume stack size by
+    #     instantiating a FileReader object. Calling this function
+    #     is obligatory for running the engine.
+    #     :param file_path: <str> path to directory containing image files
+    #     :param stack_size: <int> number of images in a single stack
+    #     """
+    #     self.fileReader = FileReader(file_path, stack_size)
 
     def setProcessor(self, processor):
         """
@@ -281,25 +296,34 @@ class Engine():
         starts the engine which consecutively does file reading, processing
         data accumulating for all possible sub light fields.
         """
-        assert self.fileReader is not None, "No FileReader instance initialized!"
-        assert self.processor is not None, "No Processor set!"
 
-        self.running = True
-        self.fileReader.read()
-        while self.running:
-            if self.fileReader.bufferReady():
-                print "processing stack..."
-                self.processor.setData(self.fileReader.getStack())
-                self.processor.start()
-                orientation = self.processor.getResults()
-                self.fileReader.read()
+        for ini in self.ini_files:
+            print "processing inifile:",ini
+            self.parameter = Parameter(ini)
+            self.processor = EpiProcessor()
+            self.processor.inner_scale = self.parameter.inner_scale
+            self.processor.outer_scale = self.parameter.outer_scale
+            self.processor.min_coherence = self.parameter.min_coherence
+            self.processor.focuses = self.parameter.focuses
+            self.processor.prefilter = self.parameter.prefilter
+
+            self.fileReader = FileReader(self.parameter.image_files_location, self.parameter.stack_size)
+            self.running = True
+            self.fileReader.read()
+            while self.running:
+                if self.fileReader.bufferReady():
+                    print "processing stack..."
+                    self.processor.setData(self.fileReader.getStack())
+                    self.processor.start()
+                    orientation = self.processor.getResult()
+                    self.fileReader.read()
 
 
-                print "done!"
+                    print "done!"
 
-            #if file reader finished break loop
-            if self.fileReader.finished:
-                self.running = False
+                #if file reader finished break loop
+                if self.fileReader.finished:
+                    self.running = False
 
 
 
@@ -308,13 +332,13 @@ class Engine():
 
 if __name__ == "__main__":
 
-    data_path = "/home/swanner/Desktop/denseSampledTestScene/rendered/fullRes"
-    processor = EpiProcessor()
-    processor.setParameter({"inner_scale": 0.6, "outer_scale": 1.3, "min_coherence": 0.95, "focuses": [1.0, 2.0], "prefilter":True})
+    #data_path = "/home/swanner/Desktop/denseSampledTestScene/rendered/fullRes"
+    #processor = EpiProcessor()
+    #processor.setParameter({"inner_scale": 0.6, "outer_scale": 1.3, "min_coherence": 0.95, "focuses": [1.0, 2.0], "prefilter":True})
 
-    engine = Engine()
-    engine.setData(data_path)
-    engine.setProcessor(processor)
+    engine = Engine("/home/swanner/Desktop/BusinessDemo/render/measurement/")
+    #engine.setData(data_path)
+    #engine.setProcessor(processor)
 
     engine.start()
 
