@@ -300,7 +300,7 @@ class Engine(object):
         parameter["numOfSubImageVolumes"] = int(np.floor(parameter["totalNumOfFrames"]/float(parameter["frameShift"])))
         # compute the maximum traveling distance of the camera
         parameter["maxBaseline_mm"] = float(parameter["totalNumOfFrames"]-1)*parameter["baseline_mm"]
-        # compute the final camera position and the center position of the camera track
+        # compute the final camera position and the center position of the camera trackparameter["maxBaseline_mm"] = float(parameter["totalNumOfFrames"]-1)*parameter["baseline_mm"]
         parameter["camInitialPos"] = np.array(parameter["camInitialPos"])
         if not parameter.has_key("frameShift"):
             parameter["frameShift"] = parameter["subImageVolumeSize"]
