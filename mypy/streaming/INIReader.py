@@ -40,6 +40,7 @@ class Parameter(ConfigParser):
         self.visible_world_area_m = None
         self.prefilter = 0
         self.focuses = None
+        self.swap_files_order = 0
 
         self.load(filepath)
 
@@ -69,8 +70,9 @@ class Parameter(ConfigParser):
         str_out += "min_coherence : " + str(self.min_coherence) + "\n"
         str_out += "world_accuracy_m : " + str(self.world_accuracy_m) + "\n"
         str_out += "visible_world_area_m : " + str(self.visible_world_area_m) + "\n"
-        str_out += "prefilter : " + str(bool(self.prefilter)) + "\n"
+        str_out += "prefilter : " + str(bool(int(self.prefilter))) + "\n"
         str_out += "focuses : " + str(self.focuses) + "\n"
+        str_out += "swap_files_order : " +str(bool(int(self.swap_files_order)))
 
         return str_out
 
@@ -130,6 +132,7 @@ class Parameter(ConfigParser):
         self.prefilter = bool(int(self.get('computation', 'prefilter')))
         self.focuses = np.arange(float(self.get('computation', 'focus_start')),
                              float(self.get('computation', 'focus_start'))+float(self.get('computation', 'focus_steps'))).astype(np.float32)
+        self.swap_files_order = bool(int(self.get('computation', 'swap_files_order')))
 
 
         # compute the field of view of the camera

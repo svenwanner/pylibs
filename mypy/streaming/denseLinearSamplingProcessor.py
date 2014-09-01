@@ -307,7 +307,7 @@ class Engine():
             self.processor.focuses = self.parameter.focuses
             self.processor.prefilter = self.parameter.prefilter
 
-            self.fileReader = FileReader(self.parameter.image_files_location, self.parameter.stack_size)
+            self.fileReader = FileReader(self.parameter.image_files_location, self.parameter.stack_size, self.parameter.swap_files_order)
             self.running = True
             self.fileReader.read()
             while self.running:
@@ -336,7 +336,7 @@ if __name__ == "__main__":
     #processor = EpiProcessor()
     #processor.setParameter({"inner_scale": 0.6, "outer_scale": 1.3, "min_coherence": 0.95, "focuses": [1.0, 2.0], "prefilter":True})
 
-    engine = Engine("/home/swanner/Desktop/BusinessDemo/render/measurement/")
+    engine = Engine("/home/swanner/Desktop/businessDemonstration/measurement/simple")
     #engine.setData(data_path)
     #engine.setProcessor(processor)
 

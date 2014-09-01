@@ -10,7 +10,7 @@ class FileReader():
     This class reads all image filenames from a given directory,
     loads parts of it and returns the images as ndarray volumes.
     """
-    def __init__(self, input_path, stack_size=11):
+    def __init__(self, input_path, stack_size=11, swap_files_order=False):
         """
         Constructor needs a filepath containing image files and
         defines the stack size.
@@ -28,6 +28,7 @@ class FileReader():
         self.path = input_path
         self.filenames = []
         self.stack_size = stack_size
+        self.swap_files_order = swap_files_order
         self.valid_types = ("png", "PNG", "jpg", "JPG", "JPEG", "tif", "tiff", "TIFF", "bmp", "ppm", "exr")
 
         for f in glob(input_path+"*"):
@@ -35,6 +36,8 @@ class FileReader():
                 if f.endswith(ft):
                     self.filenames.append(f)
         self.filenames.sort()
+        if self.swap_files_order:
+            self.filenames.reverse()
         assert len(self.filenames) > 0, "No image files found!"
 
         self.num_of_files = len(self.filenames)
@@ -108,8 +111,12 @@ class FileReader():
         """
         runs the buffer filling process
         """
-        while self.counter < self.stack_size-1 and not self.finished:
+        while self.counter < self.stack_size and not self.finished:
             self.ready = False
+            if self.current_file == self.num_of_files:
+                self.finished = True
+                break
+            print "read file:", self.filenames[self.current_file]
             if self.counter == 0:
                 self.stack[:] = 0.0
             tmp = self.loadImage(self.filenames[self.current_file])
@@ -117,7 +124,5 @@ class FileReader():
             self.stack[self.counter, :, :] = tmp[:]
             self.current_file += 1
             self.counter += 1
-            if self.current_file == self.num_of_files-1:
-                self.finished = True
-                break
+
         self.ready = True
