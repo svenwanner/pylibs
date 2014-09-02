@@ -26,10 +26,10 @@ class Parameter(ConfigParser):
         self.image_files_location = None
 
         # scene properties
-        self.baseline_m = None
+        self.baseline_mm = None
         self.horopter_m = None
         self.stack_size = None
-        self.max_baseline_mm = None
+        self.max_baseline_m = None
         self.number_of_sampling_points = None
 
         # computation properties
@@ -41,6 +41,7 @@ class Parameter(ConfigParser):
         self.prefilter = 0
         self.focuses = None
         self.swap_files_order = 0
+        self.speed = 0
 
         self.load(filepath)
 
@@ -60,8 +61,8 @@ class Parameter(ConfigParser):
         str_out += "image_files_location : " + self.image_files_location + "\n"
         str_out += "### scene ###\n"
         str_out += "number_of_sampling_points : " + str(self.number_of_sampling_points) + "\n"
-        str_out += "baseline_m : " + str(self.baseline_m) + "\n"
-        str_out += "max_baseline_mm : " + str(self.max_baseline_mm) + "\n"
+        str_out += "baseline_mm : " + str(self.baseline_mm) + "\n"
+        str_out += "max_baseline_m : " + str(self.max_baseline_m) + "\n"
         str_out += "horopter : " + str(self.horopter_m) + "\n"
         str_out += "stack_size : " + str(self.stack_size) + "\n"
         str_out += "### computation ###\n"
@@ -73,6 +74,7 @@ class Parameter(ConfigParser):
         str_out += "prefilter : " + str(bool(int(self.prefilter))) + "\n"
         str_out += "focuses : " + str(self.focuses) + "\n"
         str_out += "swap_files_order : " +str(bool(int(self.swap_files_order)))
+        str_out += "speed : " +str(int(self.speed))
 
         return str_out
 
@@ -117,7 +119,7 @@ class Parameter(ConfigParser):
         self.euler_rotation_xyz = np.array([float(self.get('camera', 'euler_rotation_x_rad')),
                                             float(self.get('camera', 'euler_rotation_y_rad')),
                                             float(self.get('camera', 'euler_rotation_z_rad'))])
-        self.camera_translation_vector_xyz = np.array([float(self.get('camera', 'camera_translation_vector_x_m')),
+        self.camera_translation_vector = np.array([float(self.get('camera', 'camera_translation_vector_x_m')),
                                                       float(self.get('camera', 'camera_translation_vector_y_m')),
                                                       float(self.get('camera', 'camera_translation_vector_z_m'))])
 
@@ -130,10 +132,21 @@ class Parameter(ConfigParser):
         self.outer_scale = float(self.get('computation', 'outer_scale'))
         self.min_coherence = float(self.get('computation', 'min_coherence'))
         self.prefilter = bool(int(self.get('computation', 'prefilter')))
-        self.focuses = np.arange(float(self.get('computation', 'focus_start')),
-                             float(self.get('computation', 'focus_start'))+float(self.get('computation', 'focus_steps'))).astype(np.float32)
         self.swap_files_order = bool(int(self.get('computation', 'swap_files_order')))
+        self.speed = int(self.get('computation', 'speed'))
+        if 2 < self.speed < 0:
+            self.speed = 2
 
+        # compute focus shifts depending on computation speed
+        focus_from = float(self.get('computation', 'focus_from'))
+        focus_to = float(self.get('computation', 'focus_to')) + 1.0
+        step = 1.0
+        if self.speed == 2:
+            step = 2.0
+        elif self.speed == 0:
+            step = 0.5
+            focus_to -= 0.5
+        self.focuses = np.arange(focus_from, focus_to, step).astype(np.float32)
 
         # compute the field of view of the camera
         self.fov = np.arctan2(self.sensor_width_mm/2.0, self.focal_length_mm)
@@ -142,8 +155,8 @@ class Parameter(ConfigParser):
         # compute the maximum traveling distance of the camera
         self.max_baseline_m = float((self.number_of_sampling_points-1))*self.baseline_mm/1000.0
         # compute the final amd center camera position and the center position of the camera track
-        self.final_camera_pos_m = self.initial_camera_pos_m + self.max_baseline_m * self.camera_translation_vector_xyz
-        self.center_camera_pos_m = self.initial_camera_pos_m + self.max_baseline_m/2.0 * self.camera_translation_vector_xyz
+        self.final_camera_pos_m = self.initial_camera_pos_m + self.max_baseline_m * self.camera_translation_vector
+        self.center_camera_pos_m = self.initial_camera_pos_m + self.max_baseline_m/2.0 * self.camera_translation_vector
         # compute field of view height
         self.sensor_heigth_mm = self.sensor_width_mm * float(self.resolution_yx[0])/float(self.resolution_yx[1])
         fov_h = np.arctan2(self.sensor_heigth_mm/2.0, self.focal_length_mm)
@@ -163,10 +176,3 @@ class Parameter(ConfigParser):
         elif self.world_accuracy_m < opt_wa:
             self.world_accuracy_m = opt_wa
 
-
-
-
-if __name__ == "__main__":
-    p = Parameter()
-    p.load("/home/swanner/Desktop/BusinessDemo/render/measurement/cam_000_000.ini")
-    print p

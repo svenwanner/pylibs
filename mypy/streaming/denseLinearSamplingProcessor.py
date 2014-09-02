@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import os
+import sys, os
 import vigra
 import numpy as np
 from glob import glob
@@ -16,12 +16,13 @@ from joblib import Parallel, delayed
 
 def refocus(epi, focus):
     assert isinstance(epi, np.ndarray)
-    assert isinstance(focus, np.float32)
+    assert isinstance(focus, float) or isinstance(focus, np.float32)
 
     tmp = np.zeros_like(epi)
     for h in range(epi.shape[0]):
         tmp[h, :] = shift(epi[h, :], (h-epi.shape[0]/2)*focus)
     return tmp
+
 
 
 #???????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
@@ -209,34 +210,38 @@ class EpiProcessor(object):
 
 
 class DepthAccumulator(object):
-    def __init__(self, ini_file_path=None):
+    def __init__(self, parameter=None):
         self.parameter = Parameter()
-        self.setParameter(ini_file_path)
+        self.setParameter(parameter)
         self.depthProjector = DepthProjector()
 
     def initWorldGrid(self):
         assert self.parameter is not None, "Missing parameter object!"
 
-    def setParameter(self, ini_file_path):
-        assert isinstance(ini_file_path, str)
-        self.parameter.load(ini_file_path)
-        print self.parameter
-        self.cameras = []
-        # let the depthProjector compute all camera objects for camera trail
-        self.depthProjector.camerasFromPointAndDirection(self.parameter.initial_camera_pos_m_xyz,
-                                                         self.parameter.number_of_sampling_points,
-                                                         self.parameter.baseline_mm,
-                                                         self.parameter.camera_translation_vector,
-                                                         self.parameter.focal_length_mm,
-                                                         self.parameter.sensor_width_mm,
-                                                         self.parameter.resolution_yx,
-                                                         self.parameter.euler_rotation_xyz)
-        self.world_space = np.zeros(())
+    def setParameter(self, parameter):
+        if parameter is not None:
+            assert isinstance(parameter, Parameter), "Need a instance of the Parameter class!"
+            self.parameter = parameter
+            self.cameras = []
+
+            # let the depthProjector compute all camera objects for camera trail
+            self.depthProjector.camerasFromPointAndDirection(self.parameter.initial_camera_pos_m,
+                                                             self.parameter.number_of_sampling_points,
+                                                             self.parameter.baseline_mm,
+                                                             self.parameter.camera_translation_vector,
+                                                             self.parameter.focal_length_mm,
+                                                             self.parameter.sensor_width_mm,
+                                                             self.parameter.resolution_yx,
+                                                             self.parameter.euler_rotation_xyz)
+            self.world_space = np.zeros((1, 1, 2), dtype=np.float32)
 
     def __str__(self):
         return self.parameter
 
     def addDisparity(self, disparity, reliability):
+        pass
+
+    def disparity2Depth(self, disp):
         pass
 
     def mergeDepths(self):
@@ -256,6 +261,7 @@ class Engine():
         self.running = False
         self.fileReader = None
         self.processor = None
+        self.depthAccumulator = DepthAccumulator()
 
 
     def setProjectPath(self, project_path):
@@ -272,17 +278,6 @@ class Engine():
             self.ini_files.sort()
 
 
-
-    # def setData(self, file_path, stack_size=11):
-    #     """
-    #     set the data path and the image volume stack size by
-    #     instantiating a FileReader object. Calling this function
-    #     is obligatory for running the engine.
-    #     :param file_path: <str> path to directory containing image files
-    #     :param stack_size: <int> number of images in a single stack
-    #     """
-    #     self.fileReader = FileReader(file_path, stack_size)
-
     def setProcessor(self, processor):
         """
         set a processor object handling the sub light fields.
@@ -298,7 +293,7 @@ class Engine():
         """
 
         for ini in self.ini_files:
-            print "processing inifile:",ini
+            #print "processing inifile:",ini
             self.parameter = Parameter(ini)
             self.processor = EpiProcessor()
             self.processor.inner_scale = self.parameter.inner_scale
@@ -306,6 +301,8 @@ class Engine():
             self.processor.min_coherence = self.parameter.min_coherence
             self.processor.focuses = self.parameter.focuses
             self.processor.prefilter = self.parameter.prefilter
+
+            self.depthAccumulator.setParameter(self.parameter)
 
             self.fileReader = FileReader(self.parameter.image_files_location, self.parameter.stack_size, self.parameter.swap_files_order)
             self.running = True
@@ -316,9 +313,8 @@ class Engine():
                     self.processor.setData(self.fileReader.getStack())
                     self.processor.start()
                     orientation = self.processor.getResult()
+                    self.depthAccumulator.addDisparity(orientation[:, :, 0], orientation[:, :, 1])
                     self.fileReader.read()
-
-
                     print "done!"
 
                 #if file reader finished break loop
@@ -332,14 +328,14 @@ class Engine():
 
 if __name__ == "__main__":
 
-    #data_path = "/home/swanner/Desktop/denseSampledTestScene/rendered/fullRes"
-    #processor = EpiProcessor()
-    #processor.setParameter({"inner_scale": 0.6, "outer_scale": 1.3, "min_coherence": 0.95, "focuses": [1.0, 2.0], "prefilter":True})
+    if len(sys.argv) == 2:
+        project_path = sys.argv[1]
+        assert os.path.exists(project_path), "Path does not exist!"
+    else:
+        print "Please pass a path to a project folder containing ini files!"
+        sys.exit()
 
-    engine = Engine("/home/swanner/Desktop/businessDemonstration/measurement/simple")
-    #engine.setData(data_path)
-    #engine.setProcessor(processor)
-
+    engine = Engine(project_path)
     engine.start()
 
     # #color = np.random.randint(0, 255, 540 * 960 * 3).reshape((540, 960, 3))

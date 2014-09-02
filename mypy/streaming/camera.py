@@ -30,8 +30,8 @@ class Camera(object):
 
         assert isinstance(focal_length_mm, float)
         assert isinstance(sensor_width_mm, float)
-        assert isinstance(resolution, type([]))
-        assert len(resolution) == 2
+        assert isinstance(resolution, np.ndarray)
+        assert resolution.shape[0] == 2
         assert isinstance(resolution[0], int)
 
         self.name = "Camera"

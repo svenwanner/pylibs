@@ -166,7 +166,8 @@ class DepthProjector(object):
         assert isinstance(num_of_sampling_points, int)
         assert isinstance(focal_length_mm, float)
         assert isinstance(sensor_width_mm, float)
-        assert isinstance(resolution, type([]))
+        assert isinstance(resolution, np.ndarray)
+        assert resolution.shape[0] == 2
         assert isinstance(resolution[0], int)
         assert isinstance(euler_rotation_xyz, np.ndarray)
         assert euler_rotation_xyz.shape[0] == 3
