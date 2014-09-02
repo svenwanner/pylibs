@@ -31,6 +31,8 @@ class Parameter(ConfigParser):
         self.stack_size = None
         self.max_baseline_m = None
         self.number_of_sampling_points = None
+        self.max_depth_m = None
+        self.min_depth_m = None
 
         # computation properties
         self.inner_scale = None
@@ -65,6 +67,8 @@ class Parameter(ConfigParser):
         str_out += "max_baseline_m : " + str(self.max_baseline_m) + "\n"
         str_out += "horopter : " + str(self.horopter_m) + "\n"
         str_out += "stack_size : " + str(self.stack_size) + "\n"
+        str_out += "max_depth_m : " + str(self.max_depth_m) + "\n"
+        str_out += "min_depth_m : " + str(self.min_depth_m) + "\n"
         str_out += "### computation ###\n"
         str_out += "inner_scale : " + str(self.inner_scale) + "\n"
         str_out += "outer_scale : " + str(self.outer_scale) + "\n"
@@ -127,6 +131,8 @@ class Parameter(ConfigParser):
         self.baseline_mm = float(self.get('scene', 'baseline_mm'))
         self.horopter_m = float(self.get('scene', 'horopter_m'))
         self.stack_size = int(self.get('scene', 'stack_size'))
+        self.max_depth_m = float(self.get('scene', 'max_depth_m'))
+        self.min_depth_m = float(self.get('scene', 'min_depth_m'))
 
         self.inner_scale = float(self.get('computation', 'inner_scale'))
         self.outer_scale = float(self.get('computation', 'outer_scale'))

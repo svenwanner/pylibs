@@ -14,14 +14,6 @@ from mypy.streaming.depthProjector import DepthProjector
 from joblib import Parallel, delayed
 
 
-def refocus(epi, focus):
-    assert isinstance(epi, np.ndarray)
-    assert isinstance(focus, float) or isinstance(focus, np.float32)
-
-    tmp = np.zeros_like(epi)
-    for h in range(epi.shape[0]):
-        tmp[h, :] = shift(epi[h, :], (h-epi.shape[0]/2)*focus)
-    return tmp
 
 
 
@@ -131,6 +123,15 @@ def process(input):
 ########################################################################################################################
 ########################################################################################################################
 
+
+
+def refocus(epi, focus):
+    tmp = np.zeros_like(epi)
+    for h in xrange(epi.shape[0]):
+        tmp[h, :] = shift(epi[h, :], (h-epi.shape[0]/2)*focus)
+    return tmp
+
+
 class EpiProcessor(object):
     """
     This class is used to be taking control over the epi iteration calling
@@ -203,7 +204,7 @@ class EpiProcessor(object):
             #imsave("/home/swanner/Desktop/tmp_imgs/merged_%i_%4.4i.png" % (f, self.tmp_counter), self.result[:, :, 0])
 
         #np.place(self.result[:, :, 0], self.result[:, :, 1] < 0.01, 0.0)
-        imsave("/home/swanner/Desktop/tmp_imgs/final_%4.4i.png" % self.tmp_counter, self.result[:, :, 0])
+        #imsave("/home/swanner/Desktop/tmp_imgs/final_%4.4i.png" % self.tmp_counter, self.result[:, :, 0])
         self.tmp_counter += 1
 
 
@@ -239,10 +240,17 @@ class DepthAccumulator(object):
         return self.parameter
 
     def addDisparity(self, disparity, reliability):
-        pass
+        depth = self.disparity2Depth(disparity, reliability)
+        imsave("/home/swanner/Desktop/tmp_imgs/final.png", depth)
 
-    def disparity2Depth(self, disp):
-        pass
+
+    def disparity2Depth(self, disparity, reliability):
+        depth = np.zeros_like(disparity)
+        depth[:] = self.parameter.focal_length_px * self.parameter.baseline_mm/(disparity[:]+1e-28)
+        depth /= 1000.0
+        np.place(depth, depth > self.parameter.max_depth_m, 0.0)
+        np.place(depth, depth < self.parameter.min_depth_m, 0.0)
+        return depth
 
     def mergeDepths(self):
         pass
