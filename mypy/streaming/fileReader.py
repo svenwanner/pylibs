@@ -36,8 +36,6 @@ class FileReader():
                 if f.endswith(ft):
                     self.filenames.append(f)
         self.filenames.sort()
-        # if self.swap_files_order:
-        #     self.filenames.reverse()
         assert len(self.filenames) > 0, "No image files found!"
 
         self.num_of_files = len(self.filenames)
@@ -50,6 +48,7 @@ class FileReader():
         tmp = self.channelConverter(tmp)
         self.shape = (self.stack_size, tmp.shape[0], tmp.shape[1])
         self.stack = np.zeros(self.shape, dtype=np.float32)
+        self.cv_color = np.zeros((tmp.shape[0], tmp.shape[1], 3), dtype=np.uint8)
 
     def loadImage(self, fname):
         """
@@ -105,7 +104,7 @@ class FileReader():
         if self.bufferReady():
             self.counter = 0
             self.ready = False
-            return np.copy(self.stack)
+            return np.copy(self.stack), self.cv_color
 
     def read(self):
         """
@@ -113,19 +112,38 @@ class FileReader():
         """
         filesToRead = []
         stack_index = 0
+
+        #if swap order is True count image index from the back
         if self.swap_files_order:
             stack_index = self.stack_size-1
+
         while self.counter < self.stack_size and not self.finished:
             self.ready = False
             if self.current_file == self.num_of_files:
                 self.finished = True
                 break
+
+            # store filename for debug output only
             filesToRead.append(os.path.basename(self.filenames[self.current_file]))
             if self.counter == 0:
                 self.stack[:] = 0.0
+            # load image file
             tmp = self.loadImage(self.filenames[self.current_file])
+            # save center view color
+            if self.counter == self.stack_size/2:
+                if len(tmp.shape) == 3:
+                    self.cv_color[:, :, 0:3] = tmp[:, :, 0:3]
+                elif len(tmp.shape) == 2:
+                    for c in range(3):
+                        self.cv_color[:, :, c] = tmp[:, :]
+                else:
+                    assert False, "Unknown image format!"
+            # convert image to grayscale
             tmp = self.channelConverter(tmp)
+            # put image into satck
             self.stack[stack_index, :, :] = tmp[:]
+
+            # update counters
             self.current_file += 1
             self.counter += 1
             if self.swap_files_order:

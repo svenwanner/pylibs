@@ -186,7 +186,7 @@ class EpiProcessor(object):
                 inputs.append([epi, parameter])
 
             result = Parallel(n_jobs=4)(delayed(process)(inputs[i]) for i in range(len(inputs)))
-            tmp = np.zeros((self.result.shape[0],self.result.shape[1]), dtype=np.float32)
+            tmp = np.zeros((self.result.shape[0], self.result.shape[1]), dtype=np.float32)
             for m, res in enumerate(result):
                 tmp[m, :] = res[self.data.shape[0]/2, :, 0]+f
             for m, res in enumerate(result):
@@ -224,10 +224,10 @@ class DepthAccumulator(object):
     def __str__(self):
         return self.parameter
 
-    def addDisparity(self, disparity, reliability):
+    def addDisparity(self, disparity, reliability, color):
         depth = self.disparity2Depth(disparity, reliability)
         imsave("/home/swanner/Desktop/tmp_imgs/final.png", depth)
-
+        imsave("/home/swanner/Desktop/tmp_imgs/color.png", color)
 
     def disparity2Depth(self, disparity, reliability):
         depth = np.zeros_like(disparity)
@@ -299,10 +299,11 @@ class Engine():
             while self.running:
                 if self.fileReader.bufferReady():
                     print "\nprocessing stack..."
-                    self.processor.setData(self.fileReader.getStack())
+                    stack, cv_color = self.fileReader.getStack()
+                    self.processor.setData(stack)
                     self.processor.start()
                     orientation = self.processor.getResult()
-                    self.depthAccumulator.addDisparity(orientation[:, :, 0], orientation[:, :, 1])
+                    self.depthAccumulator.addDisparity(orientation[:, :, 0], orientation[:, :, 1], cv_color)
                     self.fileReader.read()
                     print "done!"
 
