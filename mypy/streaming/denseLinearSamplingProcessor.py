@@ -140,18 +140,11 @@ class EpiProcessor(object):
     channels the result array should have and all parameter used in the
     process method. The rest ist done by the Engine class.
     """
-    def __init__(self):
+    def __init__(self, parameter):
         self.data = None
         self.result = None
-        self.parameter = None
-        self.tmp_counter = 0
-        self.inner_scale = None
-        self.outer_scale = None
-        self.min_coherence = None
-        self.focuses = None
-        self.prefilter = None
 
-        self.parameter = None
+        self.parameter = parameter
 
     def setData(self, data):
         """
@@ -174,40 +167,32 @@ class EpiProcessor(object):
         on each epi in parallel.
         """
         assert self.data is not None, "Need data before process can be started!"
-        if self.parameter is None:
-            self.parameter = {"inner_scale" : self.inner_scale,
-                          "outer_scale" : self.outer_scale,
-                          "min_coherence" : self.min_coherence,
-                          "focuses" : self.focuses,
-                          "prefilter" : self.prefilter}
 
         self.result = np.zeros((self.data.shape[1], self.data.shape[2], 2), dtype=np.float32)
 
         assert self.result is not None, "No result array is defined!"
         assert self.parameter is not None, "No parameter object is defined!"
 
-        for f in self.parameter["focuses"]:
+        for f in self.parameter.focuses:
+            print "process focus",f
             inputs = []
             for n in range(self.data.shape[1]):
                 epi = refocus(self.data[:, n, :], f)
-                inputs.append([epi, self.parameter])
+                parameter = {"inner_scale" : self.parameter.inner_scale,
+                             "outer_scale" : self.parameter.outer_scale,
+                             "min_coherence" : self.parameter.min_coherence,
+                             "focuses" : self.parameter.focuses,
+                             "prefilter" : self.parameter.prefilter}
+                inputs.append([epi, parameter])
 
             result = Parallel(n_jobs=4)(delayed(process)(inputs[i]) for i in range(len(inputs)))
             tmp = np.zeros((self.result.shape[0],self.result.shape[1]), dtype=np.float32)
             for m, res in enumerate(result):
                 tmp[m, :] = res[self.data.shape[0]/2, :, 0]+f
-            #imsave("/home/swanner/Desktop/tmp_imgs/before_%i_%4.4i.png" % (f, self.tmp_counter), tmp)
             for m, res in enumerate(result):
                 winner = np.where(res[self.data.shape[0]/2, :, 1] > self.result[m, :, 1])
                 self.result[m, winner, 0] = res[self.data.shape[0]/2, winner, 0]+f
                 self.result[m, winner, 1] = res[self.data.shape[0]/2, winner, 1]
-            #imsave("/home/swanner/Desktop/tmp_imgs/merged_%i_%4.4i.png" % (f, self.tmp_counter), self.result[:, :, 0])
-
-        #np.place(self.result[:, :, 0], self.result[:, :, 1] < 0.01, 0.0)
-        #imsave("/home/swanner/Desktop/tmp_imgs/final_%4.4i.png" % self.tmp_counter, self.result[:, :, 0])
-        self.tmp_counter += 1
-
-
 
 
 class DepthAccumulator(object):
@@ -301,23 +286,19 @@ class Engine():
         """
 
         for ini in self.ini_files:
-            #print "processing inifile:",ini
             self.parameter = Parameter(ini)
-            self.processor = EpiProcessor()
-            self.processor.inner_scale = self.parameter.inner_scale
-            self.processor.outer_scale = self.parameter.outer_scale
-            self.processor.min_coherence = self.parameter.min_coherence
-            self.processor.focuses = self.parameter.focuses
-            self.processor.prefilter = self.parameter.prefilter
+            print self.parameter
+            self.processor = EpiProcessor(self.parameter)
 
             self.depthAccumulator.setParameter(self.parameter)
 
             self.fileReader = FileReader(self.parameter.image_files_location, self.parameter.stack_size, self.parameter.swap_files_order)
             self.running = True
             self.fileReader.read()
+
             while self.running:
                 if self.fileReader.bufferReady():
-                    print "processing stack..."
+                    print "\nprocessing stack..."
                     self.processor.setData(self.fileReader.getStack())
                     self.processor.start()
                     orientation = self.processor.getResult()

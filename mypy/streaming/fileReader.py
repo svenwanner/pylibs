@@ -111,12 +111,13 @@ class FileReader():
         """
         runs the buffer filling process
         """
+        filesToRead = []
         while self.counter < self.stack_size and not self.finished:
             self.ready = False
             if self.current_file == self.num_of_files:
                 self.finished = True
                 break
-            print "read file:", self.filenames[self.current_file]
+            filesToRead.append(os.path.basename(self.filenames[self.current_file]))
             if self.counter == 0:
                 self.stack[:] = 0.0
             tmp = self.loadImage(self.filenames[self.current_file])
@@ -125,4 +126,5 @@ class FileReader():
             self.current_file += 1
             self.counter += 1
 
+        print "read files from", filesToRead[0], "to", filesToRead[-1]
         self.ready = True
