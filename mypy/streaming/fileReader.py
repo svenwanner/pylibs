@@ -36,8 +36,8 @@ class FileReader():
                 if f.endswith(ft):
                     self.filenames.append(f)
         self.filenames.sort()
-        if self.swap_files_order:
-            self.filenames.reverse()
+        # if self.swap_files_order:
+        #     self.filenames.reverse()
         assert len(self.filenames) > 0, "No image files found!"
 
         self.num_of_files = len(self.filenames)
@@ -112,6 +112,9 @@ class FileReader():
         runs the buffer filling process
         """
         filesToRead = []
+        stack_index = 0
+        if self.swap_files_order:
+            stack_index = self.stack_size-1
         while self.counter < self.stack_size and not self.finished:
             self.ready = False
             if self.current_file == self.num_of_files:
@@ -122,9 +125,14 @@ class FileReader():
                 self.stack[:] = 0.0
             tmp = self.loadImage(self.filenames[self.current_file])
             tmp = self.channelConverter(tmp)
-            self.stack[self.counter, :, :] = tmp[:]
+            self.stack[stack_index, :, :] = tmp[:]
             self.current_file += 1
             self.counter += 1
+            if self.swap_files_order:
+                stack_index -= 1
+            else:
+                stack_index += 1
 
-        print "read files from", filesToRead[0], "to", filesToRead[-1]
+        if len(filesToRead) != 0:
+            print "read files from", filesToRead[0], "to", filesToRead[-1]
         self.ready = True
