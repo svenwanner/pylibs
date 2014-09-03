@@ -240,7 +240,7 @@ class StructureTensorScharr(StructureTensor):
         # print("apply gaussian filter along 1rd dimension")
         epi = vigra.filters.convolveOneDimension(epi, 0, gaussianInner)
 
-### EPI prefilter ###
+        ### EPI prefilter ###
         if params["Scharr_Prefilter"]:
 
             # print("apply scharr pre-filter along 3rd dimension")

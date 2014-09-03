@@ -44,6 +44,9 @@ class Parameter(ConfigParser):
         self.focuses = None
         self.swap_files_order = 0
         self.speed = 0
+        self.merge_depths = None
+        self.result_folder = None
+        self.dset_name = None
 
         self.load(filepath)
 
@@ -77,8 +80,11 @@ class Parameter(ConfigParser):
         str_out += "visible_world_area_m : " + str(self.visible_world_area_m) + "\n"
         str_out += "prefilter : " + str(bool(int(self.prefilter))) + "\n"
         str_out += "focuses : " + str(self.focuses) + "\n"
-        str_out += "swap_files_order : " +str(bool(int(self.swap_files_order)))
-        str_out += "speed : " +str(int(self.speed))
+        str_out += "swap_files_order : " + str(bool(int(self.swap_files_order))) + "\n"
+        str_out += "speed : " + str(int(self.speed)) + "\n"
+        str_out += "merge_depths : " + str(bool(int(self.merge_depths))) + "\n"
+        str_out += "result_folder : " + self.result_folder + "\n"
+        str_out += "dset_name : " + self.dset_name + "\n"
 
         return str_out
 
@@ -89,6 +95,8 @@ class Parameter(ConfigParser):
             assert isinstance(filepath, str), "Invalid filepath type!"
             assert os.path.isfile(filepath), "Could not open ini file!"
             self.inifile_loc = filepath
+            self.dset_name = os.path.basename(self.inifile_loc)
+            self.dset_name = self.dset_name[0:-4]
             self.read(filepath)
             self.computeMissingParameter()
 
@@ -142,6 +150,19 @@ class Parameter(ConfigParser):
         self.speed = int(self.get('computation', 'speed'))
         if 2 < self.speed < 0:
             self.speed = 2
+
+        self.merge_depths = bool(int(self.get('computation', 'merge_depths')))
+
+        # read and create results folder if necessary
+        self.result_folder = self.get('computation', 'result_folder')
+        if not self.result_folder.endswith(os.sep):
+            self.result_folder += os.sep
+        if self.result_folder.startswith("."):
+            self.result_folder = os.path.dirname(self.inifile_loc) + self.result_folder[1:]
+        self.result_folder += self.dset_name + "/"
+        if not os.path.exists(self.result_folder):
+            os.makedirs(self.result_folder)
+
 
         # compute focus shifts depending on computation speed
         focus_from = float(self.get('computation', 'focus_from'))

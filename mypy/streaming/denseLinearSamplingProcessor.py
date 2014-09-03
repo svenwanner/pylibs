@@ -15,7 +15,7 @@ from joblib import Parallel, delayed
 
 
 
-
+DEBUG = 2
 
 #???????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
 #???????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
@@ -166,7 +166,7 @@ class EpiProcessor(object):
         this is the main routine of the class calling process()
         on each epi in parallel.
         """
-        assert self.data is not None, "Need data before process can be started!"
+        assert self.data is not None, "Need data before processing can be started!"
 
         self.result = np.zeros((self.data.shape[1], self.data.shape[2], 2), dtype=np.float32)
 
@@ -174,7 +174,7 @@ class EpiProcessor(object):
         assert self.parameter is not None, "No parameter object is defined!"
 
         for f in self.parameter.focuses:
-            print "process focus",f
+            print "process focus", f
             inputs = []
             for n in range(self.data.shape[1]):
                 epi = refocus(self.data[:, n, :], f)
@@ -200,6 +200,10 @@ class DepthAccumulator(object):
         self.parameter = Parameter()
         self.setParameter(parameter)
         self.depthProjector = DepthProjector()
+        self.disparity_counter = 0
+
+    def resetCounter(self):
+        self.disparity_counter = 0
 
     def initWorldGrid(self):
         assert self.parameter is not None, "Missing parameter object!"
@@ -226,8 +230,17 @@ class DepthAccumulator(object):
 
     def addDisparity(self, disparity, reliability, color):
         depth = self.disparity2Depth(disparity, reliability)
-        imsave("/home/swanner/Desktop/tmp_imgs/final.png", depth)
-        imsave("/home/swanner/Desktop/tmp_imgs/color.png", color)
+        if DEBUG >= 2:
+            imsave(self.parameter.result_folder+"depth_%4.4i.png"%self.disparity_counter, depth)
+            imsave(self.parameter.result_folder+"coherence_%4.4i.png"%self.disparity_counter, reliability)
+            imsave(self.parameter.result_folder+"color_%4.4i.png"%self.disparity_counter, color)
+        self.disparity_counter += 1
+
+        if self.parameter.merge_depths:
+            self.mergeDepths()
+            self.savePointCloud()
+        else:
+            self.saveLayerToPointCloud()
 
     def disparity2Depth(self, disparity, reliability):
         depth = np.zeros_like(disparity)
@@ -235,9 +248,16 @@ class DepthAccumulator(object):
         depth /= 1000.0
         np.place(depth, depth > self.parameter.max_depth_m, 0.0)
         np.place(depth, depth < self.parameter.min_depth_m, 0.0)
+        np.place(depth, reliability < 0.01, 0.0)
         return depth
 
     def mergeDepths(self):
+        pass
+
+    def savePointCloud(self):
+        pass
+
+    def saveLayerToPointCloud(self):
         pass
 
 
@@ -291,6 +311,7 @@ class Engine():
             self.processor = EpiProcessor(self.parameter)
 
             self.depthAccumulator.setParameter(self.parameter)
+            self.depthAccumulator.resetCounter()
 
             self.fileReader = FileReader(self.parameter.image_files_location, self.parameter.stack_size, self.parameter.swap_files_order)
             self.running = True
