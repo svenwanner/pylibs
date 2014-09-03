@@ -234,13 +234,8 @@ class DepthAccumulator(object):
             imsave(self.parameter.result_folder+"depth_%4.4i.png"%self.disparity_counter, depth)
             imsave(self.parameter.result_folder+"coherence_%4.4i.png"%self.disparity_counter, reliability)
             imsave(self.parameter.result_folder+"color_%4.4i.png"%self.disparity_counter, color)
-        self.disparity_counter += 1
 
-        if self.parameter.merge_depths:
-            self.mergeDepths()
-            self.savePointCloud()
-        else:
-            self.saveLayerToPointCloud()
+        self.disparity_counter += 1
 
     def disparity2Depth(self, disparity, reliability):
         depth = np.zeros_like(disparity)
@@ -250,6 +245,15 @@ class DepthAccumulator(object):
         np.place(depth, depth < self.parameter.min_depth_m, 0.0)
         np.place(depth, reliability < 0.01, 0.0)
         return depth
+
+    def save(self):
+        pc_filename = os.path.dirname(self.parameter.result_folder[0:-1]) + "/pointcloud.ply"
+        print pc_filename
+        if self.parameter.merge_depths:
+            self.mergeDepths()
+            self.savePointCloud()
+        else:
+            self.saveLayerToPointCloud()
 
     def mergeDepths(self):
         pass
@@ -331,6 +335,8 @@ class Engine():
                 #if file reader finished break loop
                 if self.fileReader.finished:
                     self.running = False
+
+            self.depthAccumulator.save()
 
 
 
