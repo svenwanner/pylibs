@@ -4,6 +4,7 @@ import numpy as np
 from glob import glob
 from scipy.misc import imread
 
+from mypy.streaming.globals import DEBUG
 
 class FileReader():
     """

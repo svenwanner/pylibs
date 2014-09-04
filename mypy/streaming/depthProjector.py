@@ -9,6 +9,8 @@ from mypy.streaming.camera import Camera
 from mypy.streaming.plyWriter import PlyWriter
 from mypy.tools.cg import transformations as transformations
 
+from mypy.streaming.globals import DEBUG
+
 ########################################################################################################################
 #                              D E P T H   T O   W O R L D   P R O J E C T O R
 ########################################################################################################################
