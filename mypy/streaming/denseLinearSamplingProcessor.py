@@ -197,13 +197,19 @@ class EpiProcessor(object):
 
 class DepthAccumulator(object):
     def __init__(self, parameter=None):
-        self.parameter = Parameter()
-        self.setParameter(parameter)
+        self.cameras = None
+        self.parameter = None
+        self.depthProjector = None
+        self.disparity_counter = 0
+
+    def reset(self):
+        self.cameras = []
+        self.parameter = None
         self.depthProjector = DepthProjector()
         self.disparity_counter = 0
 
-    def resetCounter(self):
-        self.disparity_counter = 0
+    def setCounter(self, index):
+        self.disparity_counter = index
 
     def initWorldGrid(self):
         assert self.parameter is not None, "Missing parameter object!"
@@ -211,22 +217,24 @@ class DepthAccumulator(object):
     def setParameter(self, parameter):
         if parameter is not None:
             assert isinstance(parameter, Parameter), "Need a instance of the Parameter class!"
-            self.parameter = parameter
-            self.cameras = []
+        assert isinstance(self.depthProjector, DepthProjector), "Wrong type depthProjector, reset depthProjector before setting new parameter!"
+        assert isinstance(self.cameras, type([])), "Camera object is not a empty list, reset depthProjector before setting new parameter!"
+        assert len(self.cameras) == 0, "Camera object is not empty, reset depthProjector before setting new parameter!"
+        self.parameter = parameter
 
-            # let the depthProjector compute all camera objects for camera trail
-            self.depthProjector.camerasFromPointAndDirection(self.parameter.initial_camera_pos_m,
-                                                             self.parameter.number_of_sampling_points,
-                                                             self.parameter.baseline_mm,
-                                                             self.parameter.camera_translation_vector,
-                                                             self.parameter.focal_length_mm,
-                                                             self.parameter.sensor_width_mm,
-                                                             self.parameter.resolution_yx,
-                                                             self.parameter.euler_rotation_xyz)
-            self.world_space = np.zeros((1, 1, 2), dtype=np.float32)
+        # let the depthProjector compute all camera objects for camera trail
+        self.depthProjector.camerasFromPointAndDirection(self.parameter.initial_camera_pos_m,
+                                                         self.parameter.number_of_sampling_points,
+                                                         self.parameter.baseline_mm,
+                                                         self.parameter.camera_translation_vector,
+                                                         self.parameter.focal_length_mm,
+                                                         self.parameter.sensor_width_mm,
+                                                         self.parameter.resolution_yx,
+                                                         self.parameter.euler_rotation_xyz)
+        self.world_space = np.zeros((1, 1, 2), dtype=np.float32)
 
     def __str__(self):
-        return self.parameter
+        return self.parameter.__str__()
 
     def addDisparity(self, disparity, reliability, color):
         depth = self.disparity2Depth(disparity, reliability)
@@ -234,8 +242,6 @@ class DepthAccumulator(object):
             imsave(self.parameter.result_folder+"depth_%4.4i.png"%self.disparity_counter, depth)
             imsave(self.parameter.result_folder+"coherence_%4.4i.png"%self.disparity_counter, reliability)
             imsave(self.parameter.result_folder+"color_%4.4i.png"%self.disparity_counter, color)
-
-        self.disparity_counter += 1
 
     def disparity2Depth(self, disparity, reliability):
         depth = np.zeros_like(disparity)
@@ -310,27 +316,43 @@ class Engine():
         """
 
         for ini in self.ini_files:
+            # create a Parameter object
             self.parameter = Parameter(ini)
-            print self.parameter
+            if DEBUG > 0: print self.parameter
+
+            #create a Processor object
             self.processor = EpiProcessor(self.parameter)
 
+            # pass the parameter to the depthAccumulator and reset the image index counter
+            self.depthAccumulator.reset()
             self.depthAccumulator.setParameter(self.parameter)
-            self.depthAccumulator.resetCounter()
 
+            # create a FileReader from the current ini file
             self.fileReader = FileReader(self.parameter.image_files_location, self.parameter.stack_size, self.parameter.swap_files_order)
-            self.running = True
             self.fileReader.read()
+            self.running = True
+
+            # count the subLFs
+            subLF_counter = 0
 
             while self.running:
                 if self.fileReader.bufferReady():
-                    print "\nprocessing stack..."
+                    if DEBUG > 0: print "\nprocessing stack..."
+                    # the fileReader reads the next subLF
                     stack, cv_color = self.fileReader.getStack()
+                    # pass the data to the processor and start orientation estimation
                     self.processor.setData(stack)
                     self.processor.start()
+                    # get the disparity or orientation map from the processor
                     orientation = self.processor.getResult()
+                    # set the current index of the disparity map that is added to the depthProjector
+                    self.depthAccumulator.setCounter(self.parameter.stack_size*subLF_counter+self.parameter.stack_size/2)
+                    # pass the disparity map to the depthAccumulator
                     self.depthAccumulator.addDisparity(orientation[:, :, 0], orientation[:, :, 1], cv_color)
+                    #read the next subLF
                     self.fileReader.read()
-                    print "done!"
+                    subLF_counter += 1
+                    if DEBUG > 0: print "done!"
 
                 #if file reader finished break loop
                 if self.fileReader.finished:
