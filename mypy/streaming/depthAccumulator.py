@@ -24,8 +24,10 @@ class DepthAccumulator(object):
     def setCounter(self, index):
         self.disparity_counter = index
 
+
     def initWorldGrid(self):
         assert self.parameter is not None, "Missing parameter object!"
+
 
     def setParameter(self, parameter):
         if parameter is not None:
@@ -36,7 +38,7 @@ class DepthAccumulator(object):
         self.parameter = parameter
 
         # let the depthProjector compute all camera objects for camera trail
-        self.depthProjector.camerasFromPointAndDirection(self.parameter.initial_camera_pos_m,
+        self.cameras = self.depthProjector.camerasFromPointAndDirection(self.parameter.initial_camera_pos_m,
                                                          self.parameter.number_of_sampling_points,
                                                          self.parameter.baseline_mm,
                                                          self.parameter.camera_translation_vector,
@@ -44,7 +46,10 @@ class DepthAccumulator(object):
                                                          self.parameter.sensor_width_mm,
                                                          self.parameter.resolution_yx,
                                                          self.parameter.euler_rotation_xyz)
-        self.world_space = np.zeros((1, 1, 2), dtype=np.float32)
+
+        pc_filename = os.path.dirname(self.parameter.result_folder[0:-1]) + "/pointcloud.ply"
+        if DEBUG >= 2: print "save pointcloud to:", pc_filename
+        self.depthProjector.cloud_filename = pc_filename
 
     def addDisparity(self, disparity, reliability, color):
         depth = self.disparity2Depth(disparity, reliability)
@@ -52,6 +57,12 @@ class DepthAccumulator(object):
             imsave(self.parameter.result_folder+"depth_%4.4i.png"%self.disparity_counter, depth)
             imsave(self.parameter.result_folder+"coherence_%4.4i.png"%self.disparity_counter, reliability)
             imsave(self.parameter.result_folder+"color_%4.4i.png"%self.disparity_counter, color)
+
+        self.depthProjector.cameras.append(self.cameras[self.disparity_counter])
+        self.depthProjector.addDepthMap(depth, reliability)
+        self.depthProjector.addColor(color)
+        self.depthProjector.reconstruct()
+
 
     def disparity2Depth(self, disparity, reliability):
         depth = np.zeros_like(disparity)
@@ -62,20 +73,11 @@ class DepthAccumulator(object):
         np.place(depth, reliability < 0.01, 0.0)
         return depth
 
-    def save(self):
-        pc_filename = os.path.dirname(self.parameter.result_folder[0:-1]) + "/pointcloud.ply"
-        if DEBUG >= 2: print "save pointcloud to:", pc_filename
-        if self.parameter.merge_depths:
-            self.mergeDepths()
-            self.savePointCloud()
-        else:
-            self.saveLayerToPointCloud()
 
-    def mergeDepths(self):
-        pass
+    # def save(self):
+    #     self.depthProjector.reconstruct()
+    #     pc_filename = os.path.dirname(self.parameter.result_folder[0:-1]) + "/pointcloud.ply"
+    #     if DEBUG >= 2: print "save pointcloud to:", pc_filename
+    #     self.depthProjector.save(pc_filename)
 
-    def savePointCloud(self):
-        pass
 
-    def saveLayerToPointCloud(self):
-        pass

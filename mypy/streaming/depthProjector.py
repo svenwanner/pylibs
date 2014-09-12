@@ -28,6 +28,8 @@ class DepthProjector(object):
         self.colors = []
         self.cameras = []
         self.cloud = np.zeros((0, 4), dtype=np.float64)
+        self.cloud_filename = None
+        self.cur_ptr = 0
 
     def __call__(self, min_reliability=0.0):
         """
@@ -75,13 +77,17 @@ class DepthProjector(object):
         depth[:, :, 1] = np.ones_like(d)
         self.depth_maps.append(depth)
 
-    def addDepthMap(self, depth_map):
+    def addDepthMap(self, depth_map, reliability=None):
         """
         Add a depth map from ndarray, if depth_map has 2 channels the second is interpreted
         as reliability. If not reliability is set to 1.
         :param depth_map: <ndarray>
         """
         assert isinstance(depth_map, np.ndarray)
+        if reliability is not None:
+            assert isinstance(reliability, np.ndarray)
+            assert depth_map.shape == reliability.shape
+
         depth = np.zeros((depth_map.shape[0], depth_map.shape[1], 2), dtype=np.float32)
         if len(depth_map.shape) > 2:
             if depth_map.shape[2] == 2:
@@ -91,7 +97,10 @@ class DepthProjector(object):
                 depth[:, :, 1] = 1
         else:
             depth[:, :, 0] = depth_map[:, :]
-            depth[:, :, 1] = 1
+            if reliability is not None:
+                depth[:, :, 1] = reliability[:]
+            else:
+                depth[:, :, 1] = 1
         self.depth_maps.append(depth)
 
     def addColor(self, img):
@@ -143,11 +152,14 @@ class DepthProjector(object):
         assert isinstance(euler_rotation_xyz, np.ndarray)
         assert euler_rotation_xyz.shape[0] == 3
 
+        cameras = []
+
         trail, baseline, direction, length = compute_linear_trail_from_positions(cam_pos1, cam_pos2, num_of_sampling_points)
         for n in range(len(trail.keys())):
-            self.cameras.append(Camera(focal_length_mm, sensor_width_mm, resolution))
-            self.cameras[n].setPosition(trail[n])
-            self.cameras[n].setRotation(euler_rotation_xyz)
+            cameras.append(Camera(focal_length_mm, sensor_width_mm, resolution))
+            cameras[n].setPosition(trail[n])
+            cameras[n].setRotation(euler_rotation_xyz)
+        return cameras
 
     def camerasFromPointAndDirection(self, cam_pos1, num_of_sampling_points, baseline, translation_vector, focal_length_mm, sensor_width_mm, resolution, euler_rotation_xyz):
         """
@@ -174,11 +186,13 @@ class DepthProjector(object):
         assert isinstance(euler_rotation_xyz, np.ndarray)
         assert euler_rotation_xyz.shape[0] == 3
 
+        cameras = []
         trail, baseline, direction, length = compute_linear_trail_from_translation(cam_pos1, num_of_sampling_points, baseline, translation_vector)
         for n in range(len(trail.keys())):
-            self.cameras.append(Camera(focal_length_mm, sensor_width_mm, resolution))
-            self.cameras[n].setPosition(trail[n])
-            self.cameras[n].setRotation(euler_rotation_xyz)
+            cameras.append(Camera(focal_length_mm, sensor_width_mm, resolution))
+            cameras[n].setPosition(trail[n])
+            cameras[n].setRotation(euler_rotation_xyz)
+        return cameras
 
     def transform(self, point, cam_index):
         """
@@ -190,7 +204,7 @@ class DepthProjector(object):
         wm = np.mat(self.cameras[cam_index].world_matrix, dtype=np.float64)
         return wm * point
 
-    def reconstruct(self, min_reliability=0.0):
+    def reconstruct(self, min_reliability=0.5):
         """
         Reconstructs a point cloud from depth maps and cameras. Number of both
         has to be same. Result is saved in self.cloud which can be saved using save()
@@ -242,6 +256,13 @@ class DepthProjector(object):
                                 self.cloud[m, 6] = self.colors[0][u, v, 2]
 
                         m += 1
+        self.depth_maps = []
+        self.colors = []
+        self.cameras = []
+
+        if self.cloud_filename is not None:
+            self.save(self.cloud_filename)
+
 
     def save(self, filename, cformat="EN"):
         """
@@ -250,7 +271,8 @@ class DepthProjector(object):
         :param filename: <str> filename to save cloud
         :param cformat: <str> number coding
         """
-        writer = PlyWriter(filename, self.cloud, format=cformat)
+        writer = PlyWriter(filename, self.cloud[self.cur_ptr:, :], format=cformat)
+        self.cur_ptr = self.cloud.shape[0]
         writer.setColor()
         writer.save()
 
@@ -336,7 +358,7 @@ def compute_linear_trail_from_translation(pos1, num_of_sampling_points, baseline
 
     trail = {}
     for n in range(num_of_sampling_points):
-        trail[n] = pos1 + n * baseline * translation_vector
+        trail[n] = pos1 + n * baseline/1000.0 * translation_vector
 
     return trail, baseline, translation_vector, length
 
@@ -366,7 +388,7 @@ def compute_linear_trail_from_positions(pos1, pos2, num_of_sampling_points):
 
     trail = {}
     for n in range(num_of_sampling_points):
-        trail[n] = pos1 + n * baseline * direction
+        trail[n] = pos1 + n * baseline/1000.0 * direction
 
     return trail, baseline, direction, length
 
