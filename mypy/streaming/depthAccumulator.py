@@ -54,14 +54,14 @@ class DepthAccumulator(object):
     def addDisparity(self, disparity, reliability, color):
         depth = self.disparity2Depth(disparity, reliability)
         if DEBUG >= 2:
-            imsave(self.parameter.result_folder+"depth_%4.4i.png"%self.disparity_counter, depth)
-            imsave(self.parameter.result_folder+"coherence_%4.4i.png"%self.disparity_counter, reliability)
-            imsave(self.parameter.result_folder+"color_%4.4i.png"%self.disparity_counter, color)
+            imsave(self.parameter.result_folder+"depth_%4.4i.png" % self.disparity_counter, depth)
+            imsave(self.parameter.result_folder+"coherence_%4.4i.png" % self.disparity_counter, reliability)
+            imsave(self.parameter.result_folder+"color_%4.4i.png" % self.disparity_counter, color)
 
-        self.depthProjector.cameras.append(self.cameras[self.disparity_counter])
-        self.depthProjector.addDepthMap(depth, reliability)
-        self.depthProjector.addColor(color)
-        self.depthProjector.reconstruct()
+        # self.depthProjector.cameras.append(self.cameras[self.disparity_counter])
+        # self.depthProjector.addDepthMap(depth, reliability)
+        # self.depthProjector.addColor(color)
+        # self.depthProjector.reconstruct()
 
 
     def disparity2Depth(self, disparity, reliability):

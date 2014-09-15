@@ -15,6 +15,62 @@ from mypy.streaming.globals import DEBUG
 #                              D E P T H   T O   W O R L D   P R O J E C T O R
 ########################################################################################################################
 
+class BackProjector(object):
+    #TODO: write backprojector which can take depthmaps and save them directly to a point cloud
+    #TODO: it should be instanciated in the DepthAccumulator and called in addDisparity()
+
+    def __init__(self, cloudname):
+        self.plyWriter = PlyWriter(cloudname)
+
+    def reproject(self, depth, camera, color=None, min_reliability=0.5):
+        pass
+        # valid_coh = np.where(depth[:, :, 1] > min_reliability)
+        # cloud = np.zeros((len(valid_coh[0]), 4), dtype=np.float32)
+        #     #m is the number of points already in the cloud
+        #     m = self.cloud.shape[0]
+        #     #resize the cloud array by the new number of points
+        #     if len(self.colors) > 0:
+        #         self.cloud.resize((self.cloud.shape[0]+valid_coh[0].shape[0], 7))
+        #     else:
+        #         self.cloud.resize((self.cloud.shape[0]+valid_coh[0].shape[0], 4))
+        #     #loop over pixel domain
+        #     for u in xrange(depth_grid.shape[0]):
+        #         for v in xrange(depth_grid.shape[1]):
+        #             #check if coherence is valid
+        #             coh = depth_grid[u, v, 1]
+        #             if coh > min_reliability:
+        #                 #write coherence into 4th dimension of the cloud
+        #                 self.cloud[m, 3] = depth_grid[u, v, 1]
+        #                 #get depth value
+        #                 _z = -depth_grid[u, v, 0]
+        #                 #ignore z=0 and z=inf
+        #                 if not np.isinf(_z) and _z != 0.0:
+        #                     #reproject to real coordinates
+        #                     _y = (float(u) - depth_grid.shape[0]/2.0) * _z/self.cameras[cam_index].f_px
+        #                     _x = -(float(v) - depth_grid.shape[1]/2.0) * _z/self.cameras[cam_index].f_px
+        #                     point = np.mat([_x, _y, _z, 1], dtype=np.float64).T
+        #                     #if world_matrix exist, transform point from camera to world cs
+        #                     if self.cameras[cam_index].world_matrix is not None:
+        #                         point = self.transform(point, cam_index)
+        #                     self.cloud[m, 0] = point[0, 0]
+        #                     self.cloud[m, 1] = point[1, 0]
+        #                     self.cloud[m, 2] = point[2, 0]
+        #                     #if color data available set rgb
+        #                     if len(self.colors) > 0:
+        #                         self.cloud[m, 4] = self.colors[0][u, v, 0]
+        #                         self.cloud[m, 5] = self.colors[0][u, v, 1]
+        #                         self.cloud[m, 6] = self.colors[0][u, v, 2]
+        #
+        #                 m += 1
+        # self.depth_maps = []
+        # self.colors = []
+        # self.cameras = []
+        #
+        # if self.cloud_filename is not None:
+        #     self.save(self.cloud_filename)
+
+
+
 class DepthProjector(object):
     """
     This class reprojects multiple depth maps from corresponding
