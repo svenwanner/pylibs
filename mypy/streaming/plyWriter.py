@@ -17,9 +17,15 @@ class PlyWriter(object):
         self.num_of_vertices = 0
         self.cloud = None
         self.color = None
+        self.reliability = None
         self.format = "EN"
         self.header_exist = False
         self.save_round = 1
+        self.save_reliability_as_color = False
+
+    def saveReliabilityAsColor(self, status=True):
+        assert isinstance(status, bool)
+        self.save_reliability_as_color = status
 
     def setFormat2German(self):
         self.format = "DE"
@@ -31,21 +37,30 @@ class PlyWriter(object):
         assert isinstance(cloud, np.ndarray)
         self.cloud = cloud
 
-    def setColor(self, color):
+    def setReliability(self, reliability):
+        assert isinstance(reliability, np.ndarray)
+        self.reliability = reliability
+
+    def setColor(self, color=None):
         assert isinstance(color, np.ndarray)
         self.color = color
 
-    def setDepthmap(self, depth, focal_length_px):
+    def setDepthmap(self, depth, focal_length_px, reliabilty=True):
         assert isinstance(depth, np.ndarray)
         assert isinstance(focal_length_px, float) or isinstance(focal_length_px, np.float32)
 
-        if len(depth.shape)==2:
+        if len(depth.shape) == 2:
             tmp = np.copy(depth)
             depth = np.ones((tmp.shape[0], tmp.shape[1], 2), dtype=np.float32)
             depth[:, :, 0] = tmp[:]
 
         valid = np.where(depth[:, :, 1] != 0)
-        self.cloud = np.zeros((len(valid[0]), 4), dtype=np.float32)
+        self.cloud = np.zeros((len(valid[0]), 3), dtype=np.float32)
+        self.reliability = None
+        if reliabilty:
+            self.reliability = np.zeros((len(valid[0])), dtype=np.float32)
+
+        print self.reliability.shape
         n = 0
         for y in range(depth.shape[0]):
             for x in range(depth.shape[1]):
@@ -53,7 +68,8 @@ class PlyWriter(object):
                     self.cloud[n, 0] = float((float(x)-depth.shape[1]/2.0)*depth[y, x, 0]/float(focal_length_px))
                     self.cloud[n, 1] = float((float(y)-depth.shape[0]/2.0)*depth[y, x, 0]/float(focal_length_px))
                     self.cloud[n, 2] = depth[y, x, 0]
-                    self.cloud[n, 3] = depth[y, x, 1]
+                    if reliabilty:
+                        self.reliability[n] = depth[y, x, 1]
                     n += 1
 
 
@@ -64,27 +80,40 @@ class PlyWriter(object):
         outfile.write('property float x\n')
         outfile.write('property float y\n')
         outfile.write('property float z\n')
-        if self.color is not None:
+        if self.color is not None or self.save_reliability_as_color:
             outfile.write('property uchar red\n')
             outfile.write('property uchar green\n')
             outfile.write('property uchar blue\n')
+        if self.reliability is not None:
+            outfile.write('property float reliability\n')
         outfile.write('end_header\n')
 
     def write_points(self):
         string = ""
         for n in range(self.cloud.shape[0]):
-            if self.cloud[n, 3] != 0:
+            reliability = 1.0
+            if self.reliability is not None:
+                reliability = self.reliability[n]
+            if reliability != 0:
                 line = ""
                 line += "{0} {1} {2}".format(self.cloud[n, 0], self.cloud[n, 1], self.cloud[n, 2])
-                if self.color is not None:
-                    if self.color.shape[1] == 3:
+                if self.color is not None or self.save_reliability_as_color:
+                    if self.save_reliability_as_color:
+                        line += " {0} {1} {2}".format(int(np.round(reliability*255)),
+                                                      int(np.round(reliability*255)),
+                                                      int(np.round(reliability*255)))
+                    elif self.color.shape[1] == 3:
                         line += " {0} {1} {2}".format(int(np.round(self.color[n, 0]*255)),
                                                       int(np.round(self.color[n, 1]*255)),
                                                       int(np.round(self.color[n, 2]*255)))
-                    else:
+                    elif self.color.shape[1] == 1:
                         line += " {0} {1} {2}".format(int(np.round(self.color[n, 0]*255)),
                                                       int(np.round(self.color[n, 0]*255)),
                                                       int(np.round(self.color[n, 0]*255)))
+
+
+                if self.reliability is not None:
+                    line += " {0}".format(float(reliability))
                 line += "\n"
                 if self.format == "DE":
                     line = line.replace(".", ",")
@@ -202,16 +231,14 @@ class PlyWriter(object):
 #
 
 if __name__ == "__main__":
-
-
-
     class Parameter:
         def __init__(self):
             self.focal_length_px = 10.0
 
-    depth = np.zeros((10, 10), dtype=np.float32)
-    depth2 = np.zeros((10, 10), dtype=np.float32)
-    cloud = np.zeros((100, 4), dtype=np.float32)
+    depth = np.zeros((10, 10, 2), dtype=np.float32)
+    depth2 = np.zeros((10, 10, 2), dtype=np.float32)
+    cloud = np.zeros((100, 3), dtype=np.float32)
+    reb = np.zeros((100), dtype=np.float32)
     color = np.zeros((100, 3), dtype=np.float32)
     color2 = np.zeros((100, 3), dtype=np.float32)
     color3 = np.zeros((100, 3), dtype=np.float32)
@@ -219,12 +246,14 @@ if __name__ == "__main__":
     n = 0
     for y in range(10):
         for x in range(10):
-            depth[y, x] = 1.0
-            depth2[y, x] = 0.2 + np.random.randint(0, 100, 1)[0]/1000.0
+            depth[y, x, 0] = 1.0
+            depth[y, x, 1] = np.random.randint(50, 1000, 1)[0]/1000.0
+            depth2[y, x, 0] = 0.2 + np.random.randint(0, 100, 1)[0]/1000.0
+            depth2[y, x, 1] = np.random.randint(50, 1000, 1)[0]/1000.0
             cloud[n, 0] = float(x)/10.0-0.5
             cloud[n, 1] = float(y)/10.0-0.5
             cloud[n, 2] = float(x)/10.0-0.5
-            cloud[n, 3] = 1.0
+            reb[n] = np.random.randint(50, 1000, 1)[0]/1000.0
             color[n, 0] = 1.0-x/20.0
             color[n, 1] = np.random.randint(0, 200, 1)[0]/255.0
             color[n, 2] = np.random.randint(0, 200, 1)[0]/255.0
@@ -239,9 +268,11 @@ if __name__ == "__main__":
     filename = "/home/swanner/Desktop/testCloud.ply"
 
 
-    writer = PlyWriterBase(filename)
+    writer = PlyWriter(filename)
+    writer.saveReliabilityAsColor(True)
     writer.setCloud(cloud)
     writer.setColor(color)
+    writer.setReliability(reb)
     writer.save()
 
     writer.setDepthmap(depth, parameter.focal_length_px)
