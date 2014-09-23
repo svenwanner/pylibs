@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import numpy as np
+from mypy.streaming.camera import Camera
 
 ########################################################################################################################
 #                                           P L Y   W R I T E R
@@ -9,11 +10,8 @@ import numpy as np
 class PlyWriter(object):
 
     def __init__(self, filename=None):
-        assert isinstance(filename, str)
-        if not filename.endswith(".ply"):
-            filename += ".ply"
-        self.filename = filename
-        self.outfile = open(self.filename, "w")
+        if filename is not None:
+            self.setFilename(filename)
         self.num_of_vertices = 0
         self.cloud = None
         self.color = None
@@ -22,6 +20,18 @@ class PlyWriter(object):
         self.header_exist = False
         self.save_round = 1
         self.save_reliability_as_color = False
+        self.ref_cam = None
+
+    def setFilename(self, filename):
+        assert isinstance(filename, str)
+        if not filename.endswith(".ply"):
+            filename += ".ply"
+        self.filename = filename
+        self.outfile = open(self.filename, "w")
+
+    def setReferenceCamera(self, ref_cam):
+        assert isinstance(ref_cam, Camera)
+        self.ref_cam = ref_cam
 
     def saveReliabilityAsColor(self, status=True):
         assert isinstance(status, bool)
@@ -45,31 +55,56 @@ class PlyWriter(object):
         assert isinstance(color, np.ndarray)
         self.color = color
 
-    def setDepthmap(self, depth, focal_length_px, reliabilty=True):
+    def getPointTransform(self, ref_cam, cam):
+        assert isinstance(ref_cam, Camera)
+        assert isinstance(cam, Camera)
+
+    def transform(self, point, camera):
+        wm = np.mat(camera.world_matrix, dtype=np.float64)
+        return wm * point
+
+    def setDepthmap(self, depth, camera, reliability=None, color=None):
         assert isinstance(depth, np.ndarray)
-        assert isinstance(focal_length_px, float) or isinstance(focal_length_px, np.float32)
+        assert isinstance(camera, Camera)
 
-        if len(depth.shape) == 2:
-            tmp = np.copy(depth)
-            depth = np.ones((tmp.shape[0], tmp.shape[1], 2), dtype=np.float32)
-            depth[:, :, 0] = tmp[:]
-
-        valid = np.where(depth[:, :, 1] != 0)
-        self.cloud = np.zeros((len(valid[0]), 3), dtype=np.float32)
+        valid = None
+        self.cloud = None
         self.reliability = None
-        if reliabilty:
-            self.reliability = np.zeros((len(valid[0])), dtype=np.float32)
+        self.cloud = None
 
-        print self.reliability.shape
+        if reliability is not None:
+            valid = np.where(reliability != 0)
+            self.cloud = np.zeros((len(valid[0]), 3), dtype=np.float32)
+            self.reliability = np.zeros((len(valid[0])), dtype=np.float32)
+            if color is not None:
+                self.color = np.zeros((len(valid[0]), 3), dtype=np.uint8)
+        else:
+            reliability = np.ones_like(depth)
+            self.cloud = np.zeros((depth.shape[0]*depth.shape[1], 3), dtype=np.float32)
+            self.reliability = np.zeros((len(valid[0])), dtype=np.float32)
+            if color is not None:
+                self.color = np.zeros((depth.shape[0]*depth.shape[1], 3), dtype=np.uint8)
+
+        #transform = self.getPointTransform(self.ref_cam, camera)
+
         n = 0
         for y in range(depth.shape[0]):
             for x in range(depth.shape[1]):
-                if depth[y, x, 0] != 0:
-                    self.cloud[n, 0] = float((float(x)-depth.shape[1]/2.0)*depth[y, x, 0]/float(focal_length_px))
-                    self.cloud[n, 1] = float((float(y)-depth.shape[0]/2.0)*depth[y, x, 0]/float(focal_length_px))
-                    self.cloud[n, 2] = depth[y, x, 0]
-                    if reliabilty:
-                        self.reliability[n] = depth[y, x, 1]
+                if reliability[y, x] > 0:
+                    _x = float((float(x)-depth.shape[1]/2.0)*depth[y, x]/camera.f_px)
+                    _y = float((float(y)-depth.shape[0]/2.0)*depth[y, x]/camera.f_px)
+                    _z = depth[y, x]
+                    point = np.mat([_x, _y, _z, 1], dtype=np.float64).T
+                    point = self.transform(point, camera)
+                    self.cloud[n, 0] = point[0, 0]
+                    self.cloud[n, 1] = point[1, 0]
+                    self.cloud[n, 2] = point[2, 0]
+                    if reliability is not None:
+                        self.reliability[n] = reliability[y, x]
+                    if color is not None:
+                        self.color[n, 0] = color[y, x, 0]
+                        self.color[n, 1] = color[y, x, 1]
+                        self.color[n, 2] = color[y, x, 2]
                     n += 1
 
 
@@ -103,13 +138,13 @@ class PlyWriter(object):
                                                       int(np.round(reliability*255)),
                                                       int(np.round(reliability*255)))
                     elif self.color.shape[1] == 3:
-                        line += " {0} {1} {2}".format(int(np.round(self.color[n, 0]*255)),
-                                                      int(np.round(self.color[n, 1]*255)),
-                                                      int(np.round(self.color[n, 2]*255)))
+                        line += " {0} {1} {2}".format(int(np.round(self.color[n, 0])),
+                                                      int(np.round(self.color[n, 1])),
+                                                      int(np.round(self.color[n, 2])))
                     elif self.color.shape[1] == 1:
-                        line += " {0} {1} {2}".format(int(np.round(self.color[n, 0]*255)),
-                                                      int(np.round(self.color[n, 0]*255)),
-                                                      int(np.round(self.color[n, 0]*255)))
+                        line += " {0} {1} {2}".format(int(np.round(self.color[n, 0])),
+                                                      int(np.round(self.color[n, 0])),
+                                                      int(np.round(self.color[n, 0])))
 
 
                 if self.reliability is not None:

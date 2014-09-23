@@ -106,7 +106,6 @@ class Engine():
                 if self.fileReader.finished:
                     self.running = False
 
-            self.depthAccumulator.save()
 
 
 
