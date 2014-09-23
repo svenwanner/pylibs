@@ -8,6 +8,17 @@ from mypy.streaming.depthProjector import DepthProjector
 
 from mypy.streaming.globals import DEBUG
 
+
+class BackProjector(object):
+
+    def __init__(self):
+        pass
+
+
+
+    def addDepth(self):
+
+
 class DepthAccumulator(object):
     def __init__(self):
         self.cameras = None
@@ -18,7 +29,7 @@ class DepthAccumulator(object):
     def reset(self):
         self.cameras = []
         self.parameter = None
-        self.depthProjector = DepthProjector()
+        self.backProjector = BackProjector()
         self.disparity_counter = 0
 
     def setCounter(self, index):
