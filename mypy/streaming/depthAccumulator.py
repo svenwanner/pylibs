@@ -22,6 +22,7 @@ class DepthAccumulator(object):
         self.depthProjector = None
         self.plyWriter = PlyWriter()
         self.disparity_counter = 0
+        self.running = False
 
     def reset(self):
         self.cameras = []
@@ -51,9 +52,10 @@ class DepthAccumulator(object):
                                                          self.parameter.resolution_yx,
                                                          self.parameter.euler_rotation_xyz)
 
-        self.plyWriter.setReferenceCamera(self.cameras[len(self.cameras)/2])
-        self.plyWriter.setFilename(os.path.dirname(self.parameter.result_folder[0:-1]) + "/pointcloud.ply")
+        if not self.running:
+            self.plyWriter.setFilename(os.path.dirname(self.parameter.result_folder[0:-1]) + "/pointcloud.ply")
         if DEBUG >= 2: print "save pointcloud to:", self.plyWriter.filename
+        self.running = True
 
     def addDisparity(self, disparity, reliability, color):
         depth = self.disparity2Depth(disparity, reliability)

@@ -20,8 +20,6 @@ class PlyWriter(object):
         self.header_exist = False
         self.save_round = 1
         self.save_reliability_as_color = False
-        self.ref_cam = None
-
     def setFilename(self, filename):
         assert isinstance(filename, str)
         if not filename.endswith(".ply"):
@@ -29,9 +27,6 @@ class PlyWriter(object):
         self.filename = filename
         self.outfile = open(self.filename, "w")
 
-    def setReferenceCamera(self, ref_cam):
-        assert isinstance(ref_cam, Camera)
-        self.ref_cam = ref_cam
 
     def saveReliabilityAsColor(self, status=True):
         assert isinstance(status, bool)
@@ -91,9 +86,9 @@ class PlyWriter(object):
         for y in range(depth.shape[0]):
             for x in range(depth.shape[1]):
                 if reliability[y, x] > 0:
-                    _x = float((float(x)-depth.shape[1]/2.0)*depth[y, x]/camera.f_px)
+                    _x = -float((float(x)-depth.shape[1]/2.0)*depth[y, x]/camera.f_px)
                     _y = float((float(y)-depth.shape[0]/2.0)*depth[y, x]/camera.f_px)
-                    _z = depth[y, x]
+                    _z = -depth[y, x]
                     point = np.mat([_x, _y, _z, 1], dtype=np.float64).T
                     point = self.transform(point, camera)
                     self.cloud[n, 0] = point[0, 0]
