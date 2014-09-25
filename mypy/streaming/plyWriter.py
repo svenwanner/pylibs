@@ -55,7 +55,7 @@ class PlyWriter(object):
         assert isinstance(cam, Camera)
 
     def transform(self, point, camera):
-        wm = np.mat(camera.world_matrix, dtype=np.float64)
+        wm = np.linalg.inv(np.mat(camera.world_matrix, dtype=np.float64))
         return wm * point
 
     def setDepthmap(self, depth, camera, reliability=None, color=None):
@@ -86,9 +86,9 @@ class PlyWriter(object):
         for y in range(depth.shape[0]):
             for x in range(depth.shape[1]):
                 if reliability[y, x] > 0:
-                    _x = -float((float(x)-depth.shape[1]/2.0)*depth[y, x]/camera.f_px)
+                    _x = float((float(x)-depth.shape[1]/2.0)*depth[y, x]/camera.f_px)
                     _y = float((float(y)-depth.shape[0]/2.0)*depth[y, x]/camera.f_px)
-                    _z = -depth[y, x]
+                    _z = depth[y, x]
                     point = np.mat([_x, _y, _z, 1], dtype=np.float64).T
                     point = self.transform(point, camera)
                     self.cloud[n, 0] = point[0, 0]
