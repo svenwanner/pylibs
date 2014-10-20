@@ -149,7 +149,7 @@ class StructureTensorClassic(StructureTensor):
         GD.initGaussianDerivative(params["inner_scale"], 1)
         #Border Treatments:
         ##BORDER_TREATMENT_AVOID, BORDER_TREATMENT_REPEAT, BORDER_TREATMENT_REFLECT, BORDER_TREATMENT_ZEROPAD, BORDER_TREATMENT_WARP
-        GD.setBorderTreatment(vigra.filters.BorderTreatmentMode.BORDER_TREATMENT_AVOID)
+        GD.setBorderTreatment(vigra.filters.BorderTreatmentMode.BORDER_TREATMENT_REFLECT)
 
         ### Inner gaussian filter ###
         # print("apply gaussian filter along 3rd dimension")
@@ -186,8 +186,6 @@ class StructureTensorClassic(StructureTensor):
 
 
 
-
-
 class StructureTensorHourGlass(StructureTensor):
 
     def __init__(self):
@@ -208,46 +206,48 @@ class StructureTensorScharr(StructureTensor):
     def __init__(self):
         StructureTensor.__init__(self)
 
-    def derivations(self, epi, params):
-        assert isinstance(epi, np.ndarray)
+    def derivations(self, epi_in, params):
+        assert isinstance(epi_in, np.ndarray)
         assert params.has_key("inner_scale")
         assert params.has_key("outer_scale")
-        assert params.has_key("Scharr_Prefilter")
+        assert params.has_key("Prefilter")
 
         gaussianInner = vigra.filters.gaussianKernel(params["inner_scale"])
         gaussianOuter = vigra.filters.gaussianKernel(params["outer_scale"])
-
-        grad = np.zeros((epi.shape[0], epi.shape[1], 2), dtype=np.float32)
 
         K = np.array([-1, 0, 1]) / 2.0
         scharr1dim = vigra.filters.Kernel1D()
         scharr1dim.initExplicitly(-1, 1, K)
         #Border Treatments:
         ##BORDER_TREATMENT_AVOID, BORDER_TREATMENT_REPEAT, BORDER_TREATMENT_REFLECT, BORDER_TREATMENT_ZEROPAD, BORDER_TREATMENT_WARP
-        scharr1dim.setBorderTreatment(vigra.filters.BorderTreatmentMode.BORDER_TREATMENT_AVOID)
+        scharr1dim.setBorderTreatment(vigra.filters.BorderTreatmentMode.BORDER_TREATMENT_REFLECT)
 
         K = np.array([3, 10, 3]) / 16.0
         scharr2dim = vigra.filters.Kernel1D()
         scharr2dim.initExplicitly(-1, 1, K)
         #Border Treatments:
         #BORDER_TREATMENT_AVOID, BORDER_TREATMENT_REPEAT, BORDER_TREATMENT_REFLECT, BORDER_TREATMENT_ZEROPAD, BORDER_TREATMENT_WARP
-        scharr2dim.setBorderTreatment(vigra.filters.BorderTreatmentMode.BORDER_TREATMENT_AVOID)
-
+        scharr2dim.setBorderTreatment(vigra.filters.BorderTreatmentMode.BORDER_TREATMENT_REFLECT)
 
         ### Inner gaussian filter ###
         # print("apply gaussian filter along 3rd dimension")
-        epi = vigra.filters.convolveOneDimension(epi, 1, gaussianInner)
+        epi = vigra.filters.convolveOneDimension(epi_in, 1, gaussianInner)
         # print("apply gaussian filter along 1rd dimension")
         epi = vigra.filters.convolveOneDimension(epi, 0, gaussianInner)
 
+        #upsampling
+        # epi = np.zeros((epi_in.shape[0]*2-1, epi_in.shape[1]*2-1), dtype=np.float32)
+        # vigra.sampling.resizeImageSplineInterpolation(epi_in, out=epi, order=3)
+
 ### EPI prefilter ###
-        if params["Scharr_Prefilter"]:
+        if params["Prefilter"]:
 
             # print("apply scharr pre-filter along 3rd dimension")
             epi = vigra.filters.convolveOneDimension(epi, 1, scharr1dim)
             epi = vigra.filters.convolveOneDimension(epi, 0, scharr2dim)
 
         ### Derivative computation ###
+        grad = np.zeros((epi.shape[0], epi.shape[1], 2), dtype=np.float32)
         # print("apply scharr filter along 1st dimension")
         grad[:, :, 0] = vigra.filters.convolveOneDimension(epi, 0, scharr1dim)
         grad[:, :, 0] = vigra.filters.convolveOneDimension(grad[:, :, 0], 1, scharr2dim)
@@ -266,6 +266,12 @@ class StructureTensorScharr(StructureTensor):
         tensor[:, :, 0] = vigra.filters.convolveOneDimension(tensor[:, :, 0], 0, gaussianOuter)
         tensor[:, :, 1] = vigra.filters.convolveOneDimension(tensor[:, :, 1], 0, gaussianOuter)
         tensor[:, :, 2] = vigra.filters.convolveOneDimension(tensor[:, :, 2], 0, gaussianOuter)
+
+        #downsampling
+        # tensor_downscaled = np.zeros((epi_in.shape[0], epi_in.shape[1], 3), dtype=np.float32)
+        # vigra.sampling.resizeImageNoInterpolation(tensor[:, :, 0], out=tensor_downscaled[:, :, 0])
+        # vigra.sampling.resizeImageNoInterpolation(tensor[:, :, 1], out=tensor_downscaled[:, :, 1])
+        # vigra.sampling.resizeImageNoInterpolation(tensor[:, :, 2], out=tensor_downscaled[:, :, 2])
 
         # tensor = vigra.filters.hourGlassFilter2D(tensor, params["outer_scale"], 0.4)
         # tensor = vigra.filters.hourGlassFilter2D(tensor, params["hour-glass"], 0.4)

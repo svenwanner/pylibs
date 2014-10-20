@@ -170,7 +170,7 @@ def refocus_3d(lf, focus, lf_type='h'):
     return tmp
 
 
-
+from scipy.ndimage import shift
 def refocus_epi(epi, focus):
     """
     refocus a 3D light field by an integer pixel shift

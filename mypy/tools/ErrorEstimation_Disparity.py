@@ -14,7 +14,9 @@ def compute_MSE(depth, gt):
     """
 
     mse = (depth[:] - gt[:])*(depth[:] - gt[:])
-    mask = np.where(gt > 0)
+    mask2 = np.where(depth > 0)
+    mask1 = np.where(gt > 0)
+    mask = mask2 and mask1
     np.place(mse, gt == 0 , 0)
     # Comment out for digital data having negative disparities , otherwise not.
     # mask = np.where(depth > 0)
@@ -33,7 +35,9 @@ def compute_MAE(depth, gt):
     """
 
     mae = abs(depth[:] - gt[:])
-    mask = np.where(gt > 0)
+    mask2 = np.where(depth > 0)
+    mask1 = np.where(gt > 0)
+    mask = mask2 and mask1
     np.place(mae, gt == 0 , 0)
     # Comment out for digital data having negative disparities , otherwise not.
     # mask = np.where(depth > 0)
@@ -49,8 +53,10 @@ def compute_MRE(depth, gt):
     :return mse: mean squared error
     :return mse_pc: mean relative error in percent
     """
-    mre = (depth[:] - gt[:])*(depth[:] - gt[:]) / abs(gt[:])
-    mask = np.where(gt > 0)
+    mre = abs(depth[:] - gt[:]) / abs(gt[:])
+    mask2 = np.where(depth > 0)
+    mask1 = np.where(gt > 0)
+    mask = mask2 and mask1
     np.place(mre, gt == 0 , 0)
     # Comment out for digital data having negative disparities , otherwise not.
     # mask = np.where(depth > 0)
@@ -165,9 +171,9 @@ if __name__ == "__main__":
 
         ### compute the MAE, MSE, MRE ###
 
-        mae, mae_no = compute_MAE(disparity, GT_img)
-        mse, mse_no = compute_MSE(disparity, GT_img)
-        [mre, mre_no, mre_pc] = compute_MRE(disparity, GT_img)
+        mae, mae_no = compute_MAE(disparity[30:disparity.shape[0]-30,30:disparity.shape[1]-30], GT_img[30:disparity.shape[0]-30,30:disparity.shape[1]-30])
+        mse, mse_no = compute_MSE(disparity[30:disparity.shape[0]-30,30:disparity.shape[1]-30], GT_img[30:disparity.shape[0]-30,30:disparity.shape[1]-30])
+        [mre, mre_no, mre_pc] = compute_MRE(disparity[30:disparity.shape[0]-30,30:disparity.shape[1]-30], GT_img[30:disparity.shape[0]-30,30:disparity.shape[1]-30])
 
         print('\033[91mMAE [m]: '+ str(mae_no))
         print('MSE [m]: '+ str(mse_no))

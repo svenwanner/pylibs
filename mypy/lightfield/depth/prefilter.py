@@ -11,7 +11,7 @@ import skimage.color as color
 
 
 COLORSPACE = enum(RGB=0, LAB=1, LUV=2, GRAY=3, HSV=4, SGRAY=5)
-PREFILTER = enum(NO=0, IMGD=1, EPID=2, IMGD2=3, EPID2=4, SCHARR=5, DOG=6)
+PREFILTER = enum(NO=0, IMGD=1, EPID=2, IMGD2=3, EPID2=4, SCHARR=5, DOG=6, GAUSS=7)
 
 
 def changeColorSpace(lf3d, cspace=COLORSPACE.RGB):
@@ -152,30 +152,36 @@ def preImgScharr(lf3d, config=None, direction='h'):
 
     assert isinstance(lf3d, np.ndarray)
 
+    K = np.array([-1, 0, 1]) / 2.0
+    scharr1dim = vigra.filters.Kernel1D()
+    scharr1dim.initExplicitly(-1, 1, K)
+    #Border Treatments:
+    ##BORDER_TREATMENT_AVOID, BORDER_TREATMENT_REPEAT, BORDER_TREATMENT_REFLECT, BORDER_TREATMENT_ZEROPAD, BORDER_TREATMENT_WARP
+    scharr1dim.setBorderTreatment(vigra.filters.BorderTreatmentMode.BORDER_TREATMENT_AVOID)
+
+    K = np.array([3, 10, 3]) / 16.0
+    scharr2dim = vigra.filters.Kernel1D()
+    scharr2dim.initExplicitly(-1, 1, K)
+    #Border Treatments:
+    #BORDER_TREATMENT_AVOID, BORDER_TREATMENT_REPEAT, BORDER_TREATMENT_REFLECT, BORDER_TREATMENT_ZEROPAD, BORDER_TREATMENT_WARP
+    scharr2dim.setBorderTreatment(vigra.filters.BorderTreatmentMode.BORDER_TREATMENT_AVOID)
+
     print("apply image scharr prefilter")
     if direction == 'h':
-        Kernel = np.array([[-3, 0, 3], [-10, 0, 10], [-3, 0, 3]]) / 32.0
-        scharr = vigra.filters.Kernel2D()
-        scharr.initExplicitly((-1, -1), (1, 1), Kernel)
-        for t in xrange(lf3d.shape[0]):
-            for c in xrange(lf3d.shape[3]):
-                lf3d[t, :, :, c] = vigra.filters.gaussianSmoothing(lf3d[t, :, :, c], 0.4)
-                lf3d[t, :, :, c] = vigra.filters.convolve(lf3d[t, :, :, c], scharr)
-                lf3d[t, :, :, c] = lf3d[t, :, :, c]**2
+        lf3d = vigra.filters.convolveOneDimension(lf3d, 2, scharr1dim)
+        lf3d = vigra.filters.convolveOneDimension(lf3d, 1, scharr2dim)
+        for t in range(lf3d.shape[0]):
             if config.output_level >3:
-                    plt.imsave(config.result_path+config.result_label+"Horizontal_Scharr_Image_{0}.png".format(t), np.abs(lf3d[t, :, :, :]))
+                plt.imsave(config.result_path+config.result_label+"Horizontal_Scharr_Image_{0}.png".format(t), np.abs(lf3d[t, :, :, :]))
 
     elif direction == 'v':
-        Kernel = np.array([[-3, -10, -3], [0, 0, 0], [3, 10, 3]]) / 32.0
-        scharr = vigra.filters.Kernel2D()
-        scharr.initExplicitly((-1, -1), (1, 1), Kernel)
-        for t in xrange(lf3d.shape[0]):
-            for c in xrange(lf3d.shape[3]):
-                lf3d[t, :, :, c] = vigra.filters.gaussianSmoothing(lf3d[t, :, :, c], 0.4)
-                lf3d[t, :, :, c] = vigra.filters.convolve(lf3d[t, :, :, c], scharr)
-                lf3d[t, :, :, c] = lf3d[t, :, :, c]**2
+
+        lf3d = vigra.filters.convolveOneDimension(lf3d, 1, scharr1dim)
+        lf3d = vigra.filters.convolveOneDimension(lf3d, 2, scharr2dim)
+
+        for t in range(lf3d.shape[0]):
             if config.output_level >3:
-                    plt.imsave(config.result_path+config.result_label+"Vertical_Scharr_Image_{0}.png".format(t), np.abs(lf3d[t, :, :, :]))
+                plt.imsave(config.result_path+config.result_label+"Vertical_Scharr_Image_{0}.png".format(t), np.abs(lf3d[t, :, :, :]))
     else:
         assert False, "unknown lightfield direction!"
 

@@ -6,7 +6,7 @@ from mypy.lightfield import helpers as lfhelpers
 import numpy as np
 import Image
 import PIL
-
+import tiff
 #============================================================================================================
 #============================================================================================================
 #============================================================================================================
@@ -22,9 +22,9 @@ class Config:
         self.path_vertical = None               # path to the vertical images [optional]
 
         self.roi = None                         # region of interest
-        self.height = 0
+        self.height = 50
         self.centerview_path = None             # path to the center view image to get color for pointcloud [optional]
-        self.global_shifts = 5.0               # list of horopter shifts in pixel
+        self.global_shifts = 0.0               # list of horopter shifts in pixel
 
         self.rgb = True                         # forces grayscale if False
 
@@ -78,6 +78,7 @@ def getEPI(config):
 
         for i in range(lf3dh.shape[1]):
             img = lf3dh[:,i,config.global_shifts[0]*lf3dh.shape[0]/2:lf3dh.shape[2]-config.global_shifts[0]*lf3dh.shape[0]/2,:]
+            # img = lf3dh[:,i,0:lf3dh.shape[2],:]
             img[:] = img[:]*255
             img = img.astype(np.uint8)
             shape = img.shape[1]
@@ -86,13 +87,18 @@ def getEPI(config):
             img = np.array(img)
             plt.imsave(config.result_path+config.result_label+"EPI_horizontal_at_{0}.tif".format(i), img)
 
-        # for i in range(lf3dh.shape[1]):
+
+        ### For GT values
+            # tiff.imsave(config.result_path+config.result_label+"EPI_horizontal_at_{0}.tif".format(i), img)
+
+
+        # for i in range(lf3dh.shape[2]):
         #     img = lf3dh[:,config.global_shifts[0]*lf3dh.shape[0]/2:lf3dh.shape[1]-config.global_shifts[0]*lf3dh.shape[0]/2,i,:]
         #     img[:] = img[:]*255
         #     img = img.astype(np.uint8)
         #     shape = img.shape[1]
         #     img = PIL.Image.fromarray(img)
-        #     img = img.resize((shape,50), Image.BICUBIC)
+        #     img = img.resize((shape,config.height), Image.BICUBIC)
         #     img = np.array(img)
         #     plt.imsave(config.result_path+config.result_label+"Fake_EPI_horizontal_at_{0}.tif".format(i), img, cmap=plt.cm.jet)
 
@@ -103,13 +109,13 @@ def getEPI(config):
         if config.height == 0:
             config.height = lf3dv.shape[0]
 
-        for i in range(lf3dh.shape[1]):
-            img = lf3dv[:,config.global_shifts[0]*lf3dv.shape[0]/2:lf3dv.shape[1]-config.global_shifts[0]*lf3dv.shape[0]/2,i,:]
+        for i in range(lf3dh.shape[2]):
+            img = lf3dv[:,config.global_shifts[0]*lf3dv.shape[0]/2:lf3dv.shape[1]-config.global_shifts[0]*lf3dv.shape[0]/2-1,i,:]
             img[:] = img[:]*255
             img = img.astype(np.uint8)
             shape = img.shape[1]
             img = PIL.Image.fromarray(img)
-            img = img.resize((shape,50), Image.BICUBIC)
+            img = img.resize((shape,config.height), Image.BICUBIC)
             img = np.array(img)
             plt.imsave(config.result_path+config.result_label+"EPI_vertical_at_{0}.tif".format(i), img, cmap=plt.cm.jet)
 
@@ -119,7 +125,7 @@ def getEPI(config):
         #     img = img.astype(np.uint8)
         #     shape = img.shape[1]
         #     img = PIL.Image.fromarray(img)
-        #     img = img.resize((shape,50), Image.BICUBIC)
+        #     img = img.resize((shape,config.height), Image.BICUBIC)
         #     img = np.array(img)
         #     plt.imsave(config.result_path+config.result_label+"Fake_EPI_vertical_at_{0}.tif".format(i), img, cmap=plt.cm.jet)
 

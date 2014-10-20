@@ -73,6 +73,9 @@ def load_3d(path, rgb=True, roi=None, switchOrder=False):
         for f in glob(path + "*.tif"):
             fnames.append(f)
     if len(fnames) == 0:
+        for f in glob(path + "*.TIF"):
+            fnames.append(f)
+    if len(fnames) == 0:
         for f in glob(path + "*.exr"):
             fnames.append(f)
     if len(fnames) == 0:
@@ -200,6 +203,9 @@ def readEpi_fromSequence(fpath, position=0, direction='h'):
             fnames.append(f)
     if len(fnames) == 0:
         for f in glob(fpath + "*.tif"):
+            fnames.append(f)
+    if len(fnames) == 0:
+        for f in glob(fpath + "*.bmp"):
             fnames.append(f)
     fnames.sort()
 

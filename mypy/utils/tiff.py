@@ -2167,7 +2167,8 @@ def _replace_by(module_function, package=None, warn=True):
             globals()['__old_' + func.__name__] = oldfunc
         except Exception:
             if warn:
-                warnings.warn("failed to import %s" % module_function)
+                pass
+                # warnings.warn("failed to import %s" % module_function)
         return func
 
     return decorate

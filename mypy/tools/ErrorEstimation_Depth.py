@@ -14,7 +14,7 @@ def compute_MSE(depth, gt):
     """
 
     mse = (depth[:] - gt[:])*(depth[:] - gt[:])
-    mask = np.where(gt > 0)
+    mask = np.where(gt < float("inf"))
     mse_no = np.mean(mse[mask])
 
     return mse, mse_no
@@ -30,7 +30,7 @@ def compute_MAE(depth, gt):
     """
 
     mae = abs(depth[:] - gt[:])
-    mask = np.where(gt > 0)
+    mask = np.where(gt < float("inf"))
     mae_no = np.mean(mae[mask])
 
     return mae, mae_no
@@ -44,8 +44,8 @@ def compute_MRE(depth, gt):
     :return mse_pc: mean relative error in percent
     """
     mre = (depth[:] - gt[:])*(depth[:] - gt[:]) / gt[:]
-    mask = np.where(gt > 0)
-    np.place(mre, gt == 0 , 0)
+    mask = np.where(gt < float("inf"))
+    np.place(mre, gt == float("inf") , 0)
     mre_no = np.mean(mre[mask])
     mre_pc = mre_no *100
 
@@ -108,7 +108,7 @@ def str2bool(v):
 
 if __name__ == "__main__":
 
-    if 8 <= len(sys.argv) <= 8:
+    if 9 <= len(sys.argv) <= 9:
 
         #### Load depth estimation and ground truth data ###
 
@@ -140,7 +140,7 @@ if __name__ == "__main__":
 
         ### Exr files are 4dimensional extract layer with depth information ###
 
-        depth = np.copy(depth_img[:, :, 2])
+        depth = np.copy(depth_img[:, :, 2]).T
 
         ### check if size of both arrays is the same, if not reduce the ground truth ###
 

@@ -104,6 +104,11 @@ def compute_horizontal(lf3dh, shift, config):
     excecute = False
     if config.prefilter == PREFILTER.SCHARR:
         print("Apply Scharr Prefilter")
+        # prefilter.preImgScharr(lf3d, config=config, direction='h')
+        excecute = True
+    if config.prefilter == PREFILTER.GAUSS:
+        print("Apply Gauss Prefilter")
+        # prefilter.preImgScharr(lf3d, config=config, direction='v')
         excecute = True
 
     ### compute structure tensor ###
@@ -118,7 +123,7 @@ def compute_horizontal(lf3dh, shift, config):
         print "use scharr structure tensor..."
         structureTensor = st2d.StructureTensorScharr()
 
-    params = {"direction": 'h', "inner_scale": config.inner_scale, "outer_scale": config.outer_scale, "hour-glass": config.hourglass_scale, "Scharr_Prefilter": excecute}
+    params = {"direction": 'h', "inner_scale": config.inner_scale, "outer_scale": config.outer_scale, "hour-glass": config.hourglass_scale, "Prefilter": excecute}
     structureTensor.compute(lf3d, params)
     st3d = structureTensor.get_result()
 
@@ -151,7 +156,13 @@ def compute_vertical(lf3dv, shift, config):
     excecute = False
     if config.prefilter == PREFILTER.SCHARR:
         print("Apply Scharr Prefilter")
+        # prefilter.preImgScharr(lf3d, config=config, direction='v')
         excecute = True
+    if config.prefilter == PREFILTER.GAUSS:
+        print("Apply Gauss Prefilter")
+        # prefilter.preImgScharr(lf3d, config=config, direction='v')
+        excecute = True
+
 
     structureTensor = None
     if config.structure_tensor_type == "classic":
@@ -164,7 +175,7 @@ def compute_vertical(lf3dv, shift, config):
         print "use scharr structure tensor..."
         structureTensor = st2d.StructureTensorScharr()
 
-    params = {"direction": 'v', "inner_scale": config.inner_scale, "outer_scale": config.outer_scale, "hour-glass": config.hourglass_scale, "Scharr_Prefilter": excecute}
+    params = {"direction": 'v', "inner_scale": config.inner_scale, "outer_scale": config.outer_scale, "hour-glass": config.hourglass_scale, "Prefilter": excecute}
     structureTensor.compute(lf3d, params)
     st3d = structureTensor.get_result()
 
