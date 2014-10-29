@@ -42,7 +42,74 @@ def load_lf3d_fromFiles(fpath, index=0, amount=-1, dtype=np.float32, ftype="png"
     fnames = getFilenames(fpath, index, amount, ftype, switchOrder)
     return loadSequence(fnames, dtype)
 
+def load_4d(path, horizontalCameras, verticalCameras, config, rgb=True, roi=None, switchOrder=False):
+    """
+    load a 3d light field from filesequence. The images need to be in .png, .tif or .jpg
 
+    :rtype : light field 3D volume
+    :param path: string path to load filesequence from
+    :param rgb: bool to define number of channels in light field returned
+    :param roi: dict to define a region of interest {"size":[h,w],"pos":[y,x]}
+    :return lf: lf numpy array of structure [num_of_cams,height,width,channels]
+    """
+    assert isinstance(path, str)
+    assert isinstance(rgb, bool)
+    if roi is not None:
+        assert isinstance(roi, dict)
+
+    fnames = []
+    for f in glob(path + "*.png"):
+        fnames.append(f)
+    if len(fnames) == 0:
+        for f in glob(path + "*.jpg"):
+            fnames.append(f)
+    if len(fnames) == 0:
+        for f in glob(path + "*.JPG"):
+            fnames.append(f)
+    if len(fnames) == 0:
+        for f in glob(path + "*.tif"):
+            fnames.append(f)
+    if len(fnames) == 0:
+        for f in glob(path + "*.TIF"):
+            fnames.append(f)
+    if len(fnames) == 0:
+        for f in glob(path + "*.exr"):
+            fnames.append(f)
+    if len(fnames) == 0:
+        for f in glob(path + "*.ppm"):
+            fnames.append(f)
+
+    fnames.sort()
+
+    for i in fnames:
+        print(i)
+
+    if switchOrder:
+        fnames.reverse()
+
+    im = vigra.readImage(fnames[0], order='C')
+
+    if len(im.shape) == 2:
+        rgb = False
+
+    lf = np.zeros((verticalCameras, horizontalCameras, im.shape[0], im.shape[1], 3), dtype=np.float32)
+
+    for n in range(0, len(fnames)):
+        im = vigra.readImage(fnames[n], order='C')
+        a = (horizontalCameras-1) - n % horizontalCameras
+        b = int(n / horizontalCameras)
+        lf[b,a, :, :, :] = im[:,:,0:3]
+
+    amax = np.amax(lf)
+    if amax >= 1:
+        lf[:] /= 255
+
+    # for v in range(lf.shape[0]):
+    #     for h in range(lf.shape[1]):
+    #         plt.imsave(config.result_path+config.result_label+"image_{0}.png".format(h+9*v), lf[v,h, :, :, :])
+
+
+    return lf
 
 
 def load_3d(path, rgb=True, roi=None, switchOrder=False):

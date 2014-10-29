@@ -4,7 +4,7 @@ import numpy as np
 from glob import glob
 from scipy.ndimage import shift
 from scipy.misc import imread
-
+import pylab as plt
 
 def getFilenames(fpath, index=0, amount=-1, ftype="png", switchOrder=False):
     """
@@ -135,6 +135,32 @@ def enum(**enums):
 # ============================================================================================================
 #======================              Shift Light fied to horoptor depth                   ====================
 #=============================================================================================================
+
+
+def refocus_4d(tmp, focus, config):
+    """
+    refocus a 3D light field by an integer pixel shift
+
+    :param lf: numpy array of structure [num_of_cams,height,width,channels]
+    :param focus: integer pixel value to refocus
+    :param lf_type: char 'h' or 'v' to decide between horizontal and vertical light field
+    :return lf: numpy array of structure [num_of_cams,height,width,channels]
+    """
+    assert isinstance(tmp, np.ndarray)
+    assert isinstance(focus, int) or isinstance(focus, float)
+
+
+    for v in range(tmp.shape[0]):
+        for h in range(tmp.shape[1]):
+            for c in range(tmp.shape[4]):
+                if isinstance(focus, float):
+                    tmp[v,h, :, :, c] = shift(tmp[v,h, :, :, c], shift=[(v - tmp.shape[0] / 2) * focus, (h - tmp.shape[1] / 2) * focus])
+                elif isinstance(focus, int):
+                    tmp[v,h, :, :, c] = np.roll(tmp[v,h, :, :, c], shift=(h - tmp.shape[1] / 2) * focus, axis=1)
+                    tmp[v,h, :, :, c] = np.roll(tmp[v,h, :, :, c], shift=(v - tmp.shape[0] / 2) * focus, axis=0)
+            # plt.imsave(config.result_path+config.result_label+"image_{0}.png".format(h+9*v), tmp[v,h, :, :, :])
+
+    return tmp
 
 def refocus_3d(lf, focus, lf_type='h'):
     """
