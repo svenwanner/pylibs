@@ -82,8 +82,15 @@ def compute_horizontal(lf3dh, shift, config):
         scharr1dim.setBorderTreatment(vigra.filters.BorderTreatmentMode.BORDER_TREATMENT_AVOID)
 
         grad = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], 2), dtype=np.float32)
-        tensor = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], 3), dtype=np.float32)
-        st3d = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], 3), dtype=np.float32)
+        st3d_f = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], 3), dtype=np.float32)
+
+###
+        # tensor = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], 3), dtype=np.float32)
+        # st3d = np.zeros((lf3d.shape[0], lf3d.shape[1], lf3d.shape[2], 3), dtype=np.float32)
+###
+        tensor = np.zeros((lf3d.shape[0]*2-1, lf3d.shape[1]*2-1, lf3d.shape[2]*2-1, 3), dtype=np.float32)
+        st3d = np.zeros((lf3d.shape[0]*2-1, lf3d.shape[1]*2-1, lf3d.shape[2]*2-1, 3), dtype=np.float32)
+###
 
         for i in range(lf3d.shape[3]):
 
@@ -110,10 +117,17 @@ def compute_horizontal(lf3dh, shift, config):
             grad[:, :, :, 1] = vigra.filters.convolveOneDimension(lf3d[:, :, :, i], 2, scharr1dim)
             grad[:, :, :, 1] = vigra.filters.convolveOneDimension(grad[:, :, :, 1], 0, scharr2dim)
 
-            tensor[:, :, :, 0] = grad[:, :, :, 0]**2
-            tensor[:, :, :, 1] = grad[:, :, :, 1]*grad[:, :, :, 0]
-            tensor[:, :, :, 2] = grad[:, :, :, 1]**2
-
+###Upsampling###
+            pyramid0 = vigra.sampling.resize(grad[:, :, :, 0],shape=(grad.shape[0]*2-1, grad.shape[1]*2-1, grad.shape[2]*2-1), order = 3)
+            pyramid1 = vigra.sampling.resize(grad[:, :, :, 1],shape=(grad.shape[0]*2-1, grad.shape[1]*2-1, grad.shape[2]*2-1), order = 3)
+            tensor[:, :, :, 0] = pyramid0**2
+            tensor[:, :, :, 1] = pyramid1*pyramid0
+            tensor[:, :, :, 2] = pyramid1**2
+###
+            # tensor[:, :, :, 0] = grad[:, :, :, 0]**2
+            # tensor[:, :, :, 1] = grad[:, :, :, 1]*grad[:, :, :, 0]
+            # tensor[:, :, :, 2] = grad[:, :, :, 1]**2
+###
             st3d[:, :, :, 0] += tensor[:, :, :, 0]
             st3d[:, :, :, 1] += tensor[:, :, :, 1]
             st3d[:, :, :, 2] += tensor[:, :, :, 2]
@@ -137,9 +151,17 @@ def compute_horizontal(lf3dh, shift, config):
         st3d[:, :, :, 1] = vigra.filters.convolveOneDimension(st3d[:, :, :, 1], 2, gaussianOuter2)
         st3d[:, :, :, 2] = vigra.filters.convolveOneDimension(st3d[:, :, :, 2], 2, gaussianOuter2)
 
+###downsampling###
+        # st3d_f[:] = st3d[:]
+###
+        st3d_f[:, :, :, 0] = vigra.sampling.resize(st3d[:, :, :, 0], shape=(grad.shape[0], grad.shape[1], grad.shape[2]), order = 3)
+        st3d_f[:, :, :, 1] = vigra.sampling.resize(st3d[:, :, :, 1], shape=(grad.shape[0], grad.shape[1], grad.shape[2]), order = 3)
+        st3d_f[:, :, :, 2] = vigra.sampling.resize(st3d[:, :, :, 2], shape=(grad.shape[0], grad.shape[1], grad.shape[2]), order = 3)
+###
 
     if(config.structure_tensor_type == "classic"):
         if config.prefilter == "True":
+
             lf3d = prefilter.preEpiDerivation(lf3d, scale=config.prefilter_scale, direction='h')
 
         print "compute 2.5D structure tensor (vigra)"
@@ -151,8 +173,8 @@ def compute_horizontal(lf3dh, shift, config):
         st3d[:,:,:,1] = tmp[:,:,:,2]
         st3d[:,:,:,2] = tmp[:,:,:,5]
 
-    coherence = np.sqrt((st3d[:, :, :, 2]-st3d[:, :, :, 0])**2+4*st3d[:, :, :, 1]**2)/(st3d[:, :, :, 2]+st3d[:, :, :, 0] + 1e-16)
-    orientation = 1/2.0*vigra.numpy.arctan2(2*st3d[:, :, :, 1], st3d[:, :, :, 2]-st3d[:, :, :, 0])
+    coherence = np.sqrt((st3d_f[:, :, :, 2]-st3d_f[:, :, :, 0])**2+4*st3d_f[:, :, :, 1]**2)/(st3d_f[:, :, :, 2]+st3d_f[:, :, :, 0] + 1e-16)
+    orientation = 1/2.0*vigra.numpy.arctan2(2*st3d_f[:, :, :, 1], st3d_f[:, :, :, 2]-st3d_f[:, :, :, 0])
     orientation = vigra.numpy.tan(orientation[:])
     invalid_ubounds = np.where(orientation > 1)
     invalid_lbounds = np.where(orientation < -1)
@@ -408,6 +430,8 @@ def structureTensor25D(config):
     orientation[invalids] = 0
     coherence[invalids] = 0
 
+    orientation += config.offsetDisparity
+
     if isinstance(config.median, int) and config.median > 0:
         print "apply median filter ..."
         orientation = median_filter(orientation, config.median)
@@ -459,10 +483,10 @@ def structureTensor25D(config):
     vim = vigra.RGBImage(tmp)
     vim.writeImage(config.result_path+config.result_label+"final25D.exr")
 
-    if config.output_level >= 2:
+    if config.output_level >= 1:
         plt.imsave(config.result_path+config.result_label+"depth_final.png", depth, cmap=plt.cm.jet)
 
-    if config.output_level >= 2:
+    if config.output_level >= 1:
         if isinstance(config.centerview_path, str):
             color = misc.imread(config.centerview_path)
             if isinstance(config.roi, type({})):
@@ -519,6 +543,7 @@ class Config:
 
         self.min_depth = 0.01                   # minimum depth possible
         self.max_depth = 1.0                    # maximum depth possible
+	self.offsetDisparity = 0
 
         self.rgb = True                         # forces grayscale if False
 
